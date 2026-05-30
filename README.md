@@ -7,36 +7,35 @@ menu-bar tray. Runs on **macOS, Linux, and Windows**.
 
 ## Download
 
-Get the latest build for your platform from the
-**[Releases page](https://github.com/Kwaai-AI-Lab/KwaaiNetGUI/releases/latest)**:
-
-| Platform | Download              |
-| -------- | --------------------- |
-| macOS    | `.dmg`                |
-| Windows  | `.msix`               |
-| Linux    | `.deb` / `.rpm`       |
+Pre-built apps for all three desktop platforms are produced by CI on every
+push to `main`. Grab the latest from the
+**[Actions tab](https://github.com/Kwaai-AI-Lab/KwaaiNetGUI/actions/workflows/ci.yml?query=branch%3Amain+is%3Asuccess)**:
+open the most recent successful run and download the artifact for your
+platform — `kwaainet-gui-macos`, `kwaainet-gui-windows`, or
+`kwaainet-gui-linux`. Each is a zip of the ready-to-run app.
 
 Each download bundles the matching KwaaiNet node, so the app works out of the
 box — no separate install needed. Open the app, and it starts a node for you.
 
-> **Heads up: these builds aren't code-signed yet.** Your OS will warn that the
-> app is from an unidentified developer. To install anyway:
+> **Heads up: these are unpackaged, unsigned builds.** You download a zipped
+> app folder (not an installer yet), and your OS will warn that the app is from
+> an unidentified developer. To run it anyway:
 >
-> - **macOS** — the `.dmg` opens fine, but the first time you launch the app,
->   macOS will block it. **Right-click the app → Open**, then click **Open** in
->   the dialog. (Or: System Settings → Privacy & Security → **Open Anyway**.)
-> - **Windows** — the `.msix` is signed with a self-signed certificate.
->   Double-click it, and if Windows shows a SmartScreen prompt click
->   **More info → Run anyway**. (You may first need to trust the bundled
->   certificate — see the install notes on the release.)
-> - **Linux** — install the package directly: `sudo dpkg -i <file>.deb` or
->   `sudo rpm -i <file>.rpm`. No signing prompt.
+> - **macOS** — unzip, then **right-click `kwaainet_gui.app` → Open** and click
+>   **Open** in the dialog (a plain double-click will be blocked). Or allow it
+>   under System Settings → Privacy & Security → **Open Anyway**.
+> - **Windows** — unzip and run `kwaainet_gui.exe`. If SmartScreen appears,
+>   click **More info → Run anyway**.
+> - **Linux** — unzip and run `./kwaainet_gui` from the extracted folder.
 >
-> Signed/notarized builds are coming.
+> Downloading artifacts requires a (free) GitHub login, and they expire after
+> 14 days. Proper signed installers — `.dmg` / `.msix` / `.deb` / `.rpm`
+> published to the [Releases page](https://github.com/Kwaai-AI-Lab/KwaaiNetGUI/releases)
+> — are coming.
 
 ## Getting started
 
-1. Download and install for your platform (above).
+1. Download and unzip the build for your platform (above).
 2. Launch **KwaaiNet GUI**. It starts a local node automatically and lives in
    your menu bar / system tray.
 3. Open the chat tab and start talking to the network.
