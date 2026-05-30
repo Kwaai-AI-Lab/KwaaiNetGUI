@@ -5,6 +5,20 @@ to the `kwaainet` daemon over gRPC and ships with a menu-bar tray, a chat
 view backed by the daemon's shard mesh, and a developer-mode local-chat
 tab that drives `kwaainet generate` directly.
 
+## Downloads
+
+CI builds the app for all three desktop platforms on every push to `main`
+and attaches them as workflow artifacts. Grab the latest from the
+[Actions tab](https://github.com/Kwaai-AI-Lab/KwaaiNetGUI/actions/workflows/ci.yml?query=branch%3Amain)
+— open the most recent green run and download `kwaainet-gui-macos`,
+`kwaainet-gui-linux`, or `kwaainet-gui-windows`.
+
+These bundles include the matching `kwaainet` daemon (and its `p2pd`
+helper), pulled from the pinned [KwaaiNet release](https://github.com/Kwaai-AI-Lab/KwaaiNet/releases)
+in [`.kwaainet-version`](.kwaainet-version), so the app runs out of the box
+in built-in daemon mode. (Artifacts require a GitHub login and expire after
+14 days; signed installers — DMG/MSIX/DEB/RPM — are tracked separately.)
+
 ## Prerequisites
 
 - Flutter SDK **3.11.4** or newer (`flutter --version`)

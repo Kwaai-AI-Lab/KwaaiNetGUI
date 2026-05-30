@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      kwaainet_version:
+        description: "kwaainet release tag to bundle (blank = use .kwaainet-version)"
+        required: false
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -37,16 +43,34 @@ jobs:
     name: Build (${{ matrix.target }})
     needs: analyze
     runs-on: ${{ matrix.os }}
+    # Release assets from Kwaai-AI-Lab/KwaaiNet are public; the default token
+    # can download them across repos. No extra secret needed.
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             target: linux
+            # kwaainet release asset for this target (from KwaaiNet Releases)
+            kwaainet_asset: kwaainet-x86_64-unknown-linux-gnu.tar.xz
+            # where flutter drops the GUI executable; kwaainet sits beside it
+            bundle_dir: build/linux/x64/release/bundle
+            # what to upload as the artifact (whole distributable dir/app)
+            artifact_path: build/linux/x64/release/bundle
           - os: macos-latest
             target: macos
+            kwaainet_asset: kwaainet-aarch64-apple-darwin.tar.xz
+            bundle_dir: build/macos/Build/Products/Release/kwaainet_gui.app/Contents/MacOS
+            artifact_path: build/macos/Build/Products/Release/kwaainet_gui.app
           - os: windows-latest
             target: windows
+            kwaainet_asset: kwaainet-x86_64-pc-windows-msvc.zip
+            bundle_dir: build/windows/x64/runner/Release
+            artifact_path: build/windows/x64/runner/Release
     steps:
       - uses: actions/checkout@v6
 
@@ -68,4 +92,65 @@ jobs:
         run: flutter pub get
 
       - name: Build ${{ matrix.target }}
-        run: flutter build ${{ matrix.target }} --debug
+        run: flutter build ${{ matrix.target }} --release
+
+      # ── Bundle the kwaainet daemon next to the GUI executable ───────────────
+      # paths.dart's "built-in" mode looks for kwaainet beside the GUI binary.
+      - name: Resolve kwaainet version
+        id: kwaainet
+        shell: bash
+        run: |
+          ver='${{ github.event.inputs.kwaainet_version }}'
+          if [ -z "$ver" ]; then ver="$(tr -d '[:space:]' < .kwaainet-version)"; fi
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "Bundling kwaainet $ver"
+
+      - name: Download & bundle kwaainet + p2pd (Unix)
+        if: matrix.target != 'windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver='${{ steps.kwaainet.outputs.version }}'
+          asset='${{ matrix.kwaainet_asset }}'
+          dest="$GITHUB_WORKSPACE/${{ matrix.bundle_dir }}"
+          gh release download "$ver" --repo Kwaai-AI-Lab/KwaaiNet \
+            --pattern "$asset" --pattern "$asset.sha256" --dir /tmp/kw --clobber
+          cd /tmp/kw
+          # cargo-dist .sha256 files are "<hash>  <name>" — verify it.
+          shasum -a 256 -c "$asset.sha256"
+          # The archive unpacks into a "<target>/" subdir containing both
+          # kwaainet and the p2pd helper it spawns at runtime.
+          tar -xf "$asset"
+          src="${asset%.tar.xz}"
+          install -m 0755 "$src/kwaainet" "$dest/kwaainet"
+          install -m 0755 "$src/p2pd" "$dest/p2pd"
+          echo "Bundled kwaainet + p2pd into ${{ matrix.bundle_dir }}"
+
+      - name: Download & bundle kwaainet + p2pd (Windows)
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ver = '${{ steps.kwaainet.outputs.version }}'
+          $asset = '${{ matrix.kwaainet_asset }}'
+          $dest = "$env:GITHUB_WORKSPACE\${{ matrix.bundle_dir }}"
+          gh release download $ver --repo Kwaai-AI-Lab/KwaaiNet `
+            --pattern $asset --pattern "$asset.sha256" --dir $env:TEMP\kw --clobber
+          Push-Location $env:TEMP\kw
+          $expected = (Get-Content "$asset.sha256").Split(' ')[0].Trim()
+          $actual = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLower()
+          if ($expected -ne $actual) { throw "sha256 mismatch for $asset" }
+          # The Windows zip is flat (kwaainet.exe + p2pd.exe at the top level).
+          Expand-Archive -Path $asset -DestinationPath kw -Force
+          Pop-Location
+          Copy-Item "$env:TEMP\kw\kw\kwaainet.exe" "$dest\kwaainet.exe" -Force
+          Copy-Item "$env:TEMP\kw\kw\p2pd.exe"     "$dest\p2pd.exe"     -Force
+          Write-Host "Bundled kwaainet.exe + p2pd.exe into ${{ matrix.bundle_dir }}"
+
+      - name: Upload ${{ matrix.target }} build
+        uses: actions/upload-artifact@v4
+        with:
+          name: kwaainet-gui-${{ matrix.target }}
+          path: ${{ matrix.artifact_path }}
+          retention-days: 14
+          if-no-files-found: error
