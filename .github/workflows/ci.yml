@@ -147,10 +147,43 @@ jobs:
           Copy-Item "$env:TEMP\kw\kw\p2pd.exe"     "$dest\p2pd.exe"     -Force
           Write-Host "Bundled kwaainet.exe + p2pd.exe into ${{ matrix.bundle_dir }}"
 
+      # ── Package into a single archive that preserves the bundle ────────────
+      # We archive ourselves (rather than letting upload-artifact zip the
+      # folder) so macOS .app symlinks and Unix exec bits survive the round
+      # trip. The artifact is then a single, ready-to-extract file.
+      - name: Package (macOS)
+        if: matrix.target == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # `ditto` is the macOS-correct archiver: keeps symlinks, exec bits,
+          # and resource forks. --keepParent puts kwaainet_gui.app at the
+          # zip root so it unzips straight to a launchable .app.
+          ditto -c -k --keepParent \
+            "${{ matrix.artifact_path }}" "$GITHUB_WORKSPACE/kwaainet-gui-macos.zip"
+
+      - name: Package (Linux)
+        if: matrix.target == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # tar preserves the exec bits on kwaainet_gui, kwaainet, and p2pd.
+          tar -C "$(dirname "${{ matrix.artifact_path }}")" \
+            -czf "$GITHUB_WORKSPACE/kwaainet-gui-linux.tar.gz" \
+            "$(basename "${{ matrix.artifact_path }}")"
+
+      - name: Package (Windows)
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Compress-Archive -Path "${{ matrix.artifact_path }}\*" `
+            -DestinationPath "$env:GITHUB_WORKSPACE\kwaainet-gui-windows.zip" -Force
+
       - name: Upload ${{ matrix.target }} build
         uses: actions/upload-artifact@v4
         with:
           name: kwaainet-gui-${{ matrix.target }}
-          path: ${{ matrix.artifact_path }}
+          path: kwaainet-gui-${{ matrix.target }}.${{ matrix.target == 'linux' && 'tar.gz' || 'zip' }}
           retention-days: 14
           if-no-files-found: error
