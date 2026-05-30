@@ -1,94 +1,55 @@
 # KwaaiNet GUI
 
-Flutter desktop GUI for KwaaiNet. Runs on macOS, Linux, and Windows. Talks
-to the `kwaainet` daemon over gRPC and ships with a menu-bar tray, a chat
-view backed by the daemon's shard mesh, and a developer-mode local-chat
-tab that drives `kwaainet generate` directly.
+A desktop app for [KwaaiNet](https://github.com/Kwaai-AI-Lab/KwaaiNet) — the
+distributed inference network. Chat with models running across the network,
+contribute your machine to the mesh, and control the `kwaainet` node from a
+menu-bar tray. Runs on **macOS, Linux, and Windows**.
 
-## Downloads
+## Download
 
-CI builds the app for all three desktop platforms on every push to `main`
-and attaches them as workflow artifacts. Grab the latest from the
-[Actions tab](https://github.com/Kwaai-AI-Lab/KwaaiNetGUI/actions/workflows/ci.yml?query=branch%3Amain)
-— open the most recent green run and download `kwaainet-gui-macos`,
-`kwaainet-gui-linux`, or `kwaainet-gui-windows`.
+Get the latest build for your platform from the
+**[Releases page](https://github.com/Kwaai-AI-Lab/KwaaiNetGUI/releases/latest)**:
 
-These bundles include the matching `kwaainet` daemon (and its `p2pd`
-helper), pulled from the pinned [KwaaiNet release](https://github.com/Kwaai-AI-Lab/KwaaiNet/releases)
-in [`.kwaainet-version`](.kwaainet-version), so the app runs out of the box
-in built-in daemon mode. (Artifacts require a GitHub login and expire after
-14 days; signed installers — DMG/MSIX/DEB/RPM — are tracked separately.)
+| Platform | Download              |
+| -------- | --------------------- |
+| macOS    | `.dmg`                |
+| Windows  | `.msix`               |
+| Linux    | `.deb` / `.rpm`       |
 
-## Prerequisites
+Each download bundles the matching KwaaiNet node, so the app works out of the
+box — no separate install needed. Open the app, and it starts a node for you.
 
-- Flutter SDK **3.11.4** or newer (`flutter --version`)
-- A working desktop toolchain for your platform:
-  - macOS: Xcode command-line tools
-  - Linux: GTK 3 / clang / ninja / pkg-config (see
-    [Flutter Linux setup](https://docs.flutter.dev/get-started/install/linux/desktop))
-  - Windows: Visual Studio with the "Desktop development with C++" workload
-- A `kwaainet` binary on `PATH`, or a checkout of this repo if you want
-  the GUI to drive a debug build of the daemon (see "Daemon modes" below)
+> **Heads up: these builds aren't code-signed yet.** Your OS will warn that the
+> app is from an unidentified developer. To install anyway:
+>
+> - **macOS** — the `.dmg` opens fine, but the first time you launch the app,
+>   macOS will block it. **Right-click the app → Open**, then click **Open** in
+>   the dialog. (Or: System Settings → Privacy & Security → **Open Anyway**.)
+> - **Windows** — the `.msix` is signed with a self-signed certificate.
+>   Double-click it, and if Windows shows a SmartScreen prompt click
+>   **More info → Run anyway**. (You may first need to trust the bundled
+>   certificate — see the install notes on the release.)
+> - **Linux** — install the package directly: `sudo dpkg -i <file>.deb` or
+>   `sudo rpm -i <file>.rpm`. No signing prompt.
+>
+> Signed/notarized builds are coming.
 
-## Build & run
+## Getting started
 
-```bash
-flutter pub get
-flutter run -d macos      # or: -d linux, -d windows
-```
+1. Download and install for your platform (above).
+2. Launch **KwaaiNet GUI**. It starts a local node automatically and lives in
+   your menu bar / system tray.
+3. Open the chat tab and start talking to the network.
 
-Release builds land under `build/<platform>/` — e.g.
-`build/macos/Build/Products/Release/kwaainet_gui.app`,
-`build/linux/x64/release/bundle/`,
-`build/windows/x64/runner/Release/`.
+Want to point the app at a node you run yourself (on `PATH`, a custom path, or
+managed by something else)? See **[Daemon modes](docs/daemon-modes.md)**.
 
-## Tests & lint
+## Contributing
 
-```bash
-flutter analyze
-flutter test
-```
+KwaaiNet GUI is built with Flutter. To build it from source, run the tests, or
+regenerate the gRPC bindings, see the **[development guide](docs/development.md)**.
 
-CI runs both on every push and PR (see `.github/workflows/ci.yml`).
+## Documentation
 
-## Daemon modes
-
-The Settings page exposes four ways for the GUI to find the `kwaainet`
-daemon (see `lib/src/settings.dart` and `lib/src/daemon/daemon_controller.dart`):
-
-| Mode        | Behaviour                                                              |
-| ----------- | ---------------------------------------------------------------------- |
-| `builtIn`   | Run a bundled `kwaainet`, or the debug binary from a sibling `KwaaiNet/` checkout (`../KwaaiNet/core/target/debug/kwaainet`); override with `KWAAINET_DEBUG_BIN` |
-| `system`    | Find `kwaainet` on `PATH`                                              |
-| `custom`    | Run a binary at a user-chosen path                                     |
-| `external`  | Don't manage the daemon — assume something else (launchd, systemd,     |
-|             | Docker, a shell) is already running it                                 |
-
-The first three modes spawn and supervise the daemon process; the GUI
-writes the PID to a state file and surfaces start/stop controls. In
-`external` mode the GUI is read-only and only probes the daemon over
-gRPC.
-
-## gRPC bindings
-
-The Dart bindings under `lib/src/chat/generated/` are generated from
-the `kwaai.proto` in the KwaaiNet repo
-(`core/crates/kwaai-rpc/proto/kwaai.proto`). See
-[`lib/src/chat/generated/README.md`](lib/src/chat/generated/README.md)
-for how to regenerate them.
-
-## Layout
-
-```
-lib/
-├── main.dart
-└── src/
-    ├── chat/        # gRPC client, chat state, generated bindings
-    ├── daemon/      # daemon lifecycle (spawn/probe/stop)
-    ├── settings.dart
-    ├── tray/        # menu-bar tray integration
-    ├── ui/          # widgets and pages
-    └── window/      # window/lifecycle wiring
-macos/  linux/  windows/   # platform shells
-test/
-```
+- [Development guide](docs/development.md) — build, run, test, project layout
+- [Daemon modes](docs/daemon-modes.md) — how the app finds and runs the node
