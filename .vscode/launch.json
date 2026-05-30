@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "dart",
+            "request": "launch",
+            "name": "KwaaiNet GUI (debug)",
+            "program": "${workspaceFolder}/lib/main.dart",
+            "cwd": "${workspaceFolder}",
+            "deviceId": "macos",
+            "console": "debugConsole",
+            "internalConsoleOptions": "openOnSessionStart",
+            "preLaunchTask": "Build KwaaiNet GUI (debug)"
+        },
+        {
+            "type": "dart",
+            "request": "launch",
+            "name": "KwaaiNet GUI (debug, verbose)",
+            "program": "${workspaceFolder}/lib/main.dart",
+            "cwd": "${workspaceFolder}",
+            "deviceId": "macos",
+            "console": "debugConsole",
+            "internalConsoleOptions": "openOnSessionStart",
+            "toolArgs": ["--verbose"],
+            "preLaunchTask": "Build KwaaiNet GUI (debug)"
+        },
+        {
+            "type": "dart",
+            "request": "launch",
+            "name": "KwaaiNet GUI (profile)",
+            "program": "${workspaceFolder}/lib/main.dart",
+            "cwd": "${workspaceFolder}",
+            "deviceId": "macos",
+            "flutterMode": "profile",
+            "console": "debugConsole",
+            "preLaunchTask": "Build KwaaiNet GUI (debug)"
+        }
+    ]
+}

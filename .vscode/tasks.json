@@ -1,0 +1,20 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build KwaaiNet GUI (debug)",
+            "type": "shell",
+            "command": "flutter",
+            "args": ["build", "macos", "--debug"],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared",
+                "clear": false
+            }
+        }
+    ]
+}
