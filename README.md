@@ -19,15 +19,18 @@ tab that drives `kwaainet generate` directly.
 ## Build & run
 
 ```bash
-cd apps/gui
 flutter pub get
 flutter run -d macos      # or: -d linux, -d windows
 ```
 
+Release builds land under `build/<platform>/` — e.g.
+`build/macos/Build/Products/Release/kwaainet_gui.app`,
+`build/linux/x64/release/bundle/`,
+`build/windows/x64/runner/Release/`.
+
 ## Tests & lint
 
 ```bash
-cd apps/gui
 flutter analyze
 flutter test
 ```
@@ -41,7 +44,7 @@ daemon (see `lib/src/settings.dart` and `lib/src/daemon/daemon_controller.dart`)
 
 | Mode        | Behaviour                                                              |
 | ----------- | ---------------------------------------------------------------------- |
-| `builtIn`   | Run the debug binary from this checkout (`core/target/debug/kwaainet`) |
+| `builtIn`   | Run a bundled `kwaainet`, or the debug binary from a sibling `KwaaiNet/` checkout (`../KwaaiNet/core/target/debug/kwaainet`); override with `KWAAINET_DEBUG_BIN` |
 | `system`    | Find `kwaainet` on `PATH`                                              |
 | `custom`    | Run a binary at a user-chosen path                                     |
 | `external`  | Don't manage the daemon — assume something else (launchd, systemd,     |
@@ -55,23 +58,23 @@ gRPC.
 ## gRPC bindings
 
 The Dart bindings under `lib/src/chat/generated/` are generated from
-`core/crates/kwaai-rpc/proto/kwaai.proto`. See
+the `kwaai.proto` in the KwaaiNet repo
+(`core/crates/kwaai-rpc/proto/kwaai.proto`). See
 [`lib/src/chat/generated/README.md`](lib/src/chat/generated/README.md)
 for how to regenerate them.
 
 ## Layout
 
 ```
-apps/gui/
-├── lib/
-│   ├── main.dart
-│   └── src/
-│       ├── chat/        # gRPC client, chat state, generated bindings
-│       ├── daemon/      # daemon lifecycle (spawn/probe/stop)
-│       ├── settings.dart
-│       ├── tray/        # menu-bar tray integration
-│       ├── ui/          # widgets and pages
-│       └── window/      # window/lifecycle wiring
-├── macos/  linux/  windows/   # platform shells
-└── test/
+lib/
+├── main.dart
+└── src/
+    ├── chat/        # gRPC client, chat state, generated bindings
+    ├── daemon/      # daemon lifecycle (spawn/probe/stop)
+    ├── settings.dart
+    ├── tray/        # menu-bar tray integration
+    ├── ui/          # widgets and pages
+    └── window/      # window/lifecycle wiring
+macos/  linux/  windows/   # platform shells
+test/
 ```
