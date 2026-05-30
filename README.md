@@ -7,12 +7,14 @@ menu-bar tray. Runs on **macOS, Linux, and Windows**.
 
 ## Download
 
-Pre-built apps for all three desktop platforms are produced by CI on every
-push to `main`. Grab the latest from the
-**[Actions tab](https://github.com/Kwaai-AI-Lab/KwaaiNetGUI/actions/workflows/ci.yml?query=branch%3Amain+is%3Asuccess)**:
-open the most recent successful run and download the artifact for your
-platform — `kwaainet-gui-macos`, `kwaainet-gui-windows`, or
-`kwaainet-gui-linux`. Each is a zip of the ready-to-run app.
+Grab the latest build for your platform from the
+**[Releases page](https://github.com/Kwaai-AI-Lab/KwaaiNetGUI/releases/latest)**:
+
+| Platform | Download                       |
+| -------- | ------------------------------ |
+| macOS    | `kwaainet-gui-macos.zip`       |
+| Windows  | `kwaainet-gui-windows.zip`     |
+| Linux    | `kwaainet-gui-linux.tar.gz`    |
 
 Each download bundles the matching KwaaiNet node, so the app works out of the
 box — no separate install needed. Open the app, and it starts a node for you.
@@ -26,12 +28,9 @@ box — no separate install needed. Open the app, and it starts a node for you.
 >   under System Settings → Privacy & Security → **Open Anyway**.
 > - **Windows** — unzip and run `kwaainet_gui.exe`. If SmartScreen appears,
 >   click **More info → Run anyway**.
-> - **Linux** — unzip and run `./kwaainet_gui` from the extracted folder.
+> - **Linux** — extract and run `./kwaainet_gui` from the extracted folder.
 >
-> Downloading artifacts requires a (free) GitHub login, and they expire after
-> 14 days. Proper signed installers — `.dmg` / `.msix` / `.deb` / `.rpm`
-> published to the [Releases page](https://github.com/Kwaai-AI-Lab/KwaaiNetGUI/releases)
-> — are coming.
+> Proper signed installers — `.dmg` / `.msix` / `.deb` / `.rpm` — are coming.
 
 ## Getting started
 
