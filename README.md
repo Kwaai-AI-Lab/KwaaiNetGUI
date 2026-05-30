@@ -23,7 +23,7 @@ box — no separate install needed. Open the app, and it starts a node for you.
 > app folder (not an installer yet), and your OS will warn that the app is from
 > an unidentified developer. To run it anyway:
 >
-> - **macOS** — unzip, then **right-click `kwaainet_gui.app` → Open** and click
+> - **macOS** — unzip, then **right-click `KwaaiNet GUI.app` → Open** and click
 >   **Open** in the dialog (a plain double-click will be blocked). Or allow it
 >   under System Settings → Privacy & Security → **Open Anyway**.
 > - **Windows** — unzip and run `kwaainet_gui.exe`. If SmartScreen appears,

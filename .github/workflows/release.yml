@@ -38,8 +38,8 @@ jobs:
           - os: macos-latest
             target: macos
             kwaainet_asset: kwaainet-aarch64-apple-darwin.tar.xz
-            bundle_dir: build/macos/Build/Products/Release/kwaainet_gui.app/Contents/MacOS
-            artifact_path: build/macos/Build/Products/Release/kwaainet_gui.app
+            bundle_dir: build/macos/Build/Products/Release/KwaaiNet GUI.app/Contents/MacOS
+            artifact_path: build/macos/Build/Products/Release/KwaaiNet GUI.app
           - os: windows-latest
             target: windows
             kwaainet_asset: kwaainet-x86_64-pc-windows-msvc.zip
@@ -112,6 +112,13 @@ jobs:
           Pop-Location
           Copy-Item "$env:TEMP\kw\kw\kwaainet.exe" "$dest\kwaainet.exe" -Force
           Copy-Item "$env:TEMP\kw\kw\p2pd.exe"     "$dest\p2pd.exe"     -Force
+
+      # Re-seal the ad-hoc signature broken by injecting kwaainet/p2pd, so
+      # macOS doesn't reject the app as "damaged". (See ci.yml for detail.)
+      - name: Re-sign app bundle (macOS)
+        if: matrix.target == 'macos'
+        shell: bash
+        run: codesign --force --deep --sign - "${{ matrix.artifact_path }}"
 
       - name: Package (macOS)
         if: matrix.target == 'macos'

@@ -64,8 +64,8 @@ jobs:
           - os: macos-latest
             target: macos
             kwaainet_asset: kwaainet-aarch64-apple-darwin.tar.xz
-            bundle_dir: build/macos/Build/Products/Release/kwaainet_gui.app/Contents/MacOS
-            artifact_path: build/macos/Build/Products/Release/kwaainet_gui.app
+            bundle_dir: build/macos/Build/Products/Release/KwaaiNet GUI.app/Contents/MacOS
+            artifact_path: build/macos/Build/Products/Release/KwaaiNet GUI.app
           - os: windows-latest
             target: windows
             kwaainet_asset: kwaainet-x86_64-pc-windows-msvc.zip
@@ -151,13 +151,22 @@ jobs:
       # We archive ourselves (rather than letting upload-artifact zip the
       # folder) so macOS .app symlinks and Unix exec bits survive the round
       # trip. The artifact is then a single, ready-to-extract file.
+      # Re-sign after injecting kwaainet/p2pd: Flutter ad-hoc signs the .app at
+      # build time, and adding files breaks that seal — macOS then refuses to
+      # launch it as "damaged". Re-sealing ad-hoc fixes that (users still clear
+      # quarantine via right-click → Open until we have a Developer ID).
+      - name: Re-sign app bundle (macOS)
+        if: matrix.target == 'macos'
+        shell: bash
+        run: codesign --force --deep --sign - "${{ matrix.artifact_path }}"
+
       - name: Package (macOS)
         if: matrix.target == 'macos'
         shell: bash
         run: |
           set -euo pipefail
           # `ditto` is the macOS-correct archiver: keeps symlinks, exec bits,
-          # and resource forks. --keepParent puts kwaainet_gui.app at the
+          # and resource forks. --keepParent puts "KwaaiNet GUI.app" at the
           # zip root so it unzips straight to a launchable .app.
           ditto -c -k --keepParent \
             "${{ matrix.artifact_path }}" "$GITHUB_WORKSPACE/kwaainet-gui-macos.zip"
