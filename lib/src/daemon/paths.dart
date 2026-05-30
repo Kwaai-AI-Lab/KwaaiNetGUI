@@ -19,27 +19,52 @@ class KwaainetPaths {
   static String get logsDir => '$home${Platform.pathSeparator}logs';
 }
 
+/// Locates the bundled `kwaainet` daemon for "built-in" mode.
+///
+/// The built-in binary can live in one of two places:
+///   1. A production/sandbox install — shipped *inside* the app bundle,
+///      alongside the GUI executable (a fixed offset, no searching).
+///   2. A dev checkout — built at `core/target/debug/kwaainet` in the
+///      KwaaiNet repo, which is now a *sibling* of this GUI project.
+///
+/// `KWAAINET_DEBUG_BIN` overrides both.
 String get builtInDebugDaemonPath {
-  final exe = File(Platform.resolvedExecutable).absolute.path;
   final sep = Platform.pathSeparator;
+  final exeName = Platform.isWindows ? 'kwaainet.exe' : 'kwaainet';
 
-  String? walk(String start) {
-    var dir = Directory(start).parent;
-    for (var i = 0; i < 16; i++) {
-      final candidate =
-          '${dir.path}${sep}core${sep}target${sep}debug${sep}kwaainet';
-      if (File(candidate).existsSync()) return candidate;
-      if (dir.parent.path == dir.path) break;
-      dir = dir.parent;
+  // Explicit override always wins — point this at any built kwaainet binary.
+  final override = Platform.environment['KWAAINET_DEBUG_BIN'];
+  if (override != null && override.isNotEmpty) return override;
+
+  // Case 1: bundled next to the GUI executable (production / sandbox install).
+  final exeDir = File(Platform.resolvedExecutable).absolute.parent.path;
+  for (final neighbour in [
+    '$exeDir$sep$exeName', // …/MacOS/kwaainet
+    '$exeDir$sep..${sep}Resources$sep$exeName', // …/Resources/kwaainet
+  ]) {
+    if (File(neighbour).existsSync()) {
+      return File(neighbour).absolute.path;
     }
-    return null;
   }
 
-  final found = walk(exe);
-  if (found != null) return found;
+  // Case 2: dev sibling checkout. Find this GUI project's root by walking up
+  // to the directory that holds pubspec.yaml (self-limiting — no magic
+  // depth), then look for the KwaaiNet repo beside it.
+  final sibling = ['..', 'KwaaiNet', 'core', 'target', 'debug', exeName];
+  String? projectRoot(String start) {
+    for (var dir = Directory(start); ; dir = dir.parent) {
+      if (File('${dir.path}${sep}pubspec.yaml').existsSync()) return dir.path;
+      if (dir.parent.path == dir.path) return null; // hit filesystem root
+    }
+  }
 
-  final scriptDir = Directory.current.path;
-  final guess =
-      '$scriptDir$sep..$sep..${sep}core${sep}target${sep}debug${sep}kwaainet';
-  return File(guess).existsSync() ? File(guess).absolute.path : guess;
+  final root = projectRoot(exeDir) ?? projectRoot(Directory.current.path);
+  if (root != null) {
+    final candidate = [root, ...sibling].join(sep);
+    if (File(candidate).existsSync()) return File(candidate).absolute.path;
+  }
+
+  // Nothing found — return the sibling-layout guess relative to cwd so the
+  // error message points somewhere actionable.
+  return [Directory.current.absolute.path, ...sibling].join(sep);
 }
