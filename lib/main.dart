@@ -18,7 +18,7 @@ import 'src/ui/theme/theme_controller.dart';
 import 'src/ui/theme/theme_variants.dart';
 import 'src/window/close_handler.dart';
 import 'src/window/dock_icon.dart';
-import 'src/window/shutdown_overlay.dart';
+import 'src/window/shutdown_gate.dart';
 import 'src/window/window_focus.dart';
 
 Future<void> main() async {
@@ -167,10 +167,10 @@ class KwaainetGuiApp extends StatelessWidget {
               theme: lightTheme,
               darkTheme: darkTheme,
               themeMode: themeMode,
-              // Wrap every route so the quit/shutdown overlay (interaction
-              // lock + "Stopping service…") covers main page and settings.
+              // Wrap every route so a quit replaces the whole window (main
+              // page or settings) with the "Stopping service…" screen.
               builder: (context, child) =>
-                  ShutdownOverlay(child: child ?? const SizedBox.shrink()),
+                  ShutdownGate(child: child ?? const SizedBox.shrink()),
               home: MainPage(daemon: daemon, settings: settings, tray: tray),
             );
           },

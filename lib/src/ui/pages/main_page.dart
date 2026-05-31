@@ -13,6 +13,7 @@ import '../theme/kwaai_theme.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/branded_title.dart';
 import '../widgets/kwaai_chat_composer.dart';
+import '../widgets/service_status_view.dart';
 import 'settings_page.dart';
 
 class MainPage extends ConsumerStatefulWidget {
@@ -323,25 +324,12 @@ class _ChatBody extends ConsumerWidget {
       color: Theme.of(context).colorScheme.onSurfaceVariant,
     );
 
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (spinner) ...[
-            SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                valueColor: AlwaysStoppedAnimation(spinnerColor),
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-          Text(headline, style: Theme.of(context).textTheme.titleMedium),
-          if (showStoppedSub) ...[
-            const SizedBox(height: 4),
-            Text.rich(
+    return ServiceStatusView(
+      headline: headline,
+      spinner: spinner,
+      spinnerColor: spinnerColor,
+      subtitle: showStoppedSub
+          ? Text.rich(
               TextSpan(
                 style: mutedStyle,
                 children: [
@@ -366,10 +354,8 @@ class _ChatBody extends ConsumerWidget {
                   const TextSpan(text: ' to start or configure the service.'),
                 ],
               ),
-            ),
-          ],
-        ],
-      ),
+            )
+          : null,
     );
   }
 }
