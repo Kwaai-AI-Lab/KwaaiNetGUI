@@ -5,10 +5,37 @@ import FlutterMacOS
 class AppDelegate: FlutterAppDelegate {
   private var lifecycleChannel: FlutterMethodChannel?
 
+  /// True once Dart has finished its clean shutdown and macOS is clear to
+  /// terminate. Guards re-entrancy if applicationShouldTerminate fires twice.
+  private var readyToTerminate = false
+
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
     // Let the Flutter-side WindowCloseHandler decide whether to quit or
     // hide to the menu-bar tray. Returning true here pre-empts that.
     return false
+  }
+
+  /// Cmd-Q, the Apple-menu Quit, and OS logout/shutdown all land here. Run the
+  /// same clean shutdown the window/tray paths use (stop the daemon via
+  /// `kwaainet stop`), then let macOS terminate. We reply `.terminateLater`
+  /// and call `reply(toApplicationShouldTerminate:)` once Dart signals it's
+  /// done, so the daemon and its children are reaped before we exit.
+  override func applicationShouldTerminate(
+    _ sender: NSApplication
+  ) -> NSApplication.TerminateReply {
+    if readyToTerminate {
+      return .terminateNow
+    }
+    guard let channel = lifecycleChannel else {
+      // No Dart channel yet (very early launch) — nothing to clean up.
+      return .terminateNow
+    }
+    channel.invokeMethod("performQuit", arguments: nil) { _ in
+      // Dart finished (or errored) — let macOS proceed with termination.
+      self.readyToTerminate = true
+      NSApp.reply(toApplicationShouldTerminate: true)
+    }
+    return .terminateLater
   }
 
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {

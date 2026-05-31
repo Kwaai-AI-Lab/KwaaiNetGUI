@@ -2,7 +2,10 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
+
+import 'shutdown.dart';
 
 void _log(String msg) {
   stderr.writeln('[dock-icon] $msg');
@@ -28,18 +31,27 @@ class DockIcon {
   }
 }
 
-/// Installs the `reopenWindow` listener from AppDelegate.swift —
-/// triggered by Dock-icon click / Finder relaunch when the policy is
-/// `.regular`. Brings the window back to the foreground.
-void installReopenHandler() {
+/// Installs the macOS `kwaai/lifecycle` handlers from AppDelegate.swift:
+///
+///  - `reopenWindow` — Dock-icon click / Finder relaunch while hidden:
+///    bring the window back to the foreground.
+///  - `performQuit` — Cmd-Q / Apple-menu Quit / OS logout: run the shared
+///    clean-shutdown routine. The native side replied `.terminateLater`, so
+///    awaiting [performQuit] here is what gates termination on the daemon
+///    actually stopping (the method-call result fires the Swift completion).
+void installLifecycleHandlers(ProviderContainer container) {
   if (kIsWeb || !Platform.isMacOS) return;
   const channel = MethodChannel('kwaai/lifecycle');
   channel.setMethodCallHandler((call) async {
-    if (call.method == 'reopenWindow') {
-      _log('reopen requested — showing window');
-      await DockIcon.setVisible(true);
-      await windowManager.show();
-      await windowManager.focus();
+    switch (call.method) {
+      case 'reopenWindow':
+        _log('reopen requested — showing window');
+        await DockIcon.setVisible(true);
+        await windowManager.show();
+        await windowManager.focus();
+      case 'performQuit':
+        _log('OS terminate requested — clean shutdown');
+        await performQuit(container, osTerminating: true);
     }
   });
 }

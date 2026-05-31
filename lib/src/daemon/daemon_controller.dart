@@ -163,20 +163,29 @@ class DaemonController {
       _log('external mode — refusing to stop (managed by user)');
       return false;
     }
-    final pid = readPid();
-    if (pid == null) {
+    if (readPid() == null) {
       _log('no pid file — nothing to stop');
       return false;
     }
-    _log('sending SIGTERM to pid $pid');
-    if (Platform.isWindows) {
-      final r = await Process.run('taskkill', ['/PID', '$pid']);
-      _log('taskkill exit ${r.exitCode}');
-      return r.exitCode == 0;
+    // Defer to the CLI: `kwaainet stop` tears down the node AND its detached
+    // children (shard serve, storage API), which a raw kill of the node pid
+    // would orphan. Keep the GUI out of kwaainet's process internals.
+    final res = resolveBinary();
+    if (!res.exists) {
+      _log('ABORT: binary not found at ${res.path} (${res.source})');
+      return false;
     }
-    final r = await Process.run('kill', ['$pid']);
-    _log('kill exit ${r.exitCode}');
-    return r.exitCode == 0;
+    _log('running: ${res.path} stop');
+    try {
+      final r = await Process.run(res.path, ['stop']);
+      if (r.exitCode != 0) {
+        _log('kwaainet stop exit ${r.exitCode}: ${r.stderr}');
+      }
+      return r.exitCode == 0;
+    } catch (e, st) {
+      _log('kwaainet stop failed: $e\n$st');
+      return false;
+    }
   }
 }
 

@@ -9,6 +9,7 @@ import 'package:window_manager/window_manager.dart';
 import '../daemon/daemon_state.dart';
 import '../daemon/status_watcher.dart';
 import '../window/dock_icon.dart';
+import '../window/shutdown.dart';
 
 enum TrayState { running, stopped, starting, stopping, error }
 
@@ -201,23 +202,14 @@ class TrayController with TrayListener {
         }
         break;
       case 'quit':
-        _log('quit → tearing down');
-        // Stop the daemon we started before exiting, so kwaainet/p2pd don't
-        // outlive the app. stop() is a no-op in external mode (user-managed).
-        try {
-          await _container.read(daemonControllerProvider).stop();
-        } catch (e) {
-          _log('quit: daemon stop error (proceeding to exit): $e');
-        }
+        _log('quit → performQuit');
+        // Shared shutdown: shows "Stopping service…" and runs `kwaainet stop`
+        // (reaping the node + its detached children). We deliberately keep the
+        // tray icon in place until performQuit returns — the menu already
+        // reflects DaemonTransition.stopping, so reopening it shows "Stopping"
+        // rather than vanishing. dispose() then runs on the way out.
+        await performQuit(_container);
         await dispose();
-        // Bypass the close-handler's prevent-close so Quit actually quits.
-        try {
-          await windowManager.setPreventClose(false);
-          await windowManager.destroy();
-        } catch (e) {
-          _log('quit teardown error (proceeding to exit): $e');
-        }
-        exit(0);
     }
   }
 

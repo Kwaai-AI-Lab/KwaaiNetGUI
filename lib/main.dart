@@ -18,6 +18,7 @@ import 'src/ui/theme/theme_controller.dart';
 import 'src/ui/theme/theme_variants.dart';
 import 'src/window/close_handler.dart';
 import 'src/window/dock_icon.dart';
+import 'src/window/shutdown_overlay.dart';
 import 'src/window/window_focus.dart';
 
 Future<void> main() async {
@@ -89,9 +90,9 @@ Future<void> main() async {
   }
   final windowFocus = WindowFocusNotifier()..attach();
   await WindowCloseHandler(settings, tray, container).attach();
-  // Listen for Dock-icon re-clicks / Finder reopens while the app is
-  // hidden — brings the window + Dock icon back.
-  installReopenHandler();
+  // Handle macOS lifecycle callbacks: Dock-icon re-clicks / Finder reopens
+  // (restore the window) and OS terminate / Cmd-Q (clean daemon shutdown).
+  installLifecycleHandlers(container);
 
   // Auto-start the service at boot if the user has it enabled and the
   // daemon isn't already running. Goes through the same transition
@@ -166,6 +167,10 @@ class KwaainetGuiApp extends StatelessWidget {
               theme: lightTheme,
               darkTheme: darkTheme,
               themeMode: themeMode,
+              // Wrap every route so the quit/shutdown overlay (interaction
+              // lock + "Stopping service…") covers main page and settings.
+              builder: (context, child) =>
+                  ShutdownOverlay(child: child ?? const SizedBox.shrink()),
               home: MainPage(daemon: daemon, settings: settings, tray: tray),
             );
           },
