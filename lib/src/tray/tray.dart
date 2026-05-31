@@ -202,6 +202,13 @@ class TrayController with TrayListener {
         break;
       case 'quit':
         _log('quit → tearing down');
+        // Stop the daemon we started before exiting, so kwaainet/p2pd don't
+        // outlive the app. stop() is a no-op in external mode (user-managed).
+        try {
+          await _container.read(daemonControllerProvider).stop();
+        } catch (e) {
+          _log('quit: daemon stop error (proceeding to exit): $e');
+        }
         await dispose();
         // Bypass the close-handler's prevent-close so Quit actually quits.
         try {

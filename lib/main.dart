@@ -88,7 +88,7 @@ Future<void> main() async {
     await tray.init();
   }
   final windowFocus = WindowFocusNotifier()..attach();
-  await WindowCloseHandler(settings).attach();
+  await WindowCloseHandler(settings, tray, container).attach();
   // Listen for Dock-icon re-clicks / Finder reopens while the app is
   // hidden — brings the window + Dock icon back.
   installReopenHandler();
