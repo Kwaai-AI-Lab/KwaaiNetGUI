@@ -23,7 +23,7 @@ box — no separate install needed. Open the app, and it starts a node for you.
 > app folder (not an installer yet), and your OS will warn that the app is from
 > an unidentified developer. To run it anyway:
 >
-> - **macOS** — unzip, then **right-click `KwaaiNet GUI.app` → Open** and click
+> - **macOS** — unzip, then **right-click `KwaaiNet.app` → Open** and click
 >   **Open** in the dialog (a plain double-click will be blocked). Or allow it
 >   under System Settings → Privacy & Security → **Open Anyway**.
 > - **Windows** — unzip and run `kwaainet_gui.exe`. If SmartScreen appears,
@@ -35,7 +35,7 @@ box — no separate install needed. Open the app, and it starts a node for you.
 ## Getting started
 
 1. Download and unzip the build for your platform (above).
-2. Launch **KwaaiNet GUI**. It starts a local node automatically and lives in
+2. Launch **KwaaiNet**. It starts a local node automatically and lives in
    your menu bar / system tray.
 3. Open the chat tab and start talking to the network.
 

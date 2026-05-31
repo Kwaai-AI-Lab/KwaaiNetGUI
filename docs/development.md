@@ -23,7 +23,7 @@ flutter run -d macos      # or: -d linux, -d windows
 ```
 
 Release builds land under `build/<platform>/` — e.g.
-`build/macos/Build/Products/Release/KwaaiNet GUI.app`,
+`build/macos/Build/Products/Release/KwaaiNet.app`,
 `build/linux/x64/release/bundle/`,
 `build/windows/x64/runner/Release/`.
 

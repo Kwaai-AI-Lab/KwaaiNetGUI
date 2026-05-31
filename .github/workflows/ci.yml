@@ -64,8 +64,8 @@ jobs:
           - os: macos-latest
             target: macos
             kwaainet_asset: kwaainet-aarch64-apple-darwin.tar.xz
-            bundle_dir: build/macos/Build/Products/Release/KwaaiNet GUI.app/Contents/MacOS
-            artifact_path: build/macos/Build/Products/Release/KwaaiNet GUI.app
+            bundle_dir: build/macos/Build/Products/Release/KwaaiNet.app/Contents/MacOS
+            artifact_path: build/macos/Build/Products/Release/KwaaiNet.app
           - os: windows-latest
             target: windows
             kwaainet_asset: kwaainet-x86_64-pc-windows-msvc.zip
@@ -166,7 +166,7 @@ jobs:
         run: |
           set -euo pipefail
           # `ditto` is the macOS-correct archiver: keeps symlinks, exec bits,
-          # and resource forks. --keepParent puts "KwaaiNet GUI.app" at the
+          # and resource forks. --keepParent puts "KwaaiNet.app" at the
           # zip root so it unzips straight to a launchable .app.
           ditto -c -k --keepParent \
             "${{ matrix.artifact_path }}" "$GITHUB_WORKSPACE/kwaainet-gui-macos.zip"

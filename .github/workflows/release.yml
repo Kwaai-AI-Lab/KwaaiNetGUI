@@ -38,8 +38,8 @@ jobs:
           - os: macos-latest
             target: macos
             kwaainet_asset: kwaainet-aarch64-apple-darwin.tar.xz
-            bundle_dir: build/macos/Build/Products/Release/KwaaiNet GUI.app/Contents/MacOS
-            artifact_path: build/macos/Build/Products/Release/KwaaiNet GUI.app
+            bundle_dir: build/macos/Build/Products/Release/KwaaiNet.app/Contents/MacOS
+            artifact_path: build/macos/Build/Products/Release/KwaaiNet.app
           - os: windows-latest
             target: windows
             kwaainet_asset: kwaainet-x86_64-pc-windows-msvc.zip
@@ -169,7 +169,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: KwaaiNet GUI ${{ github.event.inputs.tag || github.ref_name }}
+          name: KwaaiNet ${{ github.event.inputs.tag || github.ref_name }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: dist/*
