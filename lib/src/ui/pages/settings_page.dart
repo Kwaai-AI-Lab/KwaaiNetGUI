@@ -8,6 +8,7 @@ import '../../daemon/config_file.dart';
 import '../../daemon/daemon_controller.dart';
 import '../../daemon/daemon_state.dart';
 import '../../daemon/features_state.dart';
+import '../../daemon/paths.dart';
 import '../../settings.dart';
 import '../../tray/tray.dart';
 import '../../window/window_focus.dart';
@@ -867,9 +868,9 @@ class _DaemonSourcePickerState extends State<_DaemonSourcePicker> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _RadioRow(
+          _RadioRow(
             value: DaemonMode.builtIn,
-            label: 'Use built-in (dev: core/target/debug/kwaainet)',
+            label: builtInDaemonLabel,
           ),
           // "Use system" is only selectable when kwaainet is on PATH.
           _RadioRow(

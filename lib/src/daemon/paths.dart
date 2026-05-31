@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
+
 class KwaainetPaths {
   static String get home {
     final override = Platform.environment['KWAAINET_HOME'];
@@ -67,4 +69,50 @@ String get builtInDebugDaemonPath {
   // Nothing found — return the sibling-layout guess relative to cwd so the
   // error message points somewhere actionable.
   return [Directory.current.absolute.path, ...sibling].join(sep);
+}
+
+/// True when the resolved built-in daemon sits *inside* the app bundle (next
+/// to the GUI executable) — i.e. a normal installed/release app, where the
+/// path is an implementation detail not worth showing the user.
+bool get _builtInDaemonIsBundled {
+  final sep = Platform.pathSeparator;
+  final exeDir = File(Platform.resolvedExecutable).absolute.parent.path;
+  final resolved = builtInDebugDaemonPath;
+  return resolved == '$exeDir$sep${Platform.isWindows ? 'kwaainet.exe' : 'kwaainet'}' ||
+      resolved.startsWith('$exeDir$sep..${sep}Resources$sep');
+}
+
+/// User-facing label for the "Use built-in" daemon option.
+///
+/// Release/installed builds bundle the daemon inside the app, so the path is
+/// noise — just say "Use built-in". Only in a debug build where the daemon is
+/// run from a *different* directory than the GUI (the dev sibling checkout) do
+/// we surface the actual relative path being used, e.g.
+/// `../KwaaiNet/core/target/debug/kwaainet`.
+String get builtInDaemonLabel {
+  if (!kDebugMode || _builtInDaemonIsBundled) return 'Use built-in';
+  final rel = _relativeToCwd(builtInDebugDaemonPath);
+  return 'Use built-in (dev: $rel)';
+}
+
+/// Render [target] relative to the current working directory, so a dev sees
+/// `../KwaaiNet/core/target/debug/kwaainet` rather than an absolute path.
+/// Falls back to the absolute path if the two share no common root.
+String _relativeToCwd(String target) {
+  final sep = Platform.pathSeparator;
+  final from = Directory.current.absolute.path.split(sep)
+    ..removeWhere((s) => s.isEmpty);
+  final to = File(target).absolute.path.split(sep)
+    ..removeWhere((s) => s.isEmpty);
+
+  var common = 0;
+  while (common < from.length &&
+      common < to.length &&
+      from[common] == to[common]) {
+    common++;
+  }
+  if (common == 0) return File(target).absolute.path; // no shared root
+  final ups = List.filled(from.length - common, '..');
+  final down = to.sublist(common);
+  return [...ups, ...down].join(sep);
 }
