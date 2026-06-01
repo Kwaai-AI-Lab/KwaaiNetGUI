@@ -8,11 +8,13 @@ import '../../daemon/daemon_controller.dart';
 import '../../daemon/daemon_state.dart';
 import '../../settings.dart';
 import '../../tray/tray.dart';
+import '../../update/release_checker.dart';
 import '../../window/window_focus.dart';
 import '../theme/kwaai_theme.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/branded_title.dart';
 import '../widgets/kwaai_chat_composer.dart';
+import '../widgets/kwaai_status_bar.dart';
 import '../widgets/service_status_view.dart';
 import 'settings_page.dart';
 
@@ -92,6 +94,7 @@ class _MainPageState extends ConsumerState<MainPage> {
               selectedTab: _selectedTab,
               onSelectTab: (i) => setState(() => _selectedTab = i),
             ),
+            const _UpdateBanner(),
             Expanded(
               child: IndexedStack(
                 index: _selectedTab,
@@ -242,6 +245,56 @@ class _MainTopBar extends StatelessWidget {
               icon: const Icon(Icons.settings),
               onPressed: onOpenSettings,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pinned info banner shown under the top bar when a newer GUI release is
+/// available. Offers Update (open the release page), Later (hide for this
+/// session), and Skip (suppress this version permanently). Collapses to
+/// nothing when there's no pending update.
+class _UpdateBanner extends ConsumerWidget {
+  const _UpdateBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pending = ref.watch(updateBannerProvider);
+    if (pending == null) return const SizedBox.shrink();
+
+    final notifier = ref.read(updateAvailabilityProvider.notifier);
+    final accent = context.kwaai.accentPrimary;
+    return KwaaiStatusBar(
+      severity: KwaaiStatusSeverity.info,
+      message: 'KwaaiNet ${pending.version} is available.',
+      action: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextButton(
+            onPressed: notifier.openReleasePage,
+            style: TextButton.styleFrom(
+              foregroundColor: accent,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: const Text('Update'),
+          ),
+          TextButton(
+            onPressed: notifier.later,
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: const Text('Later'),
+          ),
+          TextButton(
+            onPressed: notifier.skip,
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: const Text('Skip'),
           ),
         ],
       ),

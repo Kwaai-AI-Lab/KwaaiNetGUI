@@ -25,6 +25,7 @@ class Settings {
   static const _keepInTrayKey = 'window.keepInTrayOnClose';
   static const _startOnStartupKey = 'daemon.startOnStartup';
   static const _localChatKey = 'dev.localChatEnabled';
+  static const _skippedVersionKey = 'app.skippedVersion';
 
   final SharedPreferences _prefs;
 
@@ -50,6 +51,12 @@ class Settings {
   /// fallback when you want to bypass the shard mesh.
   bool get localChatEnabled => _prefs.getBool(_localChatKey) ?? false;
 
+  /// The app release version the user chose to "Skip" from the update
+  /// banner (e.g. "0.1.3", normalized without a leading "v"). The banner
+  /// stays hidden until a release strictly newer than this ships. Null
+  /// when nothing has been skipped.
+  String? get skippedVersion => _prefs.getString(_skippedVersionKey);
+
   Future<void> setMode(DaemonMode m) async {
     await _prefs.setString(_modeKey, _serialize(m));
   }
@@ -73,7 +80,26 @@ class Settings {
   Future<void> setLocalChatEnabled(bool v) async {
     await _prefs.setBool(_localChatKey, v);
   }
+
+  Future<void> setSkippedVersion(String? v) async {
+    if (v == null || v.isEmpty) {
+      await _prefs.remove(_skippedVersionKey);
+    } else {
+      await _prefs.setString(_skippedVersionKey, v);
+    }
+  }
 }
+
+/// The single app-wide [Settings] instance. Overridden in the
+/// [ProviderScope] at app start (see main.dart) so providers — e.g. the
+/// update notifier persisting a skipped version — can reach it without
+/// threading it through widget constructors.
+final settingsProvider = Provider<Settings>((ref) {
+  throw UnimplementedError(
+    'settingsProvider must be overridden with the app-wide Settings '
+    'instance via ProviderScope.overrides.',
+  );
+});
 
 /// Riverpod-visible mirror of [Settings.localChatEnabled]. Widgets that
 /// need to react to the toggle (e.g. the main page's tab bar) watch
@@ -82,3 +108,11 @@ class Settings {
 /// writes through to Settings.setLocalChatEnabled() and updates this
 /// provider so subscribers see the change immediately.
 final localChatEnabledProvider = StateProvider<bool>((_) => false);
+
+/// Riverpod-visible mirror of [Settings.skippedVersion]. The update
+/// banner / tray watch this so a "Skip" takes effect immediately without
+/// re-reading prefs. Seeded by main.dart at startup; the update notifier
+/// writes through to [Settings.setSkippedVersion] and updates this
+/// provider so the banner disappears on the same frame. Null = nothing
+/// skipped.
+final skippedVersionProvider = StateProvider<String?>((_) => null);

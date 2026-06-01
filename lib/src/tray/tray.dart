@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../daemon/daemon_state.dart';
 import '../daemon/status_watcher.dart';
+import '../update/release_checker.dart';
 import '../window/dock_icon.dart';
 import '../window/shutdown.dart';
 
@@ -39,8 +40,10 @@ class TrayController with TrayListener {
   String _statusText = 'Stopped';
   String? _iconPath;
   bool _enabled = false;
+  ReleaseInfo? _pendingUpdate;
   ProviderSubscription<AsyncValue<NodeStatus>>? _statusSub;
   ProviderSubscription<DaemonTransition>? _transitionSub;
+  ProviderSubscription<ReleaseInfo?>? _updateSub;
 
   /// True when the tray icon is currently installed in the menu bar.
   bool get enabled => _enabled;
@@ -66,7 +69,7 @@ class TrayController with TrayListener {
       'tray_kwaai_logo.png',
     );
     await trayManager.setIcon(_iconPath!, isTemplate: true);
-    await trayManager.setToolTip('Kwaai AI — ${_statusText.toLowerCase()}');
+    await trayManager.setToolTip('KwaaiNet — ${_statusText.toLowerCase()}');
     trayManager.addListener(this);
     // Flip _enabled before _rebuildMenu() — it guards on !_enabled and
     // would otherwise no-op during the initial setup.
@@ -82,6 +85,17 @@ class TrayController with TrayListener {
     _transitionSub = _container.listen<DaemonTransition>(
       daemonTransitionProvider,
       (_, _) => _refresh(),
+      fireImmediately: true,
+    );
+    // Surface "Update available" in the menu. Uses updateTrayProvider, which
+    // ignores the session-only "Later" (a tray affordance persists; only a
+    // durable "Skip" suppresses it).
+    _updateSub = _container.listen<ReleaseInfo?>(
+      updateTrayProvider,
+      (_, next) {
+        _pendingUpdate = next;
+        _rebuildMenu();
+      },
       fireImmediately: true,
     );
 
@@ -127,7 +141,7 @@ class TrayController with TrayListener {
     _state = newState;
     _statusText = newText;
     if (!_enabled) return;
-    await trayManager.setToolTip('Kwaai AI — ${_statusText.toLowerCase()}');
+    await trayManager.setToolTip('KwaaiNet — ${_statusText.toLowerCase()}');
     await _rebuildMenu();
   }
 
@@ -136,9 +150,17 @@ class TrayController with TrayListener {
     final running = _state == TrayState.running;
     final transitioning =
         _state == TrayState.starting || _state == TrayState.stopping;
+    final update = _pendingUpdate;
     await trayManager.setContextMenu(
       Menu(
         items: [
+          if (update != null) ...[
+            MenuItem(
+              key: 'update',
+              label: '⬆️  Update available: ${update.version}…',
+            ),
+            MenuItem.separator(),
+          ],
           MenuItem(label: '${_state.emoji}  $_statusText', disabled: true),
           MenuItem.separator(),
           MenuItem(
@@ -152,9 +174,9 @@ class TrayController with TrayListener {
             disabled: !running || transitioning,
           ),
           MenuItem.separator(),
-          MenuItem(key: 'show', label: 'Open Kwaai AI…'),
+          MenuItem(key: 'show', label: 'Open KwaaiNet…'),
           MenuItem.separator(),
-          MenuItem(key: 'quit', label: 'Quit Kwaai AI'),
+          MenuItem(key: 'quit', label: 'Quit KwaaiNet'),
         ],
       ),
     );
@@ -180,6 +202,13 @@ class TrayController with TrayListener {
   void onTrayMenuItemClick(MenuItem menuItem) async {
     _log('menu click: key=${menuItem.key}');
     switch (menuItem.key) {
+      case 'update':
+        // Open the release page — same action the banner's Update uses.
+        // The app can't self-replace a running bundle.
+        await _container
+            .read(updateAvailabilityProvider.notifier)
+            .openReleasePage();
+        break;
       case 'start':
         // Goes through the same provider action the settings page uses, so
         // the main UI reflects Starting… immediately.
@@ -217,8 +246,10 @@ class TrayController with TrayListener {
     if (!_enabled) return;
     _statusSub?.close();
     _transitionSub?.close();
+    _updateSub?.close();
     _statusSub = null;
     _transitionSub = null;
+    _updateSub = null;
     trayManager.removeListener(this);
     await trayManager.destroy();
     _enabled = false;

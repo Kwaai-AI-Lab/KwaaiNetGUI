@@ -13,6 +13,7 @@ import 'src/daemon/daemon_state.dart';
 import 'src/daemon/status_watcher.dart';
 import 'src/settings.dart';
 import 'src/tray/tray.dart';
+import 'src/update/release_checker.dart';
 import 'src/ui/pages/main_page.dart';
 import 'src/ui/theme/theme_controller.dart';
 import 'src/ui/theme/theme_variants.dart';
@@ -24,7 +25,7 @@ import 'src/window/window_focus.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
-  await windowManager.setTitle('Kwaai AI');
+  await windowManager.setTitle('KwaaiNet');
   await windowManager.setMinimumSize(const Size(560, 400));
 
   if (!kIsWeb && Platform.isMacOS) {
@@ -50,12 +51,18 @@ Future<void> main() async {
     overrides: [
       daemonControllerProvider.overrideWithValue(daemon),
       statusWatcherProvider.overrideWithValue(watcher),
+      // Expose the app-wide Settings so providers (e.g. the update notifier
+      // persisting a skipped version) can reach it.
+      settingsProvider.overrideWithValue(settings),
       // Seed the localChatEnabled provider from the durable setting so
       // the main page's tab bar reflects the user's last choice on
       // first paint.
       localChatEnabledProvider.overrideWith(
         (_) => settings.localChatEnabled,
       ),
+      // Seed the skipped-version mirror so the update banner suppresses a
+      // previously-skipped release on first paint.
+      skippedVersionProvider.overrideWith((_) => settings.skippedVersion),
     ],
   );
 
@@ -105,6 +112,12 @@ Future<void> main() async {
     // want to block the app from coming up while the daemon spins up.
     unawaited(container.read(daemonTransitionProvider.notifier).start());
   }
+
+  // Kick off the GUI self-update check now so it runs even if the window
+  // starts hidden to the tray (the banner would otherwise be the only
+  // reader that triggers the fetch). No-op in debug builds — the notifier
+  // gates the network call on kReleaseMode.
+  container.read(updateAvailabilityProvider);
 
   runApp(
     UncontrolledProviderScope(
@@ -163,7 +176,7 @@ class KwaainetGuiApp extends StatelessWidget {
               AppThemeMode.dark => ThemeMode.dark,
             };
             return MaterialApp(
-              title: 'Kwaai AI',
+              title: 'KwaaiNet',
               theme: lightTheme,
               darkTheme: darkTheme,
               themeMode: themeMode,

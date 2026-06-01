@@ -2128,7 +2128,7 @@ class _AboutTab extends StatelessWidget {
             Image.asset('assets/kwaaiai.png', height: 240),
             const SizedBox(height: 16),
             Text(
-              'Kwaai AI',
+              'KwaaiNet',
               style: textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w600,
               ),

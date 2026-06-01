@@ -12,7 +12,7 @@ class BrandedTitle extends StatelessWidget {
       children: [
         Image.asset('assets/kwaaiai.png', height: 18),
         const SizedBox(width: 6),
-        Text('Kwaai AI', style: Theme.of(context).textTheme.titleSmall),
+        Text('KwaaiNet', style: Theme.of(context).textTheme.titleSmall),
         if (subtitle != null) ...[
           const SizedBox(width: 8),
           Text(
