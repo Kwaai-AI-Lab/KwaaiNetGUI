@@ -184,13 +184,15 @@ class SessionClient {
   // Internals
   // -------------------------------------------------------------------
 
-  Stream<String> _tokensFromFrames(Stream<pb.ServerFrame> frames) async* {
-    await for (final f in frames) {
-      if (f.whichBody() == pb.ServerFrame_Body.token) {
+  Stream<String> _tokensFromFrames(Stream<pb.ServerFrame> frames) {
+    return watchdogged<pb.ServerFrame, String>(
+      frames,
+      extract: (f) {
+        if (f.whichBody() != pb.ServerFrame_Body.token) return null;
         final t = f.token;
-        if (t.text.isNotEmpty) yield t.text;
-      }
-    }
+        return t.text.isEmpty ? null : t.text;
+      },
+    );
   }
 
   /// Allocate an id, build the ClientFrame, send it, register a router,
@@ -211,6 +213,93 @@ class SessionClient {
     _outbound!.add(build(id));
     return controller.stream;
   }
+}
+
+/// How long to wait for the daemon's *first* frame before declaring the
+/// request dead. Generous: the daemon may still be loading a model, resolving
+/// peers, or queueing behind another request.
+const kFirstFrameTimeout = Duration(seconds: 90);
+
+/// How long to tolerate silence *after* the stream has started producing.
+/// Once tokens are flowing a long gap means the far end stopped — a healthy
+/// generation does not pause this long between tokens.
+const kStallTimeout = Duration(seconds: 45);
+
+/// Wraps [source] in a silence watchdog, mapping each element through
+/// [extract] (null = consume the element without emitting).
+///
+/// The daemon can stop sending without closing the stream or reporting an
+/// error — a killed peer, a severed session, a hang inside inference. gRPC
+/// won't notice: the HTTP/2 stream stays open, so `onDone`/`onError` never
+/// fire and a UI waiting on it spins forever.
+///
+/// There is no daemon-side heartbeat to lean on (the proto has no keepalive
+/// frame) and the daemon is under active development, so this deliberately
+/// trusts nothing about the far end: any gap longer than the deadline becomes
+/// an ordinary operation error the UI already knows how to display. The timer
+/// resets on *every* element, so a slow-but-alive stream is never killed.
+///
+/// The deadline is [kFirstFrameTimeout] until the first element arrives and
+/// [kStallTimeout] thereafter — "never started" and "stopped mid-answer"
+/// warrant different patience.
+Stream<Out> watchdogged<In, Out>(
+  Stream<In> source, {
+  required Out? Function(In) extract,
+  Duration firstTimeout = kFirstFrameTimeout,
+  Duration stallTimeout = kStallTimeout,
+}) {
+  final out = StreamController<Out>();
+  StreamSubscription<In>? sub;
+  Timer? watchdog;
+  var sawElement = false;
+
+  void fail() {
+    final waited = sawElement ? stallTimeout : firstTimeout;
+    out.addError(
+      SessionOpError(
+        // UNAVAILABLE — the same code the daemon uses for a lost service, so
+        // this renders through the existing "lost connection" copy.
+        code: 3,
+        message: sawElement
+            ? 'The daemon stopped responding mid-answer '
+                  '(no data for ${waited.inSeconds}s).'
+            : 'The daemon did not respond within ${waited.inSeconds}s.',
+      ),
+    );
+    sub?.cancel();
+    out.close();
+  }
+
+  void arm() {
+    watchdog?.cancel();
+    watchdog = Timer(sawElement ? stallTimeout : firstTimeout, fail);
+  }
+
+  out.onListen = () {
+    arm();
+    sub = source.listen(
+      (e) {
+        sawElement = true;
+        arm();
+        final mapped = extract(e);
+        if (mapped != null) out.add(mapped);
+      },
+      onError: (Object e, StackTrace st) {
+        watchdog?.cancel();
+        out.addError(e, st);
+        out.close();
+      },
+      onDone: () {
+        watchdog?.cancel();
+        out.close();
+      },
+    );
+  };
+  out.onCancel = () async {
+    watchdog?.cancel();
+    await sub?.cancel();
+  };
+  return out.stream;
 }
 
 /// Thrown into a per-op stream when the server emits Error for that id.
