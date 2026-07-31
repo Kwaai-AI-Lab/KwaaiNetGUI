@@ -3,6 +3,18 @@ import 'package:flutter/services.dart';
 
 import '../theme/kwaai_theme.dart';
 
+/// Gap between the trailing send/stop button and the composer pill's
+/// edge, applied on the top, bottom and right.
+///
+/// Also drives the pill's corner radius (button radius + this), which is
+/// what makes the two curves concentric — an equal gap the whole way
+/// around the corner rather than only at the sides.
+const double _kButtonInset = 6;
+
+/// Diameter of the circular send/stop button. Both buttons use it so
+/// swapping between them can't shift the layout.
+const double _kButtonDiameter = 32;
+
 /// Multi-line chat composer. Distinct primitive from [KwaaiTextField]:
 /// pill-rounded, grows upward as the user types or wraps, no
 /// InputDecorator chrome (so Material's `hoverColor` doesn't grey
@@ -102,10 +114,28 @@ class KwaaiChatComposer extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: fill,
-        borderRadius: BorderRadius.circular(20),
+        // Concentric with the trailing send/stop button: that button is
+        // inset by _kButtonInset on the top, bottom and right, so the
+        // pill's radius must be the button's radius plus that inset for
+        // the gap to stay uniform around the curve rather than only at
+        // the sides.
+        borderRadius: BorderRadius.circular(
+          _kButtonDiameter / 2 + _kButtonInset,
+        ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      // Asymmetric on purpose: the text needs breathing room from the
+      // left edge, while the right side is sized to the button's inset
+      // rather than the text's.
+      padding: const EdgeInsets.fromLTRB(
+        14,
+        _kButtonInset,
+        _kButtonInset,
+        _kButtonInset,
+      ),
       child: Row(
+        // `end` so a wrapping field grows upward while the trailing
+        // controls stay put at the bottom. The button opts out of this
+        // via its own alignment below — see the SizedBox comment.
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
@@ -120,18 +150,27 @@ class KwaaiChatComposer extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          // Send and Stop share this slot — see [onStop].
-          if (onStop != null)
-            _StopButton(
-              onPressed: onStop,
-              accent: ext.accentPrimary,
-            )
-          else
-            _SendButton(
-              onPressed: _canSend ? onSend : null,
-              accent: ext.accentPrimary,
-              mutedFg: scheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
+          // The field is a little taller than the button at one line, and
+          // the Row is `end`-aligned so the field can grow upward. That
+          // would bottom-align the button and dump the surplus height
+          // above it, breaking the equal gap the concentric corner needs.
+          // Sizing the slot to the button and centring it puts the
+          // surplus on both sides instead.
+          SizedBox(
+            height: _kButtonDiameter,
+            width: _kButtonDiameter,
+            // Send and Stop share this slot — see [onStop].
+            child: onStop != null
+                ? _StopButton(
+                    onPressed: onStop,
+                    accent: ext.accentPrimary,
+                  )
+                : _SendButton(
+                    onPressed: _canSend ? onSend : null,
+                    accent: ext.accentPrimary,
+                    mutedFg: scheme.onSurfaceVariant.withValues(alpha: 0.5),
+                  ),
+          ),
           if (onNewChat != null) ...[
             const SizedBox(width: 4),
             _NewChatButton(
@@ -161,7 +200,7 @@ class _NewChatButton extends StatelessWidget {
       onPressed: onPressed,
       style: IconButton.styleFrom(
         foregroundColor: fg,
-        minimumSize: const Size(32, 32),
+        minimumSize: const Size(_kButtonDiameter, _kButtonDiameter),
         padding: EdgeInsets.zero,
         shape: const CircleBorder(),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -235,7 +274,12 @@ class _ComposerField extends StatelessWidget {
           style: Theme.of(context).textTheme.bodyMedium,
           decoration: InputDecoration(
             isCollapsed: true,
-            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            // Sized so a single line of text makes the field exactly as
+            // tall as the send/stop button (_kButtonDiameter). Any taller
+            // and the button — bottom-aligned in an `end`-aligned Row —
+            // gets the surplus dumped above it, which visibly breaks the
+            // concentric trailing corner.
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
             border: InputBorder.none,
             focusedBorder: InputBorder.none,
             enabledBorder: InputBorder.none,
@@ -278,7 +322,7 @@ class _StopButton extends StatelessWidget {
       style: IconButton.styleFrom(
         backgroundColor: accent,
         foregroundColor: Colors.white,
-        minimumSize: const Size(32, 32),
+        minimumSize: const Size(_kButtonDiameter, _kButtonDiameter),
         padding: EdgeInsets.zero,
         shape: const CircleBorder(),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -311,7 +355,7 @@ class _SendButton extends StatelessWidget {
       style: IconButton.styleFrom(
         backgroundColor: active ? accent : Colors.transparent,
         foregroundColor: active ? Colors.white : mutedFg,
-        minimumSize: const Size(32, 32),
+        minimumSize: const Size(_kButtonDiameter, _kButtonDiameter),
         padding: EdgeInsets.zero,
         shape: const CircleBorder(),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
