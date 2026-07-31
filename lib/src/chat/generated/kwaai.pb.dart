@@ -840,6 +840,7 @@ class StatusReply extends $pb.GeneratedMessage {
     $core.bool? shardReady,
     $core.int? peerCount,
     $fixnum.Int64? uptimeSecs,
+    $core.String? version,
   }) {
     final result = create();
     if (serverTime != null) result.serverTime = serverTime;
@@ -847,6 +848,7 @@ class StatusReply extends $pb.GeneratedMessage {
     if (shardReady != null) result.shardReady = shardReady;
     if (peerCount != null) result.peerCount = peerCount;
     if (uptimeSecs != null) result.uptimeSecs = uptimeSecs;
+    if (version != null) result.version = version;
     return result;
   }
 
@@ -870,6 +872,7 @@ class StatusReply extends $pb.GeneratedMessage {
     ..a<$fixnum.Int64>(
         5, _omitFieldNames ? '' : 'uptimeSecs', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(6, _omitFieldNames ? '' : 'version')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -942,6 +945,23 @@ class StatusReply extends $pb.GeneratedMessage {
   $core.bool hasUptimeSecs() => $_has(4);
   @$pb.TagNumber(5)
   void clearUptimeSecs() => $_clearField(5);
+
+  /// Version of the running daemon binary (CARGO_PKG_VERSION), e.g.
+  /// "0.5.4" — no leading "v". Lets a client report the version of the
+  /// process it is actually talking to, which can differ from whatever
+  /// binary is on disk after an upgrade or a config change that has not
+  /// been restarted into yet.
+  ///
+  /// Empty when talking to a daemon built before this field existed;
+  /// clients should treat "" as unknown rather than as a version.
+  @$pb.TagNumber(6)
+  $core.String get version => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set version($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasVersion() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearVersion() => $_clearField(6);
 }
 
 class ChatMessage extends $pb.GeneratedMessage {

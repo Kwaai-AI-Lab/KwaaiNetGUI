@@ -24,8 +24,11 @@ class DaemonController {
 
   final Settings _settings;
 
-  DaemonResolution resolveBinary() {
-    switch (_settings.mode) {
+  /// Resolve the binary for [mode], defaulting to the currently-selected
+  /// mode. The settings UI passes an explicit mode so it can show each
+  /// option's binary without having to select it first.
+  DaemonResolution resolveBinary([DaemonMode? mode]) {
+    switch (mode ?? _settings.mode) {
       case DaemonMode.builtIn:
         final p = builtInDebugDaemonPath;
         return DaemonResolution(
@@ -58,6 +61,76 @@ class DaemonController {
           source: 'externally managed',
         );
     }
+  }
+
+  /// Tail of the version-probe queue. Each [binaryVersion] call chains onto
+  /// the previous one so at most one `--version` child process exists at a
+  /// time — the settings page asks about several modes at once, and fanning
+  /// those out concurrently would spike load on a low-power machine for no
+  /// benefit. Probes are cheap and the UI reveals each row as it resolves,
+  /// so serial costs nothing perceptible.
+  Future<void> _versionQueue = Future.value();
+
+  /// Version string of the binary [mode] resolves to (default: the selected
+  /// mode), obtained by running `<binary> --version`.
+  ///
+  /// Serialized against every other in-flight call — see [_versionQueue].
+  ///
+  /// Returns null when there is nothing to interrogate — external mode (the
+  /// app doesn't know which binary the supervisor launched), an unresolved or
+  /// missing path, a non-zero exit, or output that doesn't look like a
+  /// version. Callers render "unknown" rather than distinguishing the cases.
+  ///
+  /// `kwaainet --version` prints `kwaainet 0.5.4`; strip the leading binary
+  /// name so the caller gets a bare `0.5.4`.
+  Future<String?> binaryVersion([DaemonMode? mode]) {
+    // Resolve *before* queueing: it's a cheap stat, and doing it up front
+    // means a missing binary costs nothing and never occupies the queue.
+    final r = resolveBinary(mode);
+    if (!r.exists || r.path.isEmpty) return Future.value(null);
+
+    final result = _versionQueue.then((_) => _probeVersion(r.path));
+    // Keep the chain alive even if a probe throws — _probeVersion already
+    // swallows its own errors, but a broken link here would wedge every
+    // subsequent probe behind a permanently-failed future.
+    _versionQueue = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
+  Future<String?> _probeVersion(String path) async {
+    try {
+      final proc = await Process.run(path, [
+        '--version',
+      ]).timeout(const Duration(seconds: 5));
+      if (proc.exitCode != 0) {
+        _log('--version exited ${proc.exitCode} for $path');
+        return null;
+      }
+      return parseVersionOutput(proc.stdout as String);
+    } catch (e) {
+      _log('--version failed for $path: $e');
+      return null;
+    }
+  }
+
+  /// Extracts the bare version from `kwaainet --version` output.
+  ///
+  /// `kwaainet 0.5.4` → `0.5.4`. Only the first line is considered, so a
+  /// binary that appends an update hint or banner still parses. Returns null
+  /// for empty output or a trailing token that isn't digit-led (e.g. a usage
+  /// string from an older binary that doesn't understand `--version`).
+  static String? parseVersionOutput(String stdout) {
+    final first = stdout.trim().split('\n').first.trim();
+    if (first.isEmpty) return null;
+    final space = first.lastIndexOf(' ');
+    final token = space == -1 ? first : first.substring(space + 1);
+    // Tolerate a `v` prefix; require the rest to start with a digit so
+    // arbitrary prose doesn't get rendered as a version.
+    final bare = token.startsWith('v') || token.startsWith('V')
+        ? token.substring(1)
+        : token;
+    if (bare.isEmpty || !RegExp(r'^\d').hasMatch(bare)) return null;
+    return bare;
   }
 
   String? findSystemBinary() => _whichKwaainet();
