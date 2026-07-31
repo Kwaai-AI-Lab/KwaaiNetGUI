@@ -40,11 +40,24 @@ enum ChatPath {
 class ChatTranscriptNotifier
     extends FamilyNotifier<List<ChatMessage>, ChatPath> {
   StreamSubscription<String>? _sub;
+  Timer? _bumpTimer;
   ChatPath get _path => arg;
+
+  /// How long token arrivals are coalesced before the UI rebuilds.
+  ///
+  /// Assistant text renders as markdown, and each rebuild re-parses the
+  /// whole message — so bumping per token makes the cost grow with the
+  /// square of the response length and drops frames on long answers.
+  /// At this interval the stream still reads as continuous to the eye
+  /// while parses stay bounded at ~15/sec regardless of token rate.
+  static const _bumpInterval = Duration(milliseconds: 66);
 
   @override
   List<ChatMessage> build(ChatPath arg) {
-    ref.onDispose(() => _sub?.cancel());
+    ref.onDispose(() {
+      _sub?.cancel();
+      _bumpTimer?.cancel();
+    });
     return [];
   }
 
@@ -66,7 +79,7 @@ class ChatTranscriptNotifier
     _sub = stream.listen(
       (token) {
         assistant.text += token;
-        _bump();
+        _bumpThrottled();
       },
       onError: (e, _) {
         // Log any tokens that streamed in before the error too — without
@@ -83,14 +96,14 @@ class ChatTranscriptNotifier
             ? ChatError(code: e.code, message: e.message)
             : ChatError(code: 0, message: e.toString());
         assistant.streaming = false;
-        _bump();
+        _flushBump();
         _sub = null;
         if (!completer.isCompleted) completer.complete();
       },
       onDone: () {
         _log('[${_path.name}] < ${assistant.text}');
         assistant.streaming = false;
-        _bump();
+        _flushBump();
         _sub = null;
         if (!completer.isCompleted) completer.complete();
       },
@@ -105,8 +118,10 @@ class ChatTranscriptNotifier
     _sub = null;
     if (state.isNotEmpty && state.last.streaming) {
       state.last.streaming = false;
-      _bump();
     }
+    // Unconditional: a pending bump must be cleared even when the last
+    // message wasn't mid-stream, so it can't fire after teardown.
+    _flushBump();
   }
 
   /// Drop the transcript and abort any in-flight stream. Backs the
@@ -116,12 +131,42 @@ class ChatTranscriptNotifier
   void newChat() {
     _sub?.cancel();
     _sub = null;
+    // Drop any pending rebuild before clearing — otherwise it fires
+    // against the emptied transcript a frame later.
+    _bumpTimer?.cancel();
+    _bumpTimer = null;
     state = [];
   }
 
   /// Trigger a rebuild without changing the list reference — copying
   /// the list is cheap and only happens on each token tick.
   void _bump() => state = List.of(state);
+
+  /// Coalescing [_bump] for the token-arrival path.
+  ///
+  /// The first token of a quiet period renders immediately (so the
+  /// response starts appearing with no perceptible lag) and any further
+  /// tokens inside the window collapse into a single trailing rebuild.
+  void _bumpThrottled() {
+    if (_bumpTimer != null) return; // a rebuild is already pending
+    _bump();
+    _bumpTimer = Timer(_bumpInterval, () {
+      _bumpTimer = null;
+      // Only needed if tokens actually arrived during the window; a
+      // redundant bump is cheap, and skipping it would risk dropping
+      // the tail of a burst.
+      _bump();
+    });
+  }
+
+  /// Cancel any pending throttled rebuild and render current text now.
+  /// Every terminal path (done, error, cancel) must call this — otherwise
+  /// the last tokens of a response stay stuck in the pending window.
+  void _flushBump() {
+    _bumpTimer?.cancel();
+    _bumpTimer = null;
+    _bump();
+  }
 }
 
 final chatTranscriptProvider =

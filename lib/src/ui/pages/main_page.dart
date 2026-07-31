@@ -14,6 +14,7 @@ import '../theme/kwaai_theme.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/branded_title.dart';
 import '../widgets/kwaai_chat_composer.dart';
+import '../widgets/kwaai_markdown_body.dart';
 import '../widgets/kwaai_status_bar.dart';
 import '../widgets/service_status_view.dart';
 import 'settings_page.dart';
@@ -621,35 +622,35 @@ class _ChatTranscriptState extends ConsumerState<_ChatTranscript> {
                               : context.kwaai.elevatedSurface,
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: SelectableText.rich(
-                          TextSpan(
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: scheme.onSurface),
-                            children: [
-                              TextSpan(text: msg.text),
-                              if (!isUser && msg.streaming)
-                                WidgetSpan(
-                                  alignment: PlaceholderAlignment.baseline,
-                                  baseline: TextBaseline.alphabetic,
-                                  child: _StreamingDots(
-                                    color: scheme.onSurface,
-                                  ),
-                                )
-                              // Text plus an error means the stream died
-                              // part-way: mark where it stopped so a
-                              // truncated answer can't be mistaken for a
-                              // complete one.
-                              else if (!isUser && msg.error != null)
-                                WidgetSpan(
-                                  alignment: PlaceholderAlignment.baseline,
-                                  baseline: TextBaseline.alphabetic,
-                                  child: _TruncationSplat(
-                                    color: context.kwaai.buttonDestructive,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
+                        // Assistant output is markdown from the model;
+                        // user text is shown verbatim, since someone
+                        // typing `a * b * c` means asterisks rather than
+                        // emphasis.
+                        child: isUser
+                            ? SelectableText(
+                                msg.text,
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(color: scheme.onSurface),
+                              )
+                            : KwaaiMarkdownBody(
+                                text: msg.text,
+                                // The dots/splat were inline WidgetSpans
+                                // before markdown; passing them down lets
+                                // the body tack them onto its final line
+                                // so they still trail the last word
+                                // rather than dropping to a row below.
+                                trailing: msg.streaming
+                                    ? _StreamingDots(color: scheme.onSurface)
+                                    // Text plus an error means the stream
+                                    // died part-way: mark where it stopped
+                                    // so a truncated answer can't be
+                                    // mistaken for a complete one.
+                                    : msg.error != null
+                                    ? _TruncationSplat(
+                                        color: context.kwaai.buttonDestructive,
+                                      )
+                                    : null,
+                              ),
                       ),
                     // Errors are not rendered inline — they surface in the
                     // full-width bar above the composer, where they get the

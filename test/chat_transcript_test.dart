@@ -113,6 +113,127 @@ void main() {
     expect(last.error?.message, contains('boom'));
     expect(last.streaming, false);
   });
+
+  // Token arrivals are coalesced into a ~66ms window to bound markdown
+  // re-parses. The risk that introduces is a *lost tail*: tokens that
+  // land inside an open window and are never flushed, so the visible
+  // response is silently truncated. Each terminal path is covered
+  // below — these fail if the flush is dropped from any of them.
+
+  test('tokens arriving inside the throttle window survive stream close',
+      () async {
+    final controller = StreamController<String>();
+    final container = ProviderContainer(
+      overrides: [
+        kwaaiRpcClientProvider.overrideWithValue(
+          _ControlledClient(controller.stream),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final notifier =
+        container.read(chatTranscriptProvider(ChatPath.shardRun).notifier);
+    final send = notifier.send('hi');
+    await Future<void>.delayed(Duration.zero);
+
+    // First token opens the throttle window and renders immediately.
+    controller.add('a');
+    await Future<void>.delayed(Duration.zero);
+
+    // These land while the window is still open, so they are not
+    // individually rendered — closing the stream must flush them.
+    controller.add('b');
+    controller.add('c');
+    await controller.close();
+    await send;
+
+    expect(
+      container.read(chatTranscriptProvider(ChatPath.shardRun)).last.text,
+      'abc',
+    );
+  });
+
+  test('tokens buffered in the throttle window survive a stream error',
+      () async {
+    final container = ProviderContainer(
+      overrides: [
+        kwaaiRpcClientProvider.overrideWithValue(_ThrowingClient()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(chatTranscriptProvider(ChatPath.shardRun).notifier)
+        .send('hi');
+
+    // The partial token preceding the throw must still be visible, so a
+    // truncated answer shows what it managed to produce.
+    final last = container.read(chatTranscriptProvider(ChatPath.shardRun)).last;
+    expect(last.text, 'first ');
+    expect(last.streaming, false);
+  });
+
+  test('cancel flushes buffered tokens and clears streaming', () async {
+    final controller = StreamController<String>();
+    final container = ProviderContainer(
+      overrides: [
+        kwaaiRpcClientProvider.overrideWithValue(
+          _ControlledClient(controller.stream),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final notifier =
+        container.read(chatTranscriptProvider(ChatPath.shardRun).notifier);
+    unawaited(notifier.send('hi'));
+    await Future<void>.delayed(Duration.zero);
+
+    controller.add('partial ');
+    await Future<void>.delayed(Duration.zero);
+    // Must yield again so this token is actually delivered to the
+    // subscription — `add` is asynchronous, and cancelling in the same
+    // synchronous block would drop it before it ever reached the
+    // notifier, testing nothing. It lands inside the still-open
+    // throttle window, which is the case we care about.
+    controller.add('tail');
+    await Future<void>.delayed(Duration.zero);
+    notifier.cancel();
+
+    final last = container.read(chatTranscriptProvider(ChatPath.shardRun)).last;
+    expect(last.text, 'partial tail');
+    expect(last.streaming, false);
+    expect(container.read(chatStreamingProvider(ChatPath.shardRun)), false);
+  });
+
+  test('newChat clears the transcript with a bump still pending', () async {
+    final controller = StreamController<String>();
+    final container = ProviderContainer(
+      overrides: [
+        kwaaiRpcClientProvider.overrideWithValue(
+          _ControlledClient(controller.stream),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final notifier =
+        container.read(chatTranscriptProvider(ChatPath.shardRun).notifier);
+    unawaited(notifier.send('hi'));
+    await Future<void>.delayed(Duration.zero);
+    controller.add('a');
+    await Future<void>.delayed(Duration.zero);
+    controller.add('b'); // opens a pending window
+
+    notifier.newChat();
+    expect(container.read(chatTranscriptProvider(ChatPath.shardRun)), isEmpty);
+
+    // Outlive the throttle window: a stale timer firing here would
+    // resurrect the cleared transcript.
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    expect(container.read(chatTranscriptProvider(ChatPath.shardRun)), isEmpty);
+  });
 }
 
 class _ControlledClient extends KwaaiRpcClient {
