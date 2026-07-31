@@ -157,6 +157,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     // previous "not found" / spawn error no longer
                     // applies. They can re-trigger by clicking Start.
                     ref.read(daemonErrorProvider.notifier).clear();
+                    // A different binary means a different version; re-probe
+                    // so the status header stops showing the old one. The
+                    // per-option probes go too: editing the custom path
+                    // changes what that row resolves to.
+                    ref.invalidate(daemonVersionProvider);
+                    ref.invalidate(binaryVersionForModeProvider);
                     // If a daemon is already running, the binary swap
                     // doesn't take effect until the user restarts —
                     // surface the prompt so they know. The bar
@@ -557,6 +563,15 @@ class _StatusHeader extends ConsumerWidget {
     final statusAsync = ref.watch(daemonStatusProvider);
     final status = statusAsync.valueOrNull;
     final unknown = transition == DaemonTransition.none && status == null;
+    // Version of the *running* daemon, over gRPC. Shown as soon as the daemon
+    // answers — including part-way through a start, which is exactly when the
+    // selected binary-location row hands the display back over. Hidden once
+    // stopped, where those rows carry the versions instead.
+    final stopped = transition == DaemonTransition.none &&
+        status != null &&
+        !status.running;
+    final version =
+        stopped ? null : ref.watch(daemonVersionProvider).valueOrNull;
 
     final Color color;
     final textColor = unknown ? cs.onSurfaceVariant : cs.onSurface;
@@ -624,6 +639,20 @@ class _StatusHeader extends ConsumerWidget {
             );
           }
       }
+    }
+
+    // Version tails the row. Null (and so omitted) whenever the daemon isn't
+    // running, or when it is but won't report one — a daemon older than
+    // StatusReply.version, with no readable binary to fall back to. Better a
+    // missing bit than a "v?" placeholder that reflows once it resolves.
+    if (version != null) {
+      bitWidgets.add(bitText('  •  '));
+      bitWidgets.add(
+        Tooltip(
+          message: 'Version of the running KwaaiNet daemon',
+          child: bitText('v$version'),
+        ),
+      );
     }
 
     return Row(
@@ -1022,7 +1051,72 @@ class _RadioRow extends StatelessWidget {
                 ),
               ),
             ),
+            if (enabled) _RadioRowVersion(mode: value),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Version chip trailing a binary-location option, e.g. `v0.5.4`.
+///
+/// Exactly one version is on screen at a time, and it never blinks out during
+/// a start:
+///
+///  * **Stopped** — every option shows the version it would launch.
+///  * **Starting** — only the *selected* option keeps its version, bridging
+///    the gap until the daemon can answer for itself.
+///  * **Running** — nothing here; the status header carries the live daemon's
+///    version. If the daemon can't report one (older than
+///    `StatusReply.version`), no version is shown anywhere: an on-disk
+///    reading is not evidence about the running process, and showing it in
+///    the daemon's place would assert something we haven't verified.
+///
+/// Renders nothing — no placeholder, no reserved space — while the probe is
+/// in flight or when the binary can't report a version (missing file,
+/// external mode), so an unresolvable row looks exactly like today's.
+class _RadioRowVersion extends ConsumerWidget {
+  const _RadioRowVersion({required this.mode});
+
+  final DaemonMode mode;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // External mode has no candidate binary to probe — the supervisor owns
+    // it. Skip the process spawn entirely rather than waiting for it to fail.
+    if (mode == DaemonMode.external) return const SizedBox.shrink();
+
+    final transition = ref.watch(daemonTransitionProvider);
+    final status = ref.watch(daemonStatusProvider).valueOrNull;
+    final stopped = status != null && !status.running;
+
+    if (transition == DaemonTransition.starting) {
+      // Bridging a start: the selected row stands in until the daemon takes
+      // over, so the display doesn't blink out mid-transition. Bounded by the
+      // transition itself, not by "until a version arrives" — against a
+      // daemon that never reports one, the latter would leave a disk reading
+      // on screen for the process's whole lifetime, implying it describes the
+      // running daemon.
+      final selected =
+          RadioGroup.maybeOf<DaemonMode>(context)?.groupValue == mode;
+      if (!selected) return const SizedBox.shrink();
+    } else if (!stopped) {
+      // Running (or not yet known): the daemon owns the version display. If
+      // it can't report one, nothing is shown — never a disk reading standing
+      // in for the running process.
+      return const SizedBox.shrink();
+    }
+
+    final version = ref.watch(binaryVersionForModeProvider(mode)).valueOrNull;
+    if (version == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: Text(
+        'v$version',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
     );

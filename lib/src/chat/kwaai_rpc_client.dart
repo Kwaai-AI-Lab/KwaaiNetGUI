@@ -263,6 +263,28 @@ class KwaaiRpcClient {
     }
   }
 
+  /// Version of the *running* daemon, read from `StatusReply.version`.
+  ///
+  /// Returns null when the daemon isn't reachable, or when it predates the
+  /// field (proto3 decodes the absent field as ""). Null means "the running
+  /// daemon did not tell us" and is reported as such — callers must not
+  /// substitute an on-disk reading, which describes a binary that may not be
+  /// the running process.
+  ///
+  /// Unlike [chatStream] this doesn't reset the channel on failure — an
+  /// unreachable daemon is the normal stopped case, not a sign the cached
+  /// channel has gone bad, and the probe loop already owns reconnection.
+  Future<String?> daemonVersion() async {
+    try {
+      final session = await _sessionOrInit();
+      final reply = await session.status().timeout(const Duration(seconds: 2));
+      return reply.version.isEmpty ? null : reply.version;
+    } catch (e) {
+      _log('daemonVersion failed: $e');
+      return null;
+    }
+  }
+
   Future<void> _resetChannel({bool silent = false}) async {
     final ch = _channel;
     final path = _connectionPath;

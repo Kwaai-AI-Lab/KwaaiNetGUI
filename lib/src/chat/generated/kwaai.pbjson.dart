@@ -304,6 +304,7 @@ const StatusReply$json = {
     {'1': 'shard_ready', '3': 3, '4': 1, '5': 8, '10': 'shardReady'},
     {'1': 'peer_count', '3': 4, '4': 1, '5': 13, '10': 'peerCount'},
     {'1': 'uptime_secs', '3': 5, '4': 1, '5': 4, '10': 'uptimeSecs'},
+    {'1': 'version', '3': 6, '4': 1, '5': 9, '10': 'version'},
   ],
 };
 
@@ -311,7 +312,8 @@ const StatusReply$json = {
 final $typed_data.Uint8List statusReplyDescriptor = $convert.base64Decode(
     'CgtTdGF0dXNSZXBseRIfCgtzZXJ2ZXJfdGltZRgBIAEoCVIKc2VydmVyVGltZRIUCgVtb2RlbB'
     'gCIAEoCVIFbW9kZWwSHwoLc2hhcmRfcmVhZHkYAyABKAhSCnNoYXJkUmVhZHkSHQoKcGVlcl9j'
-    'b3VudBgEIAEoDVIJcGVlckNvdW50Eh8KC3VwdGltZV9zZWNzGAUgASgEUgp1cHRpbWVTZWNz');
+    'b3VudBgEIAEoDVIJcGVlckNvdW50Eh8KC3VwdGltZV9zZWNzGAUgASgEUgp1cHRpbWVTZWNzEh'
+    'gKB3ZlcnNpb24YBiABKAlSB3ZlcnNpb24=');
 
 @$core.Deprecated('Use chatMessageDescriptor instead')
 const ChatMessage$json = {
