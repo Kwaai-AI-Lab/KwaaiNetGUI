@@ -133,6 +133,7 @@ class _ChatTab extends StatelessWidget {
         Expanded(
           child: _ChatBody(path: path, onOpenSettings: onOpenSettings),
         ),
+        _ChatErrorBar(path: path),
         _ChatInputBar(path: path),
       ],
     );
@@ -476,6 +477,22 @@ class _ChatInputBarState extends ConsumerState<_ChatInputBar> {
       });
     }
 
+    // Return focus to the composer when a response finishes. The field is
+    // disabled while streaming, which drops focus, so without this the user
+    // has to click back into it before typing their next message. Fires on
+    // the streaming→idle edge only (not every rebuild), and however the turn
+    // ended — completed, errored, or cancelled.
+    ref.listen<bool>(chatStreamingProvider(widget.path), (was, now) {
+      if (was == true && !now) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          // Only reclaim focus if the user hasn't moved on to something
+          // else in the meantime — stealing focus back would be worse
+          // than the extra click.
+          if (mounted && !_focusNode.hasFocus) _focusNode.requestFocus();
+        });
+      }
+    });
+
     return SafeArea(
       top: false,
       child: Padding(
@@ -617,19 +634,27 @@ class _ChatTranscriptState extends ConsumerState<_ChatTranscript> {
                                   child: _StreamingDots(
                                     color: scheme.onSurface,
                                   ),
+                                )
+                              // Text plus an error means the stream died
+                              // part-way: mark where it stopped so a
+                              // truncated answer can't be mistaken for a
+                              // complete one.
+                              else if (!isUser && msg.error != null)
+                                WidgetSpan(
+                                  alignment: PlaceholderAlignment.baseline,
+                                  baseline: TextBaseline.alphabetic,
+                                  child: _TruncationSplat(
+                                    color: context.kwaai.buttonDestructive,
+                                  ),
                                 ),
                             ],
                           ),
                         ),
                       ),
-                    if (msg.error != null)
-                      _ChatErrorBadge(
-                        error: msg.error!,
-                        // Pad above only when there's a bubble (or the
-                        // thinking indicator) above; a pure error
-                        // message hugs the top of the row.
-                        topPad: msg.text.isNotEmpty ? 6 : 0,
-                      ),
+                    // Errors are not rendered inline — they surface in the
+                    // full-width bar above the composer, where they get the
+                    // room to be read and can't be scrolled out of view.
+                    // A truncated bubble is marked with the splat above.
                   ],
                 ),
               ),
@@ -698,11 +723,39 @@ class _ChatTranscriptState extends ConsumerState<_ChatTranscript> {
   }
 }
 
+/// Full-width error bar pinned directly above the composer.
+///
+/// Errors used to render inline in the transcript, where a `Flexible`
+/// bubble squeezed them into a narrow column and they scrolled away with
+/// the message. Here they span the viewport at the composer's own left/
+/// right inset, so a long daemon message has room to wrap and stays put
+/// while the user reads it.
+///
+/// Shows the most recent error in the transcript and nothing when there
+/// is none, so a failure clears as soon as the next turn starts.
+class _ChatErrorBar extends ConsumerWidget {
+  const _ChatErrorBar({required this.path});
+
+  final ChatPath path;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final messages = ref.watch(chatTranscriptProvider(path));
+    ChatError? latest;
+    for (final m in messages) {
+      if (m.error != null) latest = m.error;
+    }
+    if (latest == null) return const SizedBox.shrink();
+    // Keyed by identity so switching to a different error collapses any
+    // expanded details rather than carrying the old disclosure state over.
+    return _ChatErrorBadge(key: ObjectKey(latest), error: latest);
+  }
+}
+
 class _ChatErrorBadge extends StatefulWidget {
-  const _ChatErrorBadge({required this.error, required this.topPad});
+  const _ChatErrorBadge({super.key, required this.error});
 
   final ChatError error;
-  final double topPad;
 
   @override
   State<_ChatErrorBadge> createState() => _ChatErrorBadgeState();
@@ -716,8 +769,12 @@ class _ChatErrorBadgeState extends State<_ChatErrorBadge> {
     final dest = context.kwaai.buttonDestructive;
     final (:headline, :details) = _friendlyChatError(widget.error);
     return Padding(
-      padding: EdgeInsets.only(top: widget.topPad),
+      // Horizontal inset matches _ChatInputBar so the bar's edges line up
+      // with the composer directly below it. The 4px bottom keeps it off
+      // the composer — the transcript's own bottom padding handles the top.
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: dest.withValues(alpha: 0.10),
@@ -728,12 +785,11 @@ class _ChatErrorBadgeState extends State<_ChatErrorBadge> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(Icons.error_outline, size: 16, color: dest),
                 const SizedBox(width: 8),
-                Flexible(
+                Expanded(
                   child: SelectableText(
                     headline,
                     style: Theme.of(
@@ -779,6 +835,31 @@ class _ChatErrorBadgeState extends State<_ChatErrorBadge> {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Inline marker appended to an assistant bubble whose stream died
+/// part-way through, so a truncated answer is visibly truncated rather
+/// than reading as a complete (if odd) response.
+///
+/// Sits in the destructive colour to tie it to the error bar below, and
+/// carries a tooltip because a bare glyph isn't self-explanatory.
+class _TruncationSplat extends StatelessWidget {
+  const _TruncationSplat({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Response incomplete — the stream stopped here',
+      child: Text(
+        ' ✻',
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: color, height: 1),
       ),
     );
   }
