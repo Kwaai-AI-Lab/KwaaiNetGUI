@@ -41,6 +41,12 @@ class ChatTranscriptNotifier
     extends FamilyNotifier<List<ChatMessage>, ChatPath> {
   StreamSubscription<String>? _sub;
   Timer? _bumpTimer;
+
+  /// Daemon-side id of the in-flight operation, used to tell the daemon
+  /// to stop generating. Null when nothing is in flight, or when the
+  /// session was closed before the request went out.
+  int? _operationId;
+
   ChatPath get _path => arg;
 
   /// How long token arrivals are coalesced before the UI rebuilds.
@@ -71,9 +77,17 @@ class ChatTranscriptNotifier
     final assistant = ChatMessage(role: 'assistant', text: '', streaming: true);
     state = [...state, user, assistant];
     final client = ref.read(kwaaiRpcClientProvider);
+    _operationId = null;
+    void captureId(int? id) => _operationId = id;
     final stream = switch (_path) {
-      ChatPath.shardRun => client.chatStream(prompt),
-      ChatPath.generateLocal => client.generateLocal(prompt),
+      ChatPath.shardRun => client.chatStreamCancellable(
+        prompt,
+        onOperationId: captureId,
+      ),
+      ChatPath.generateLocal => client.generateLocalCancellable(
+        prompt,
+        onOperationId: captureId,
+      ),
     };
     final completer = Completer<void>();
     _sub = stream.listen(
@@ -92,12 +106,21 @@ class ChatTranscriptNotifier
         // Preserve the structured (code, message) when it's a
         // SessionOpError; fall back to a 0/UNKNOWN with the toString
         // for any other thrown type (transport hiccups, asserts, etc).
+        //
+        // A user-requested stop never lands here: [cancel] drops the
+        // subscription synchronously, so the daemon's CANCELLED
+        // acknowledgement is delivered to a dead subscription and this
+        // handler is not called. That's what keeps a deliberate stop
+        // from raising the error bar. An *unsolicited* CANCELLED (the
+        // daemon aborting on its own, subscription still live) does
+        // arrive here and is surfaced normally, which is correct.
         assistant.error = e is SessionOpError
             ? ChatError(code: e.code, message: e.message)
             : ChatError(code: 0, message: e.toString());
         assistant.streaming = false;
         _flushBump();
         _sub = null;
+        _operationId = null;
         if (!completer.isCompleted) completer.complete();
       },
       onDone: () {
@@ -105,6 +128,10 @@ class ChatTranscriptNotifier
         assistant.streaming = false;
         _flushBump();
         _sub = null;
+        // Stream finished on its own: there is nothing left to cancel,
+        // so drop the id to keep a later stop from targeting a
+        // completed (or recycled) operation.
+        _operationId = null;
         if (!completer.isCompleted) completer.complete();
       },
       cancelOnError: true,
@@ -112,8 +139,23 @@ class ChatTranscriptNotifier
     return completer.future;
   }
 
-  /// Cancel the in-flight stream (if any).
+  /// Stop the in-flight response.
+  ///
+  /// Tells the daemon to abort the operation *and* tears the local
+  /// stream down. The daemon-side Cancel is what actually stops
+  /// generation — dropping only the subscription would leave it
+  /// producing tokens into a channel nobody reads, burning local and
+  /// mesh capacity until it hit the token cap.
+  ///
+  /// Local teardown does not wait on the daemon: the UI stops
+  /// immediately, and the Cancel frame is best-effort.
   void cancel() {
+    final opId = _operationId;
+    if (opId != null) {
+      _log('[${_path.name}] stopping op $opId');
+      unawaited(ref.read(kwaaiRpcClientProvider).cancelOperation(opId));
+      _operationId = null;
+    }
     _sub?.cancel();
     _sub = null;
     if (state.isNotEmpty && state.last.streaming) {
@@ -129,6 +171,13 @@ class ChatTranscriptNotifier
   /// fresh conversation from the daemon's perspective too, since we
   /// don't replay history.
   void newChat() {
+    // Same reasoning as [cancel]: abandoning the transcript must also
+    // stop the daemon, or a discarded response keeps generating.
+    final opId = _operationId;
+    if (opId != null) {
+      unawaited(ref.read(kwaaiRpcClientProvider).cancelOperation(opId));
+      _operationId = null;
+    }
     _sub?.cancel();
     _sub = null;
     // Drop any pending rebuild before clearing — otherwise it fires

@@ -452,6 +452,13 @@ class _ChatInputBarState extends ConsumerState<_ChatInputBar> {
     _focusNode.requestFocus();
   }
 
+  void _stop() {
+    // Asks the daemon to abort generation, not just this client's
+    // subscription — see ChatTranscriptNotifier.cancel.
+    ref.read(chatTranscriptProvider(widget.path).notifier).cancel();
+    _focusNode.requestFocus();
+  }
+
   void _newChat() {
     _controller.clear();
     ref.read(chatTranscriptProvider(widget.path).notifier).newChat();
@@ -520,6 +527,9 @@ class _ChatInputBarState extends ConsumerState<_ChatInputBar> {
                 focusNode: _focusNode,
                 enabled: canSend,
                 onSend: canSend ? _send : null,
+                // Non-null only while streaming, which is what swaps the
+                // send button over to stop.
+                onStop: streaming ? _stop : null,
                 hintText: 'Message kwaainet…',
               ),
             ),

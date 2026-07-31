@@ -15,6 +15,9 @@ import 'package:kwaainet_gui/src/chat/kwaai_rpc_client.dart';
 /// so reading the provider shows the full text whether or not a rebuild
 /// ever happened. These tests watch the widget tree instead, which is
 /// the thing the throttle actually governs.
+/// Overriding `chatStream` alone is not enough — `send` uses the
+/// cancellable entry point, and a stub that misses it falls through to
+/// the real socket and talks to whatever daemon is running locally.
 class _ControlledClient extends KwaaiRpcClient {
   _ControlledClient(this.source);
 
@@ -22,6 +25,18 @@ class _ControlledClient extends KwaaiRpcClient {
 
   @override
   Stream<String> chatStream(String prompt) => source;
+
+  @override
+  Stream<String> chatStreamCancellable(
+    String prompt, {
+    required void Function(int? operationId) onOperationId,
+  }) {
+    onOperationId(1);
+    return source;
+  }
+
+  @override
+  Future<void> cancelOperation(int operationId) async {}
 }
 
 /// Builds a container wired to [source], with the client's keep-alive

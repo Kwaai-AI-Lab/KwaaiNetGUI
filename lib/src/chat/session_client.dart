@@ -153,23 +153,31 @@ class SessionClient {
 
   /// `kwaainet shard run <PROMPT>` — distributed inference. Default
   /// path used by the GUI's main chat.
-  Stream<String> shardRun(String prompt, {String role = 'user'}) {
-    return _tokensFromFrames(_open((id) => pb.ClientFrame()
-      ..id = Int64(id)
-      ..shardRun = (pb.ShardRunRequest()
-        ..role = role
-        ..content = prompt)));
-  }
+  Stream<String> shardRun(String prompt, {String role = 'user'}) =>
+      shardRunOp(prompt, role: role).tokens;
+
+  /// As [shardRun], but also exposes the operation id so the caller can
+  /// [cancel] it. Stopping generation needs the id, and `_open` would
+  /// otherwise allocate and discard it.
+  SessionOperation shardRunOp(String prompt, {String role = 'user'}) =>
+      _openOp((id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..shardRun = (pb.ShardRunRequest()
+          ..role = role
+          ..content = prompt));
 
   /// `kwaainet generate <PROMPT>` — single-node local inference. Used
   /// by the Developer tab to drive the local InferenceEngine directly.
-  Stream<String> generate(String prompt, {String role = 'user'}) {
-    return _tokensFromFrames(_open((id) => pb.ClientFrame()
-      ..id = Int64(id)
-      ..generate = (pb.GenerateRequest()
-        ..role = role
-        ..content = prompt)));
-  }
+  Stream<String> generate(String prompt, {String role = 'user'}) =>
+      generateOp(prompt, role: role).tokens;
+
+  /// As [generate], but exposes the operation id for cancellation.
+  SessionOperation generateOp(String prompt, {String role = 'user'}) =>
+      _openOp((id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..generate = (pb.GenerateRequest()
+          ..role = role
+          ..content = prompt));
 
   /// Cancel an in-flight operation. The target operation's stream will
   /// error with SessionOpError(code=CANCELLED).
@@ -197,6 +205,34 @@ class SessionClient {
 
   /// Allocate an id, build the ClientFrame, send it, register a router,
   /// return the per-id stream.
+  /// As [_open], but keeps the allocated operation id so the caller can
+  /// cancel the operation server-side.
+  SessionOperation _openOp(pb.ClientFrame Function(int id) build) {
+    ensureOpen();
+    if (_closed || _outbound == null) {
+      // No frame was sent, so there is no server-side operation to
+      // cancel — `id` is null rather than a fabricated number that
+      // would cancel an unrelated (or future) operation if used.
+      return SessionOperation(
+        id: null,
+        tokens: Stream<String>.error(
+          SessionEndedError(
+            kind: SessionEndKind.localClose,
+            reason: 'session not open',
+          ),
+        ),
+      );
+    }
+    final id = _nextId++;
+    final controller = StreamController<pb.ServerFrame>();
+    _routers[id] = controller;
+    _outbound!.add(build(id));
+    return SessionOperation(
+      id: id,
+      tokens: _tokensFromFrames(controller.stream),
+    );
+  }
+
   Stream<pb.ServerFrame> _open(pb.ClientFrame Function(int id) build) {
     ensureOpen();
     if (_closed || _outbound == null) {
@@ -300,6 +336,24 @@ Stream<Out> watchdogged<In, Out>(
     await sub?.cancel();
   };
   return out.stream;
+}
+
+/// An in-flight streaming operation: its token stream plus the server
+/// operation id needed to [SessionClient.cancel] it.
+///
+/// The id is what makes a *real* stop possible — without it the client
+/// can only drop its own subscription while the daemon keeps generating
+/// into a channel nobody reads.
+class SessionOperation {
+  SessionOperation({required this.id, required this.tokens});
+
+  /// Server-side operation id, or null when the session was already
+  /// closed and no frame was ever sent. Null means "nothing to cancel";
+  /// callers must not substitute a placeholder, which would abort an
+  /// unrelated operation.
+  final int? id;
+
+  final Stream<String> tokens;
 }
 
 /// Thrown into a per-op stream when the server emits Error for that id.

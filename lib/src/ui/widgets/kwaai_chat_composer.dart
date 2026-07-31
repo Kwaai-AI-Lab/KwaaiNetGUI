@@ -30,6 +30,7 @@ class KwaaiChatComposer extends StatelessWidget {
     required this.focusNode,
     required this.enabled,
     required this.onSend,
+    this.onStop,
     this.onNewChat,
     this.canNewChat = true,
     this.hintText,
@@ -45,6 +46,15 @@ class KwaaiChatComposer extends StatelessWidget {
   /// down, empty input — caller's choice). When non-null and the
   /// user hits Cmd/Ctrl-Enter, this fires too.
   final VoidCallback? onSend;
+
+  /// Stop the in-flight response. When non-null the send button becomes
+  /// a stop button — they occupy the same slot because they're mutually
+  /// exclusive: you can't send while a response is streaming, and
+  /// there's nothing to stop when it isn't.
+  ///
+  /// Stop stays enabled regardless of [enabled] or draft contents; a
+  /// stop you can't press is worse than no stop at all.
+  final VoidCallback? onStop;
 
   /// Optional "New chat" affordance, rendered to the right of Send.
   /// Hidden entirely when null so the composer collapses back to
@@ -110,11 +120,18 @@ class KwaaiChatComposer extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          _SendButton(
-            onPressed: _canSend ? onSend : null,
-            accent: ext.accentPrimary,
-            mutedFg: scheme.onSurfaceVariant.withValues(alpha: 0.5),
-          ),
+          // Send and Stop share this slot — see [onStop].
+          if (onStop != null)
+            _StopButton(
+              onPressed: onStop,
+              accent: ext.accentPrimary,
+            )
+          else
+            _SendButton(
+              onPressed: _canSend ? onSend : null,
+              accent: ext.accentPrimary,
+              mutedFg: scheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
           if (onNewChat != null) ...[
             const SizedBox(width: 4),
             _NewChatButton(
@@ -239,6 +256,38 @@ class _ComposerField extends StatelessWidget {
 
 class _SendIntent extends Intent {
   const _SendIntent();
+}
+
+/// Circular Stop button shown in the Send slot while a response
+/// streams. Deliberately identical in geometry to [_SendButton] (same
+/// 32x32 circle, same accent fill) so swapping between them doesn't
+/// shift the composer's layout — only the glyph changes.
+///
+/// Always enabled: it appears only while there is something to stop.
+class _StopButton extends StatelessWidget {
+  const _StopButton({required this.onPressed, required this.accent});
+
+  final VoidCallback? onPressed;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'Stop generating',
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        backgroundColor: accent,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(32, 32),
+        padding: EdgeInsets.zero,
+        shape: const CircleBorder(),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      // Filled square reads as "stop" at this size where a glyph with
+      // interior detail would blur.
+      icon: const Icon(Icons.stop_rounded, size: 20),
+    );
+  }
 }
 
 /// Circular Send button. Accent fill when active, muted when not.

@@ -250,6 +250,59 @@ class KwaaiRpcClient {
     }
   }
 
+  /// As [chatStream], but reports the daemon-side operation id through
+  /// [onOperationId] as soon as the request frame goes out, so the
+  /// caller can [cancelOperation] it mid-flight.
+  ///
+  /// The id arrives via callback rather than as a return value because
+  /// the session has to be opened asynchronously first — a caller
+  /// awaiting an id before subscribing would deadlock, since the
+  /// request isn't sent until the stream is listened to.
+  Stream<String> chatStreamCancellable(
+    String prompt, {
+    required void Function(int? operationId) onOperationId,
+  }) async* {
+    final session = await _sessionOrInit();
+    final op = session.shardRunOp(prompt);
+    onOperationId(op.id);
+    try {
+      yield* op.tokens;
+    } catch (e) {
+      await _resetChannel();
+      rethrow;
+    }
+  }
+
+  /// As [generateLocal], with the operation id reported for cancellation.
+  Stream<String> generateLocalCancellable(
+    String prompt, {
+    required void Function(int? operationId) onOperationId,
+  }) async* {
+    final session = await _sessionOrInit();
+    final op = session.generateOp(prompt);
+    onOperationId(op.id);
+    try {
+      yield* op.tokens;
+    } catch (e) {
+      await _resetChannel();
+      rethrow;
+    }
+  }
+
+  /// Ask the daemon to abort an in-flight operation. Best-effort: the
+  /// stream is torn down locally regardless, so a failure to deliver
+  /// the Cancel frame must not surface as a user-facing error.
+  Future<void> cancelOperation(int operationId) async {
+    try {
+      final session = _session;
+      if (session == null) return;
+      await session.cancel(operationId);
+    } catch (e) {
+      // Nothing actionable: the user already sees generation stopped.
+      _log('cancel of op $operationId failed (ignored): $e');
+    }
+  }
+
   /// Single-node local inference. Maps to `kwaainet generate <prompt>`
   /// — used by the Developer tab for direct fallback / dev runs
   /// against the local InferenceEngine.
