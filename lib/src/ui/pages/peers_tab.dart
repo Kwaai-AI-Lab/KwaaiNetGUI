@@ -437,10 +437,18 @@ class _StaleChip extends StatelessWidget {
 /// binding order, observed addresses are ranked most-confirmed first by the
 /// daemon, and relay addresses are all equivalent.
 class _AddressLine extends StatefulWidget {
-  const _AddressLine({required this.label, required this.values});
+  const _AddressLine({
+    required this.label,
+    required this.values,
+    this.mono = true,
+  });
 
   final String label;
   final List<String> values;
+
+  /// Monospace the values. True for addresses and peer ids, where character
+  /// alignment aids comparison; false for prose, which reads badly in mono.
+  final bool mono;
 
   @override
   State<_AddressLine> createState() => _AddressLineState();
@@ -456,10 +464,12 @@ class _AddressLineState extends State<_AddressLine> {
     final labelStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
     );
-    final monoStyle = theme.textTheme.bodySmall?.copyWith(
-      fontFamily: 'Menlo',
-      fontFamilyFallback: const ['Consolas', 'monospace'],
-    );
+    final monoStyle = widget.mono
+        ? theme.textTheme.bodySmall?.copyWith(
+            fontFamily: 'Menlo',
+            fontFamilyFallback: const ['Consolas', 'monospace'],
+          )
+        : theme.textTheme.bodySmall;
 
     final values = widget.values;
     final hidden = values.length - 1;
@@ -987,27 +997,37 @@ class _PeerConnections extends StatelessWidget {
                 ),
               ),
           const SizedBox(height: 6),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(width: 74, child: Text('Protocols', style: labelStyle)),
-              Expanded(
-                child: Text(
-                  protocols.isEmpty
-                      // Not "speaks nothing": identify completes shortly after
-                      // the connection does, and a routing-only peer has no
-                      // connection to have identified over.
-                      ? (row.isConnected
-                            ? 'Identify has not completed yet'
-                            : 'Not connected')
-                      : protocols.join(', '),
-                  // Wraps: the list is long and breaks naturally at the
-                  // separators, unlike an address.
-                  style: monoStyle,
+          if (protocols.isEmpty)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 74,
+                  child: Text('Protocols', style: labelStyle),
                 ),
-              ),
-            ],
-          ),
+                Expanded(
+                  child: Text(
+                    // Not "speaks nothing": identify completes shortly after
+                    // the connection does, and a routing-only peer has no
+                    // connection to have identified over.
+                    row.isConnected
+                        ? 'Identify has not completed yet'
+                        : 'Not connected',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            )
+          else
+            // One per line, described rather than listed as raw ids, and
+            // collapsed to the first — a peer advertises a dozen and the panel
+            // should not be mostly protocol list. Reuses the same collapse the
+            // address lines use, so the interaction is identical.
+            _AddressLine(
+              label: 'Protocols',
+              values: [for (final p in protocols) describeProtocol(p)],
+              mono: false,
+            ),
         ],
       ),
     );
@@ -1141,6 +1161,58 @@ class _RoleCell extends StatelessWidget {
     return Text('—', style: theme.textTheme.bodySmall);
   }
 }
+
+/// What each libp2p protocol id means, in plain words.
+///
+/// Protocol ids are stable, versioned identifiers — a peer advertising
+/// `/libp2p/dcutr` is saying something specific and unchanging — so a lookup
+/// table is exact rather than a heuristic. Reading a peer's capabilities off
+/// raw ids means knowing the ecosystem by heart; this is the difference between
+/// "can this peer relay for me?" being obvious or requiring a search.
+///
+/// Unknown ids are shown verbatim rather than dropped: a peer running something
+/// this build has never heard of is worth seeing, not hiding.
+///
+/// Public for `test/peers_protocols_test.dart`.
+const protocolDescriptions = <String, String>{
+  // ── libp2p core ────────────────────────────────────────────────────────
+  '/ipfs/id/1.0.0': 'Identify — exchanges peer id, addresses and capabilities',
+  '/ipfs/id/push/1.0.0':
+      'Identify push — sends updates when its details change',
+  '/ipfs/ping/1.0.0': 'Ping — liveness and round-trip time',
+  '/ipfs/kad/1.0.0': 'Kademlia DHT — serves peer and content lookups',
+
+  // ── NAT traversal ──────────────────────────────────────────────────────
+  '/libp2p/autonat/1.0.0':
+      'AutoNAT — dials peers back to test their reachability',
+  '/libp2p/circuit/relay/0.2.0/hop':
+      'Circuit relay (hop) — willing to relay traffic for other peers',
+  '/libp2p/circuit/relay/0.2.0/stop':
+      'Circuit relay (stop) — can be reached through a relay',
+  '/libp2p/circuit/relay/0.1.0': 'Circuit relay v1 — legacy relay protocol',
+  '/libp2p/dcutr': 'DCUtR — coordinates hole punching to upgrade relayed paths',
+
+  // ── KwaaiNet ───────────────────────────────────────────────────────────
+  '/kwaai/p2p/hello/1.0.0': 'Hello — accepts direct messages from any peer',
+  '/kwaai/inference/1.0.0':
+      'Inference — serves transformer blocks for distributed inference',
+  '/kwaai/inference-mux/1.0.0':
+      'Inference mux — concurrent GPU inference over one persistent stream',
+  '/kwaai/ollama-proxy/1.0.0':
+      'Ollama proxy — tunnels HTTP inference to Ollama',
+  '/kwaai/shard-proxy/1.0.0':
+      'Shard proxy — tunnels HTTP inference to the local shard API',
+
+  // ── hivemind DHT ───────────────────────────────────────────────────────
+  'DHTProtocol.rpc_ping': 'Hivemind DHT — liveness probe',
+  'DHTProtocol.rpc_store': 'Hivemind DHT — stores records',
+  'DHTProtocol.rpc_find': 'Hivemind DHT — serves record lookups',
+};
+
+/// A human description for `id`, or the id itself when unrecognised.
+///
+/// Public for `test/peers_protocols_test.dart`.
+String describeProtocol(String id) => protocolDescriptions[id] ?? id;
 
 /// How widely reachable an address is. Ordering is the ranking.
 ///
