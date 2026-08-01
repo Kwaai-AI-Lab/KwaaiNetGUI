@@ -334,7 +334,10 @@ class _SelfStatusHeader extends StatelessWidget {
           if (s.listenAddrs.isNotEmpty)
             _AddressLine(label: 'Listening', values: s.listenAddrs),
           if (s.observedAddrs.isNotEmpty)
-            _AddressLine(label: 'Observed', values: s.observedAddrs),
+            _AddressLine(
+              label: 'Observed',
+              values: summariseObservedAddrs(s.observedAddrs),
+            ),
           if (s.relayAddrs.isNotEmpty)
             _AddressLine(label: 'Relays', values: s.relayAddrs),
         ],
@@ -928,6 +931,69 @@ class _RoleCell extends StatelessWidget {
     }
     return Text('—', style: theme.textTheme.bodySmall);
   }
+}
+
+/// Collapse the observed-address list to one line per host.
+///
+/// Peers report the address they see us at, which for an outbound connection is
+/// our public IP plus that connection's *ephemeral source port*. A busy node
+/// therefore reports the same address a dozen times over, once per port —
+/// eleven lines saying one thing: "your public IP is 98.232.246.19".
+///
+/// Grouping by host keeps that fact and drops the repetition. Ports are still
+/// summarised, because one of them is not noise: a port matching what we listen
+/// on means peers see us where we bound, which is the difference between a
+/// port-forwarded node and one whose NAT is rewriting every port.
+///
+/// Circuit addresses are left whole — a relayed observation names the relay,
+/// and that is the interesting part rather than the port.
+///
+/// Public for `test/peers_address_summary_test.dart`.
+List<String> summariseObservedAddrs(List<String> addrs) {
+  // Insertion-ordered: the daemon sorts most-confirmed first, and that ranking
+  // is worth preserving.
+  final byHost = <String, List<int>>{};
+  final circuits = <String>[];
+  final unparsed = <String>[];
+
+  for (final addr in addrs) {
+    if (addr.contains('/p2p-circuit')) {
+      if (!circuits.contains(addr)) circuits.add(addr);
+      continue;
+    }
+    final parts = addr.split('/')..removeWhere((p) => p.isEmpty);
+    // Expect [ip4, <host>, tcp, <port>, …]; anything else passes through
+    // unchanged rather than being silently dropped.
+    final tcp = parts.indexOf('tcp');
+    if (parts.length < 2 || tcp < 0 || tcp + 1 >= parts.length) {
+      if (!unparsed.contains(addr)) unparsed.add(addr);
+      continue;
+    }
+    final port = int.tryParse(parts[tcp + 1]);
+    if (port == null) {
+      if (!unparsed.contains(addr)) unparsed.add(addr);
+      continue;
+    }
+    final host = '/${parts.sublist(0, tcp).join('/')}';
+    (byHost[host] ??= []).add(port);
+  }
+
+  final out = <String>[];
+  byHost.forEach((host, ports) {
+    final unique = ports.toSet().toList()..sort();
+    if (unique.length == 1) {
+      out.add('$host/tcp/${unique.first}');
+    } else {
+      // The count is the useful signal — that these are many short-lived
+      // source ports rather than several distinct listeners.
+      out.add(
+        '$host/tcp/${unique.first} '
+        '(+${unique.length - 1} more ephemeral ${unique.length == 2 ? 'port' : 'ports'})',
+      );
+    }
+  });
+
+  return [...out, ...circuits, ...unparsed];
 }
 
 /// Peer ids are 52 characters and every one in a list shares a prefix; the
