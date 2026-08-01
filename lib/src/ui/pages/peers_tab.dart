@@ -365,11 +365,13 @@ class _SelfStatusHeader extends StatelessWidget {
           if (s.listenAddrs.isNotEmpty)
             _AddressLine(
               label: 'Listening',
+              itemLabel: 'Address',
               values: sortByScope(s.listenAddrs),
             ),
           if (s.observedAddrs.isNotEmpty)
             _AddressLine(
               label: 'Observed',
+              itemLabel: 'Address',
               values: sortByScope(summariseObservedAddrs(s.observedAddrs)),
             ),
           if (s.relayAddrs.isNotEmpty)
@@ -465,7 +467,16 @@ class _StaleChip extends StatelessWidget {
 /// binding order, observed addresses are ranked most-confirmed first by the
 /// daemon, and relay addresses are all equivalent.
 class _AddressLine extends StatefulWidget {
-  const _AddressLine({required this.label, required this.values});
+  const _AddressLine({
+    required this.label,
+    required this.values,
+    this.itemLabel,
+  });
+
+  /// What one entry is called, for the per-line copy buttons. The row label
+  /// names the group ("Listening"), which reads wrong on a button that copies a
+  /// single entry from it. Falls back to [label] when unset.
+  final String? itemLabel;
 
   final String label;
   final List<String> values;
@@ -554,6 +565,15 @@ class _AddressLineState extends State<_AddressLine> {
                           ),
                         ),
                       ],
+                      // One per line, copying that line alone. These are the
+                      // values you paste elsewhere — your peer id, an address
+                      // to hand to someone — unlike the connections panel,
+                      // which is read rather than copied from.
+                      const SizedBox(width: 12),
+                      _CopyButton(
+                        text: shown[i],
+                        label: widget.itemLabel ?? widget.label,
+                      ),
                     ],
                   ),
               ],
@@ -1118,10 +1138,6 @@ class _PeerConnections extends StatelessWidget {
                         softWrap: false,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    _CopyButton(
-                      text: c.via.isNotEmpty ? c.via : c.addr,
-                      label: 'Address',
                     ),
                   ],
                 ),
