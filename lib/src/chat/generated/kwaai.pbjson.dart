@@ -65,6 +65,15 @@ const ClientFrame$json = {
       '9': 0,
       '10': 'cancel'
     },
+    {
+      '1': 'block_coverage',
+      '3': 15,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.BlockCoverageRequest',
+      '9': 0,
+      '10': 'blockCoverage'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -78,7 +87,8 @@ final $typed_data.Uint8List clientFrameDescriptor = $convert.base64Decode(
     'ZVJlcXVlc3RIAFIIZ2VuZXJhdGUSOAoJc2hhcmRfcnVuGAwgASgLMhkua3dhYWkudjEuU2hhcm'
     'RSdW5SZXF1ZXN0SABSCHNoYXJkUnVuEjEKBnN0YXR1cxgNIAEoCzIXLmt3YWFpLnYxLlN0YXR1'
     'c1JlcXVlc3RIAFIGc3RhdHVzEioKBmNhbmNlbBgOIAEoCzIQLmt3YWFpLnYxLkNhbmNlbEgAUg'
-    'ZjYW5jZWxCBgoEYm9keQ==');
+    'ZjYW5jZWwSRwoOYmxvY2tfY292ZXJhZ2UYDyABKAsyHi5rd2FhaS52MS5CbG9ja0NvdmVyYWdl'
+    'UmVxdWVzdEgAUg1ibG9ja0NvdmVyYWdlQgYKBGJvZHk=');
 
 @$core.Deprecated('Use serverFrameDescriptor instead')
 const ServerFrame$json = {
@@ -130,6 +140,15 @@ const ServerFrame$json = {
       '9': 0,
       '10': 'status'
     },
+    {
+      '1': 'block_coverage',
+      '3': 15,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.BlockCoverageUpdate',
+      '9': 0,
+      '10': 'blockCoverage'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -142,7 +161,8 @@ final $typed_data.Uint8List serverFrameDescriptor = $convert.base64Decode(
     'BpbmdSZXBseUgAUgRwb25nEisKBXRva2VuGAsgASgLMhMua3dhYWkudjEuQ2hhdFRva2VuSABS'
     'BXRva2VuEiQKBGRvbmUYDCABKAsyDi5rd2FhaS52MS5Eb25lSABSBGRvbmUSJwoFZXJyb3IYDS'
     'ABKAsyDy5rd2FhaS52MS5FcnJvckgAUgVlcnJvchIvCgZzdGF0dXMYDiABKAsyFS5rd2FhaS52'
-    'MS5TdGF0dXNSZXBseUgAUgZzdGF0dXNCBgoEYm9keQ==');
+    'MS5TdGF0dXNSZXBseUgAUgZzdGF0dXMSRgoOYmxvY2tfY292ZXJhZ2UYDyABKAsyHS5rd2FhaS'
+    '52MS5CbG9ja0NvdmVyYWdlVXBkYXRlSABSDWJsb2NrQ292ZXJhZ2VCBgoEYm9keQ==');
 
 @$core.Deprecated('Use cancelDescriptor instead')
 const Cancel$json = {
@@ -314,6 +334,95 @@ final $typed_data.Uint8List statusReplyDescriptor = $convert.base64Decode(
     'gCIAEoCVIFbW9kZWwSHwoLc2hhcmRfcmVhZHkYAyABKAhSCnNoYXJkUmVhZHkSHQoKcGVlcl9j'
     'b3VudBgEIAEoDVIJcGVlckNvdW50Eh8KC3VwdGltZV9zZWNzGAUgASgEUgp1cHRpbWVTZWNzEh'
     'gKB3ZlcnNpb24YBiABKAlSB3ZlcnNpb24=');
+
+@$core.Deprecated('Use blockCoverageRequestDescriptor instead')
+const BlockCoverageRequest$json = {
+  '1': 'BlockCoverageRequest',
+  '2': [
+    {
+      '1': 'dht_prefix',
+      '3': 1,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'dhtPrefix',
+      '17': true
+    },
+    {
+      '1': 'total_blocks',
+      '3': 2,
+      '4': 1,
+      '5': 13,
+      '9': 1,
+      '10': 'totalBlocks',
+      '17': true
+    },
+    {'1': 'subscribe', '3': 3, '4': 1, '5': 8, '10': 'subscribe'},
+    {'1': 'interval_secs', '3': 4, '4': 1, '5': 13, '10': 'intervalSecs'},
+  ],
+  '8': [
+    {'1': '_dht_prefix'},
+    {'1': '_total_blocks'},
+  ],
+};
+
+/// Descriptor for `BlockCoverageRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List blockCoverageRequestDescriptor = $convert.base64Decode(
+    'ChRCbG9ja0NvdmVyYWdlUmVxdWVzdBIiCgpkaHRfcHJlZml4GAEgASgJSABSCWRodFByZWZpeI'
+    'gBARImCgx0b3RhbF9ibG9ja3MYAiABKA1IAVILdG90YWxCbG9ja3OIAQESHAoJc3Vic2NyaWJl'
+    'GAMgASgIUglzdWJzY3JpYmUSIwoNaW50ZXJ2YWxfc2VjcxgEIAEoDVIMaW50ZXJ2YWxTZWNzQg'
+    '0KC19kaHRfcHJlZml4Qg8KDV90b3RhbF9ibG9ja3M=');
+
+@$core.Deprecated('Use blockPeerDescriptor instead')
+const BlockPeer$json = {
+  '1': 'BlockPeer',
+  '2': [
+    {'1': 'peer_id', '3': 1, '4': 1, '5': 9, '10': 'peerId'},
+    {'1': 'start_block', '3': 2, '4': 1, '5': 13, '10': 'startBlock'},
+    {'1': 'end_block', '3': 3, '4': 1, '5': 13, '10': 'endBlock'},
+    {'1': 'public_name', '3': 4, '4': 1, '5': 9, '10': 'publicName'},
+    {'1': 'throughput', '3': 5, '4': 1, '5': 1, '10': 'throughput'},
+    {'1': 'trust_score', '3': 6, '4': 1, '5': 1, '10': 'trustScore'},
+    {'1': 'trust_tier', '3': 7, '4': 1, '5': 9, '10': 'trustTier'},
+  ],
+};
+
+/// Descriptor for `BlockPeer`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List blockPeerDescriptor = $convert.base64Decode(
+    'CglCbG9ja1BlZXISFwoHcGVlcl9pZBgBIAEoCVIGcGVlcklkEh8KC3N0YXJ0X2Jsb2NrGAIgAS'
+    'gNUgpzdGFydEJsb2NrEhsKCWVuZF9ibG9jaxgDIAEoDVIIZW5kQmxvY2sSHwoLcHVibGljX25h'
+    'bWUYBCABKAlSCnB1YmxpY05hbWUSHgoKdGhyb3VnaHB1dBgFIAEoAVIKdGhyb3VnaHB1dBIfCg'
+    't0cnVzdF9zY29yZRgGIAEoAVIKdHJ1c3RTY29yZRIdCgp0cnVzdF90aWVyGAcgASgJUgl0cnVz'
+    'dFRpZXI=');
+
+@$core.Deprecated('Use blockCoverageUpdateDescriptor instead')
+const BlockCoverageUpdate$json = {
+  '1': 'BlockCoverageUpdate',
+  '2': [
+    {'1': 'server_time', '3': 1, '4': 1, '5': 9, '10': 'serverTime'},
+    {'1': 'model', '3': 2, '4': 1, '5': 9, '10': 'model'},
+    {'1': 'dht_prefix', '3': 3, '4': 1, '5': 9, '10': 'dhtPrefix'},
+    {'1': 'total_blocks', '3': 4, '4': 1, '5': 13, '10': 'totalBlocks'},
+    {'1': 'covered_blocks', '3': 5, '4': 1, '5': 13, '10': 'coveredBlocks'},
+    {'1': 'full_coverage', '3': 6, '4': 1, '5': 8, '10': 'fullCoverage'},
+    {
+      '1': 'peers',
+      '3': 7,
+      '4': 3,
+      '5': 11,
+      '6': '.kwaai.v1.BlockPeer',
+      '10': 'peers'
+    },
+  ],
+};
+
+/// Descriptor for `BlockCoverageUpdate`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List blockCoverageUpdateDescriptor = $convert.base64Decode(
+    'ChNCbG9ja0NvdmVyYWdlVXBkYXRlEh8KC3NlcnZlcl90aW1lGAEgASgJUgpzZXJ2ZXJUaW1lEh'
+    'QKBW1vZGVsGAIgASgJUgVtb2RlbBIdCgpkaHRfcHJlZml4GAMgASgJUglkaHRQcmVmaXgSIQoM'
+    'dG90YWxfYmxvY2tzGAQgASgNUgt0b3RhbEJsb2NrcxIlCg5jb3ZlcmVkX2Jsb2NrcxgFIAEoDV'
+    'INY292ZXJlZEJsb2NrcxIjCg1mdWxsX2NvdmVyYWdlGAYgASgIUgxmdWxsQ292ZXJhZ2USKQoF'
+    'cGVlcnMYByADKAsyEy5rd2FhaS52MS5CbG9ja1BlZXJSBXBlZXJz');
 
 @$core.Deprecated('Use chatMessageDescriptor instead')
 const ChatMessage$json = {

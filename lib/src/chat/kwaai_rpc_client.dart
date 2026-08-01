@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grpc/grpc.dart';
 
 import '../daemon/paths.dart';
+import 'generated/kwaai.pb.dart' as pb;
 import 'generated/kwaai.pbgrpc.dart' as pbgrpc;
 import 'session_client.dart';
 
@@ -313,6 +314,26 @@ class KwaaiRpcClient {
     } catch (e) {
       await _resetChannel();
       rethrow;
+    }
+  }
+
+  /// Live model block-coverage feed. The daemon pushes one update per
+  /// [intervalSecs]; the daemon-side operation is cancelled when the
+  /// listener unsubscribes. Errors on session/channel teardown — callers
+  /// (the coverage provider) resubscribe when connectivity returns, so
+  /// like [daemonVersion] this doesn't reset the channel itself.
+  Stream<pb.BlockCoverageUpdate> blockCoverageStream({
+    int intervalSecs = 5,
+  }) async* {
+    final session = await _sessionOrInit();
+    final op = session.blockCoverageSubscribe(intervalSecs: intervalSecs);
+    try {
+      yield* op.updates;
+    } finally {
+      final id = op.id;
+      if (id != null) {
+        await cancelOperation(id);
+      }
     }
   }
 

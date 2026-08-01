@@ -179,6 +179,57 @@ class SessionClient {
           ..role = role
           ..content = prompt));
 
+  /// `kwaainet shard chain` — one-shot block-coverage snapshot: which
+  /// peers serve which blocks of the model, per the DHT.
+  Future<pb.BlockCoverageUpdate> blockCoverage() async {
+    final frames = _open((id) => pb.ClientFrame()
+      ..id = Int64(id)
+      ..blockCoverage = pb.BlockCoverageRequest());
+    pb.BlockCoverageUpdate? reply;
+    await for (final f in frames) {
+      if (f.whichBody() == pb.ServerFrame_Body.blockCoverage) {
+        reply = f.blockCoverage;
+      }
+    }
+    if (reply == null) {
+      throw SessionOpError(code: 0, message: 'blockCoverage returned no update');
+    }
+    return reply;
+  }
+
+  /// Live block-coverage feed. The daemon pushes a fresh update every
+  /// [intervalSecs] until the operation is [cancel]led (or the session
+  /// ends). The returned operation's id is what [cancel] needs.
+  BlockCoverageOperation blockCoverageSubscribe({int intervalSecs = 5}) {
+    ensureOpen();
+    if (_closed || _outbound == null) {
+      return BlockCoverageOperation(
+        id: null,
+        updates: Stream<pb.BlockCoverageUpdate>.error(
+          SessionEndedError(
+            kind: SessionEndKind.localClose,
+            reason: 'session not open',
+          ),
+        ),
+      );
+    }
+    final id = _nextId++;
+    final controller = StreamController<pb.ServerFrame>();
+    _routers[id] = controller;
+    _outbound!.add(pb.ClientFrame()
+      ..id = Int64(id)
+      ..blockCoverage = (pb.BlockCoverageRequest()
+        ..subscribe = true
+        ..intervalSecs = intervalSecs));
+    // No silence watchdog here: a subscription is legitimately quiet
+    // while the daemon's p2p layer is still coming up, and session-end
+    // errors already propagate through the router.
+    final updates = controller.stream
+        .where((f) => f.whichBody() == pb.ServerFrame_Body.blockCoverage)
+        .map((f) => f.blockCoverage);
+    return BlockCoverageOperation(id: id, updates: updates);
+  }
+
   /// Cancel an in-flight operation. The target operation's stream will
   /// error with SessionOpError(code=CANCELLED).
   Future<void> cancel(int operationId) async {
@@ -354,6 +405,16 @@ class SessionOperation {
   final int? id;
 
   final Stream<String> tokens;
+}
+
+/// An in-flight block-coverage subscription: its update stream plus the
+/// server operation id needed to [SessionClient.cancel] it. Same id
+/// semantics as [SessionOperation] — null means no frame was ever sent.
+class BlockCoverageOperation {
+  BlockCoverageOperation({required this.id, required this.updates});
+
+  final int? id;
+  final Stream<pb.BlockCoverageUpdate> updates;
 }
 
 /// Thrown into a per-op stream when the server emits Error for that id.

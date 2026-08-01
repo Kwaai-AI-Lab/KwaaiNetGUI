@@ -21,7 +21,15 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'kwaai.pbenum.dart';
 
-enum ClientFrame_Body { ping, generate, shardRun, status, cancel, notSet }
+enum ClientFrame_Body {
+  ping,
+  generate,
+  shardRun,
+  status,
+  cancel,
+  blockCoverage,
+  notSet
+}
 
 /// Frame sent from client → server on the Session stream. The `body`
 /// oneof selects which operation type this frame drives. Operation
@@ -32,6 +40,7 @@ enum ClientFrame_Body { ping, generate, shardRun, status, cancel, notSet }
 ///   shardRun          ←  `kwaainet shard run <PROMPT>`
 ///   status            ←  `kwaainet status`
 ///   cancel            ←  (no CLI equivalent; aborts an in-flight op)
+///   blockCoverage     ←  `kwaainet shard chain`
 ///
 /// New operations are added as siblings here; preserving the flat shape
 /// keeps the dispatch trivial on both sides.
@@ -43,6 +52,7 @@ class ClientFrame extends $pb.GeneratedMessage {
     ShardRunRequest? shardRun,
     StatusRequest? status,
     Cancel? cancel,
+    BlockCoverageRequest? blockCoverage,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -51,6 +61,7 @@ class ClientFrame extends $pb.GeneratedMessage {
     if (shardRun != null) result.shardRun = shardRun;
     if (status != null) result.status = status;
     if (cancel != null) result.cancel = cancel;
+    if (blockCoverage != null) result.blockCoverage = blockCoverage;
     return result;
   }
 
@@ -69,13 +80,14 @@ class ClientFrame extends $pb.GeneratedMessage {
     12: ClientFrame_Body.shardRun,
     13: ClientFrame_Body.status,
     14: ClientFrame_Body.cancel,
+    15: ClientFrame_Body.blockCoverage,
     0: ClientFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ClientFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14])
+    ..oo(0, [10, 11, 12, 13, 14, 15])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingRequest>(10, _omitFieldNames ? '' : 'ping',
@@ -88,6 +100,8 @@ class ClientFrame extends $pb.GeneratedMessage {
         subBuilder: StatusRequest.create)
     ..aOM<Cancel>(14, _omitFieldNames ? '' : 'cancel',
         subBuilder: Cancel.create)
+    ..aOM<BlockCoverageRequest>(15, _omitFieldNames ? '' : 'blockCoverage',
+        subBuilder: BlockCoverageRequest.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -114,12 +128,14 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
   ClientFrame_Body whichBody() => _ClientFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
   void clearBody() => $_clearField($_whichOneof(0));
 
   /// Operation correlation id. Pick any non-zero value unused by an
@@ -196,9 +212,32 @@ class ClientFrame extends $pb.GeneratedMessage {
   void clearCancel() => $_clearField(14);
   @$pb.TagNumber(14)
   Cancel ensureCancel() => $_ensure(5);
+
+  /// Block-coverage snapshot / subscription. One-shot when
+  /// `subscribe` is false (one BlockCoverageUpdate reply, then
+  /// Done); a live feed when true (a BlockCoverageUpdate every
+  /// refresh interval until cancelled with a `Cancel` body).
+  @$pb.TagNumber(15)
+  BlockCoverageRequest get blockCoverage => $_getN(6);
+  @$pb.TagNumber(15)
+  set blockCoverage(BlockCoverageRequest value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasBlockCoverage() => $_has(6);
+  @$pb.TagNumber(15)
+  void clearBlockCoverage() => $_clearField(15);
+  @$pb.TagNumber(15)
+  BlockCoverageRequest ensureBlockCoverage() => $_ensure(6);
 }
 
-enum ServerFrame_Body { pong, token, done, error, status, notSet }
+enum ServerFrame_Body {
+  pong,
+  token,
+  done,
+  error,
+  status,
+  blockCoverage,
+  notSet
+}
 
 /// Frame sent from server → client on the Session stream. The `id`
 /// matches the originating ClientFrame.id, so the client can dispatch
@@ -211,6 +250,7 @@ class ServerFrame extends $pb.GeneratedMessage {
     Done? done,
     Error? error,
     StatusReply? status,
+    BlockCoverageUpdate? blockCoverage,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -219,6 +259,7 @@ class ServerFrame extends $pb.GeneratedMessage {
     if (done != null) result.done = done;
     if (error != null) result.error = error;
     if (status != null) result.status = status;
+    if (blockCoverage != null) result.blockCoverage = blockCoverage;
     return result;
   }
 
@@ -237,13 +278,14 @@ class ServerFrame extends $pb.GeneratedMessage {
     12: ServerFrame_Body.done,
     13: ServerFrame_Body.error,
     14: ServerFrame_Body.status,
+    15: ServerFrame_Body.blockCoverage,
     0: ServerFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ServerFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14])
+    ..oo(0, [10, 11, 12, 13, 14, 15])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingReply>(10, _omitFieldNames ? '' : 'pong',
@@ -254,6 +296,8 @@ class ServerFrame extends $pb.GeneratedMessage {
     ..aOM<Error>(13, _omitFieldNames ? '' : 'error', subBuilder: Error.create)
     ..aOM<StatusReply>(14, _omitFieldNames ? '' : 'status',
         subBuilder: StatusReply.create)
+    ..aOM<BlockCoverageUpdate>(15, _omitFieldNames ? '' : 'blockCoverage',
+        subBuilder: BlockCoverageUpdate.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -280,12 +324,14 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
   ServerFrame_Body whichBody() => _ServerFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
+  @$pb.TagNumber(15)
   void clearBody() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -358,6 +404,20 @@ class ServerFrame extends $pb.GeneratedMessage {
   void clearStatus() => $_clearField(14);
   @$pb.TagNumber(14)
   StatusReply ensureStatus() => $_ensure(5);
+
+  /// Snapshot of model block coverage. Exactly one arrives for a
+  /// one-shot BlockCoverageRequest; a subscription delivers one
+  /// per refresh interval until the op is cancelled.
+  @$pb.TagNumber(15)
+  BlockCoverageUpdate get blockCoverage => $_getN(6);
+  @$pb.TagNumber(15)
+  set blockCoverage(BlockCoverageUpdate value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasBlockCoverage() => $_has(6);
+  @$pb.TagNumber(15)
+  void clearBlockCoverage() => $_clearField(15);
+  @$pb.TagNumber(15)
+  BlockCoverageUpdate ensureBlockCoverage() => $_ensure(6);
 }
 
 /// Sent from client → server to abort an in-flight operation by id.
@@ -962,6 +1022,374 @@ class StatusReply extends $pb.GeneratedMessage {
   $core.bool hasVersion() => $_has(5);
   @$pb.TagNumber(6)
   void clearVersion() => $_clearField(6);
+}
+
+/// `kwaainet shard chain` — model block coverage from the DHT.
+class BlockCoverageRequest extends $pb.GeneratedMessage {
+  factory BlockCoverageRequest({
+    $core.String? dhtPrefix,
+    $core.int? totalBlocks,
+    $core.bool? subscribe,
+    $core.int? intervalSecs,
+  }) {
+    final result = create();
+    if (dhtPrefix != null) result.dhtPrefix = dhtPrefix;
+    if (totalBlocks != null) result.totalBlocks = totalBlocks;
+    if (subscribe != null) result.subscribe = subscribe;
+    if (intervalSecs != null) result.intervalSecs = intervalSecs;
+    return result;
+  }
+
+  BlockCoverageRequest._();
+
+  factory BlockCoverageRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory BlockCoverageRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BlockCoverageRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'dhtPrefix')
+    ..aI(2, _omitFieldNames ? '' : 'totalBlocks',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOB(3, _omitFieldNames ? '' : 'subscribe')
+    ..aI(4, _omitFieldNames ? '' : 'intervalSecs',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockCoverageRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockCoverageRequest copyWith(void Function(BlockCoverageRequest) updates) =>
+      super.copyWith((message) => updates(message as BlockCoverageRequest))
+          as BlockCoverageRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static BlockCoverageRequest create() => BlockCoverageRequest._();
+  @$core.override
+  BlockCoverageRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static BlockCoverageRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BlockCoverageRequest>(create);
+  static BlockCoverageRequest? _defaultInstance;
+
+  /// DHT prefix to query. Defaults to the daemon's configured model
+  /// prefix when empty.
+  @$pb.TagNumber(1)
+  $core.String get dhtPrefix => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set dhtPrefix($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDhtPrefix() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDhtPrefix() => $_clearField(1);
+
+  /// Total transformer blocks in the model. Defaults to the daemon's
+  /// model config (`num_hidden_layers`) when unset.
+  @$pb.TagNumber(2)
+  $core.int get totalBlocks => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set totalBlocks($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTotalBlocks() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTotalBlocks() => $_clearField(2);
+
+  /// When true the operation stays open and the server pushes a fresh
+  /// BlockCoverageUpdate every `interval_secs` until the client sends
+  /// a Cancel body for this op id. When false a single update is sent
+  /// followed by Done.
+  @$pb.TagNumber(3)
+  $core.bool get subscribe => $_getBF(2);
+  @$pb.TagNumber(3)
+  set subscribe($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSubscribe() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSubscribe() => $_clearField(3);
+
+  /// Refresh cadence for subscriptions, in seconds. 0 means the
+  /// server default (5s). Ignored when `subscribe` is false.
+  @$pb.TagNumber(4)
+  $core.int get intervalSecs => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set intervalSecs($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasIntervalSecs() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearIntervalSecs() => $_clearField(4);
+}
+
+/// One peer serving a contiguous block range, as announced in the DHT.
+class BlockPeer extends $pb.GeneratedMessage {
+  factory BlockPeer({
+    $core.String? peerId,
+    $core.int? startBlock,
+    $core.int? endBlock,
+    $core.String? publicName,
+    $core.double? throughput,
+    $core.double? trustScore,
+    $core.String? trustTier,
+  }) {
+    final result = create();
+    if (peerId != null) result.peerId = peerId;
+    if (startBlock != null) result.startBlock = startBlock;
+    if (endBlock != null) result.endBlock = endBlock;
+    if (publicName != null) result.publicName = publicName;
+    if (throughput != null) result.throughput = throughput;
+    if (trustScore != null) result.trustScore = trustScore;
+    if (trustTier != null) result.trustTier = trustTier;
+    return result;
+  }
+
+  BlockPeer._();
+
+  factory BlockPeer.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory BlockPeer.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BlockPeer',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'peerId')
+    ..aI(2, _omitFieldNames ? '' : 'startBlock', fieldType: $pb.PbFieldType.OU3)
+    ..aI(3, _omitFieldNames ? '' : 'endBlock', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(4, _omitFieldNames ? '' : 'publicName')
+    ..aD(5, _omitFieldNames ? '' : 'throughput')
+    ..aD(6, _omitFieldNames ? '' : 'trustScore')
+    ..aOS(7, _omitFieldNames ? '' : 'trustTier')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockPeer clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockPeer copyWith(void Function(BlockPeer) updates) =>
+      super.copyWith((message) => updates(message as BlockPeer)) as BlockPeer;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static BlockPeer create() => BlockPeer._();
+  @$core.override
+  BlockPeer createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static BlockPeer getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<BlockPeer>(create);
+  static BlockPeer? _defaultInstance;
+
+  /// libp2p peer id, base58.
+  @$pb.TagNumber(1)
+  $core.String get peerId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set peerId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPeerId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPeerId() => $_clearField(1);
+
+  /// Served block range: [start_block, end_block).
+  @$pb.TagNumber(2)
+  $core.int get startBlock => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set startBlock($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasStartBlock() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearStartBlock() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get endBlock => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set endBlock($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasEndBlock() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEndBlock() => $_clearField(3);
+
+  /// Human-readable name the peer announced (may be empty).
+  @$pb.TagNumber(4)
+  $core.String get publicName => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set publicName($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasPublicName() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearPublicName() => $_clearField(4);
+
+  /// Tokens/sec the peer claimed in its DHT announcement (0 = unknown).
+  @$pb.TagNumber(5)
+  $core.double get throughput => $_getN(4);
+  @$pb.TagNumber(5)
+  set throughput($core.double value) => $_setDouble(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasThroughput() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearThroughput() => $_clearField(5);
+
+  /// Local reputation score in [0, 1]. Only meaningful when
+  /// `trust_tier` is non-empty.
+  @$pb.TagNumber(6)
+  $core.double get trustScore => $_getN(5);
+  @$pb.TagNumber(6)
+  set trustScore($core.double value) => $_setDouble(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasTrustScore() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTrustScore() => $_clearField(6);
+
+  /// Trust tier label ("UNKNOWN" / "KNOWN" / "VERIFIED" / "TRUSTED").
+  /// Empty when the local reputation system is disabled.
+  @$pb.TagNumber(7)
+  $core.String get trustTier => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set trustTier($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasTrustTier() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearTrustTier() => $_clearField(7);
+}
+
+/// Snapshot of which peers cover which blocks of the model.
+class BlockCoverageUpdate extends $pb.GeneratedMessage {
+  factory BlockCoverageUpdate({
+    $core.String? serverTime,
+    $core.String? model,
+    $core.String? dhtPrefix,
+    $core.int? totalBlocks,
+    $core.int? coveredBlocks,
+    $core.bool? fullCoverage,
+    $core.Iterable<BlockPeer>? peers,
+  }) {
+    final result = create();
+    if (serverTime != null) result.serverTime = serverTime;
+    if (model != null) result.model = model;
+    if (dhtPrefix != null) result.dhtPrefix = dhtPrefix;
+    if (totalBlocks != null) result.totalBlocks = totalBlocks;
+    if (coveredBlocks != null) result.coveredBlocks = coveredBlocks;
+    if (fullCoverage != null) result.fullCoverage = fullCoverage;
+    if (peers != null) result.peers.addAll(peers);
+    return result;
+  }
+
+  BlockCoverageUpdate._();
+
+  factory BlockCoverageUpdate.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory BlockCoverageUpdate.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BlockCoverageUpdate',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'serverTime')
+    ..aOS(2, _omitFieldNames ? '' : 'model')
+    ..aOS(3, _omitFieldNames ? '' : 'dhtPrefix')
+    ..aI(4, _omitFieldNames ? '' : 'totalBlocks',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(5, _omitFieldNames ? '' : 'coveredBlocks',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOB(6, _omitFieldNames ? '' : 'fullCoverage')
+    ..pPM<BlockPeer>(7, _omitFieldNames ? '' : 'peers',
+        subBuilder: BlockPeer.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockCoverageUpdate clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BlockCoverageUpdate copyWith(void Function(BlockCoverageUpdate) updates) =>
+      super.copyWith((message) => updates(message as BlockCoverageUpdate))
+          as BlockCoverageUpdate;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static BlockCoverageUpdate create() => BlockCoverageUpdate._();
+  @$core.override
+  BlockCoverageUpdate createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static BlockCoverageUpdate getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BlockCoverageUpdate>(create);
+  static BlockCoverageUpdate? _defaultInstance;
+
+  /// Daemon wall-clock time of this snapshot, RFC 3339.
+  @$pb.TagNumber(1)
+  $core.String get serverTime => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set serverTime($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasServerTime() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearServerTime() => $_clearField(1);
+
+  /// The model whose coverage was queried (daemon's configured model).
+  @$pb.TagNumber(2)
+  $core.String get model => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set model($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasModel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearModel() => $_clearField(2);
+
+  /// The DHT prefix actually queried.
+  @$pb.TagNumber(3)
+  $core.String get dhtPrefix => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set dhtPrefix($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDhtPrefix() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDhtPrefix() => $_clearField(3);
+
+  /// Total transformer blocks in the model.
+  @$pb.TagNumber(4)
+  $core.int get totalBlocks => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set totalBlocks($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTotalBlocks() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTotalBlocks() => $_clearField(4);
+
+  /// Number of blocks covered by at least one peer.
+  @$pb.TagNumber(5)
+  $core.int get coveredBlocks => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set coveredBlocks($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCoveredBlocks() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCoveredBlocks() => $_clearField(5);
+
+  /// True when every block is covered — distributed inference ready.
+  @$pb.TagNumber(6)
+  $core.bool get fullCoverage => $_getBF(5);
+  @$pb.TagNumber(6)
+  set fullCoverage($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasFullCoverage() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearFullCoverage() => $_clearField(6);
+
+  /// All discovered block servers, sorted by start_block.
+  @$pb.TagNumber(7)
+  $pb.PbList<BlockPeer> get peers => $_getList(6);
 }
 
 class ChatMessage extends $pb.GeneratedMessage {

@@ -22,6 +22,7 @@ import '../widgets/kwaai_dropdown.dart';
 import '../widgets/kwaai_heading.dart';
 import '../widgets/kwaai_status_bar.dart';
 import '../widgets/kwaai_text_field.dart';
+import 'blocks_tab.dart';
 
 /// Fill color for unselected/secondary controls — segmented-button segments
 /// and secondary buttons (e.g. Stop daemon).
@@ -237,6 +238,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   index: _selectedTab,
                   children: [
                     _buildStatusTab(),
+                    // Mounted only while selected: the IndexedStack builds
+                    // every child even offscreen, and building BlocksTab is
+                    // what opens (autoDispose: and closes) its live
+                    // block-coverage subscription to the daemon.
+                    if (_selectedTab == _blocksTabIndex)
+                      const BlocksTab()
+                    else
+                      const SizedBox.shrink(),
                     const _ContributeTab(),
                     const _NetworkTab(),
                     const _AppearanceTab(),
@@ -349,6 +358,7 @@ const _settingsNavEntries = <_SettingsNavEntry>[
     Icons.monitor_heart,
     'Status',
   ),
+  _SettingsNavEntry(Icons.grid_view_outlined, Icons.grid_view, 'Blocks'),
   _SettingsNavEntry(
     Icons.volunteer_activism_outlined,
     Icons.volunteer_activism,
@@ -359,6 +369,11 @@ const _settingsNavEntries = <_SettingsNavEntry>[
   _SettingsNavEntry(Icons.bug_report_outlined, Icons.bug_report, 'Developer'),
   _SettingsNavEntry(Icons.info_outline, Icons.info, 'About'),
 ];
+
+/// Index of the Blocks tab in [_settingsNavEntries] / the IndexedStack.
+/// The Blocks tab holds a live gRPC subscription, so unlike its read-only
+/// siblings it is only mounted while actually selected.
+const _blocksTabIndex = 1;
 
 class _SettingsNav extends StatelessWidget {
   const _SettingsNav({
@@ -1294,12 +1309,12 @@ bool _peersEqual(List<String> a, List<String> b) {
 /// user is on Contribute (and vice versa).
 bool _tabDirty(int tab, ConfigSnapshot draft, ConfigSnapshot snapshot) {
   switch (tab) {
-    case 1: // Contribute
+    case 2: // Contribute
       return draft.model != snapshot.model ||
           draft.shardingEnabled != snapshot.shardingEnabled ||
           draft.storageEnabled != snapshot.storageEnabled ||
           draft.storageCapacityGb != snapshot.storageCapacityGb;
-    case 2: // Network
+    case 3: // Network
       return draft.port != snapshot.port ||
           draft.publicIp != snapshot.publicIp ||
           !_peersEqual(draft.initialPeers, snapshot.initialPeers) ||
