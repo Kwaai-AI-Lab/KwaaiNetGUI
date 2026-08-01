@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -226,6 +227,31 @@ void main() {
     await tester.tap(find.byTooltip('Close'));
     await tester.pump();
     expect(find.textContaining('CONNECTIONS'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('offers connect only for peers we are not connected to',
+      (tester) async {
+    // A routing-only peer is the case this exists for: known from the DHT,
+    // no live connection. Connected rows show a check and no action — the
+    // button would mean nothing there.
+    await tester.pumpWidget(_host(_update(connected: 2, routing: 4)));
+    await tester.pump();
+
+    // The dash is the resting state; the button only appears on hover, so
+    // nothing is visible until pointed at.
+    expect(find.byTooltip('Connect to this peer'), findsNothing);
+
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    addTearDown(gesture.removePointer);
+
+    // Hover the CONN cell of a routing-only row.
+    final dashes = find.byIcon(Icons.remove);
+    expect(dashes, findsWidgets, reason: 'unconnected rows show a dash');
+    await gesture.moveTo(tester.getCenter(dashes.first));
+    await tester.pump();
+
     expect(tester.takeException(), isNull);
   });
 

@@ -30,6 +30,7 @@ enum ClientFrame_Body {
   blockCoverage,
   storageDiscovery,
   network,
+  connect,
   notSet
 }
 
@@ -57,6 +58,7 @@ class ClientFrame extends $pb.GeneratedMessage {
     BlockCoverageRequest? blockCoverage,
     StorageDiscoveryRequest? storageDiscovery,
     NetworkRequest? network,
+    ConnectRequest? connect,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -68,6 +70,7 @@ class ClientFrame extends $pb.GeneratedMessage {
     if (blockCoverage != null) result.blockCoverage = blockCoverage;
     if (storageDiscovery != null) result.storageDiscovery = storageDiscovery;
     if (network != null) result.network = network;
+    if (connect != null) result.connect = connect;
     return result;
   }
 
@@ -89,13 +92,14 @@ class ClientFrame extends $pb.GeneratedMessage {
     15: ClientFrame_Body.blockCoverage,
     16: ClientFrame_Body.storageDiscovery,
     17: ClientFrame_Body.network,
+    18: ClientFrame_Body.connect,
     0: ClientFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ClientFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingRequest>(10, _omitFieldNames ? '' : 'ping',
@@ -115,6 +119,8 @@ class ClientFrame extends $pb.GeneratedMessage {
         subBuilder: StorageDiscoveryRequest.create)
     ..aOM<NetworkRequest>(17, _omitFieldNames ? '' : 'network',
         subBuilder: NetworkRequest.create)
+    ..aOM<ConnectRequest>(18, _omitFieldNames ? '' : 'connect',
+        subBuilder: ConnectRequest.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -144,6 +150,7 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
+  @$pb.TagNumber(18)
   ClientFrame_Body whichBody() => _ClientFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
@@ -153,6 +160,7 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
+  @$pb.TagNumber(18)
   void clearBody() => $_clearField($_whichOneof(0));
 
   /// Operation correlation id. Pick any non-zero value unused by an
@@ -275,6 +283,18 @@ class ClientFrame extends $pb.GeneratedMessage {
   void clearNetwork() => $_clearField(17);
   @$pb.TagNumber(17)
   NetworkRequest ensureNetwork() => $_ensure(8);
+
+  /// Dial a peer by id. One ConnectReply, then Done.
+  @$pb.TagNumber(18)
+  ConnectRequest get connect => $_getN(9);
+  @$pb.TagNumber(18)
+  set connect(ConnectRequest value) => $_setField(18, value);
+  @$pb.TagNumber(18)
+  $core.bool hasConnect() => $_has(9);
+  @$pb.TagNumber(18)
+  void clearConnect() => $_clearField(18);
+  @$pb.TagNumber(18)
+  ConnectRequest ensureConnect() => $_ensure(9);
 }
 
 enum ServerFrame_Body {
@@ -286,6 +306,7 @@ enum ServerFrame_Body {
   blockCoverage,
   storage,
   network,
+  connect,
   notSet
 }
 
@@ -303,6 +324,7 @@ class ServerFrame extends $pb.GeneratedMessage {
     BlockCoverageUpdate? blockCoverage,
     StorageUpdate? storage,
     NetworkUpdate? network,
+    ConnectReply? connect,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -314,6 +336,7 @@ class ServerFrame extends $pb.GeneratedMessage {
     if (blockCoverage != null) result.blockCoverage = blockCoverage;
     if (storage != null) result.storage = storage;
     if (network != null) result.network = network;
+    if (connect != null) result.connect = connect;
     return result;
   }
 
@@ -335,13 +358,14 @@ class ServerFrame extends $pb.GeneratedMessage {
     15: ServerFrame_Body.blockCoverage,
     16: ServerFrame_Body.storage,
     17: ServerFrame_Body.network,
+    18: ServerFrame_Body.connect,
     0: ServerFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ServerFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingReply>(10, _omitFieldNames ? '' : 'pong',
@@ -358,6 +382,8 @@ class ServerFrame extends $pb.GeneratedMessage {
         subBuilder: StorageUpdate.create)
     ..aOM<NetworkUpdate>(17, _omitFieldNames ? '' : 'network',
         subBuilder: NetworkUpdate.create)
+    ..aOM<ConnectReply>(18, _omitFieldNames ? '' : 'connect',
+        subBuilder: ConnectReply.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -387,6 +413,7 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
+  @$pb.TagNumber(18)
   ServerFrame_Body whichBody() => _ServerFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
@@ -396,6 +423,7 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
+  @$pb.TagNumber(18)
   void clearBody() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -510,6 +538,18 @@ class ServerFrame extends $pb.GeneratedMessage {
   void clearNetwork() => $_clearField(17);
   @$pb.TagNumber(17)
   NetworkUpdate ensureNetwork() => $_ensure(8);
+
+  /// Reply to a ConnectRequest.
+  @$pb.TagNumber(18)
+  ConnectReply get connect => $_getN(9);
+  @$pb.TagNumber(18)
+  set connect(ConnectReply value) => $_setField(18, value);
+  @$pb.TagNumber(18)
+  $core.bool hasConnect() => $_has(9);
+  @$pb.TagNumber(18)
+  void clearConnect() => $_clearField(18);
+  @$pb.TagNumber(18)
+  ConnectReply ensureConnect() => $_ensure(9);
 }
 
 /// Sent from client → server to abort an in-flight operation by id.
@@ -2495,6 +2535,139 @@ class NetworkUpdate extends $pb.GeneratedMessage {
   /// The Kademlia routing table, sorted by peer id.
   @$pb.TagNumber(5)
   $pb.PbList<RoutingPeer> get routing => $_getList(4);
+}
+
+/// Dial a peer we know of but hold no connection to.
+///
+/// A bare peer id is resolved through the DHT first, the way Go's routed
+/// host does it, so the caller does not need an address — which is the
+/// point: the routing table knows peers it has no connection to, and this
+/// is how you reach one.
+///
+/// Note this makes *us* the dialer, so it will not trigger a DCUtR
+/// upgrade: libp2p has the inbound side initiate hole punching.
+class ConnectRequest extends $pb.GeneratedMessage {
+  factory ConnectRequest({
+    $core.String? peerId,
+  }) {
+    final result = create();
+    if (peerId != null) result.peerId = peerId;
+    return result;
+  }
+
+  ConnectRequest._();
+
+  factory ConnectRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ConnectRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ConnectRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'peerId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConnectRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConnectRequest copyWith(void Function(ConnectRequest) updates) =>
+      super.copyWith((message) => updates(message as ConnectRequest))
+          as ConnectRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ConnectRequest create() => ConnectRequest._();
+  @$core.override
+  ConnectRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ConnectRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ConnectRequest>(create);
+  static ConnectRequest? _defaultInstance;
+
+  /// libp2p peer id, base58. An address is resolved via the DHT.
+  @$pb.TagNumber(1)
+  $core.String get peerId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set peerId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPeerId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPeerId() => $_clearField(1);
+}
+
+class ConnectReply extends $pb.GeneratedMessage {
+  factory ConnectReply({
+    $core.bool? connected,
+    $core.String? error,
+  }) {
+    final result = create();
+    if (connected != null) result.connected = connected;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  ConnectReply._();
+
+  factory ConnectReply.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ConnectReply.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ConnectReply',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'connected')
+    ..aOS(2, _omitFieldNames ? '' : 'error')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConnectReply clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConnectReply copyWith(void Function(ConnectReply) updates) =>
+      super.copyWith((message) => updates(message as ConnectReply))
+          as ConnectReply;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ConnectReply create() => ConnectReply._();
+  @$core.override
+  ConnectReply createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ConnectReply getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ConnectReply>(create);
+  static ConnectReply? _defaultInstance;
+
+  /// True when a connection exists after the attempt — including when
+  /// one already existed, since the caller's goal is met either way.
+  @$pb.TagNumber(1)
+  $core.bool get connected => $_getBF(0);
+  @$pb.TagNumber(1)
+  set connected($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasConnected() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearConnected() => $_clearField(1);
+
+  /// Failure detail, empty on success.
+  @$pb.TagNumber(2)
+  $core.String get error => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set error($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasError() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearError() => $_clearField(2);
 }
 
 class ChatMessage extends $pb.GeneratedMessage {

@@ -404,6 +404,22 @@ class KwaaiRpcClient {
     }
   }
 
+  /// Dial a peer by id, resolving its address through the DHT.
+  ///
+  /// Returns null when the session itself could not be reached; otherwise the
+  /// daemon's reply, whose `error` carries a failed dial.
+  Future<pb.ConnectReply?> connectPeer(String peerId) async {
+    try {
+      final session = await _sessionOrInit();
+      return await session
+          .connect(peerId)
+          .timeout(const Duration(seconds: 30));
+    } catch (e) {
+      _log('connectPeer($peerId) failed: $e');
+      return null;
+    }
+  }
+
   Future<void> _resetChannel({bool silent = false}) async {
     final ch = _channel;
     final path = _connectionPath;

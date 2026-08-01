@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../chat/generated/kwaai.pb.dart' as pb;
 import '../../chat/generated/kwaai.pbenum.dart' as pbenum;
+import '../../chat/kwaai_rpc_client.dart';
 import '../../chat/session_client.dart';
 import '../../daemon/daemon_state.dart';
 import '../../daemon/peers_state.dart';
@@ -183,10 +184,30 @@ class _PeersTabState extends ConsumerState<PeersTab> {
             routing: update.routing,
             selectedPeerId: _selectedPeerId,
             onSelectPeer: _togglePeer,
+            onConnect: _connectPeer,
           ),
         ),
       ],
     );
+  }
+
+  /// Dial a peer we know of but are not connected to.
+  ///
+  /// The next snapshot reports the result, so there is nothing to update here
+  /// beyond surfacing a failure — a successful connection simply appears.
+  Future<void> _connectPeer(String peerId) async {
+    final reply = await ref.read(kwaaiRpcClientProvider).connectPeer(peerId);
+    if (!mounted) return;
+    final failed = reply == null || !reply.connected;
+    if (failed) {
+      final detail = reply?.error ?? 'the daemon could not be reached';
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text('Could not connect: $detail'),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   void _togglePeer(String peerId) => setState(() {
@@ -563,12 +584,14 @@ class _TableSection extends StatelessWidget {
     required this.routing,
     required this.selectedPeerId,
     required this.onSelectPeer,
+    required this.onConnect,
   });
 
   final List<pb.ConnectedPeer> connected;
   final List<pb.RoutingPeer> routing;
   final String? selectedPeerId;
   final void Function(String peerId) onSelectPeer;
+  final Future<void> Function(String peerId) onConnect;
 
   @override
   Widget build(BuildContext context) {
@@ -589,6 +612,7 @@ class _TableSection extends StatelessWidget {
                   rows: rows,
                   selectedPeerId: selectedPeerId,
                   onSelectPeer: onSelectPeer,
+                  onConnect: onConnect,
                 ),
         ),
         // Detail for the selected peer, pinned below the table rather than
@@ -752,11 +776,13 @@ class _PeerTable extends StatelessWidget {
     required this.rows,
     required this.selectedPeerId,
     required this.onSelectPeer,
+    required this.onConnect,
   });
 
   final List<PeerRow> rows;
   final String? selectedPeerId;
   final void Function(String peerId) onSelectPeer;
+  final Future<void> Function(String peerId) onConnect;
 
   @override
   Widget build(BuildContext context) {
@@ -811,7 +837,14 @@ class _PeerTable extends StatelessWidget {
                     ),
                     onSelectChanged: (_) => onSelectPeer(r.peerId),
                     cells: [
-                      DataCell(_StateMark(on: r.isConnected)),
+                      DataCell(
+                        r.isConnected
+                            ? const _StateMark(on: true)
+                            : _ConnectCell(
+                                peerId: r.peerId,
+                                onConnect: onConnect,
+                              ),
+                      ),
                       DataCell(_StateMark(on: r.inRoutingTable)),
                       DataCell(
                         r.primary == null
@@ -876,6 +909,69 @@ class _PeerTable extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The CONN cell for a peer we hold no connection to: a dash that becomes a
+/// connect button on hover.
+///
+/// Hover-reveal rather than an always-visible button, because most rows are
+/// connected and a column of buttons would read as the primary action on a
+/// page that is mostly for reading. The dash still says "not connected" at a
+/// glance; the action appears where you are already pointing.
+///
+/// Dialling makes us the *dialer*, so this will not trigger a DCUtR upgrade —
+/// libp2p has the inbound side initiate hole punching. It is for reaching a
+/// peer the routing table knows about but we are not talking to.
+class _ConnectCell extends StatefulWidget {
+  const _ConnectCell({required this.peerId, required this.onConnect});
+
+  final String peerId;
+  final Future<void> Function(String peerId) onConnect;
+
+  @override
+  State<_ConnectCell> createState() => _ConnectCellState();
+}
+
+class _ConnectCellState extends State<_ConnectCell> {
+  bool _hovered = false;
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final kwaai = context.kwaai;
+
+    if (_busy) {
+      return const SizedBox(
+        width: 14,
+        height: 14,
+        child: CircularProgressIndicator(strokeWidth: 1.6),
+      );
+    }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: _hovered
+          ? IconButton(
+              icon: const Icon(Icons.link, size: 14),
+              iconSize: 14,
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+              color: kwaai.accentPrimary,
+              tooltip: 'Connect to this peer',
+              onPressed: () async {
+                setState(() => _busy = true);
+                try {
+                  await widget.onConnect(widget.peerId);
+                } finally {
+                  if (mounted) setState(() => _busy = false);
+                }
+              },
+            )
+          : const _StateMark(on: false),
     );
   }
 }

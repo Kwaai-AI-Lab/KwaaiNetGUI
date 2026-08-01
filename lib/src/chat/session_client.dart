@@ -151,6 +151,28 @@ class SessionClient {
     return reply;
   }
 
+  /// `connect` — dial a peer we know of but hold no connection to.
+  ///
+  /// The daemon resolves the bare peer id through the DHT, so no address is
+  /// needed. Returns the reply rather than throwing on a failed dial: "could
+  /// not reach that peer" is an ordinary outcome here, not an error in the
+  /// operation.
+  Future<pb.ConnectReply> connect(String peerId) async {
+    final frames = _open((id) => pb.ClientFrame()
+      ..id = Int64(id)
+      ..connect = (pb.ConnectRequest()..peerId = peerId));
+    pb.ConnectReply? reply;
+    await for (final f in frames) {
+      if (f.whichBody() == pb.ServerFrame_Body.connect) {
+        reply = f.connect;
+      }
+    }
+    if (reply == null) {
+      throw SessionOpError(code: 0, message: 'connect returned no reply');
+    }
+    return reply;
+  }
+
   /// `kwaainet shard run <PROMPT>` — distributed inference. Default
   /// path used by the GUI's main chat.
   Stream<String> shardRun(String prompt, {String role = 'user'}) =>

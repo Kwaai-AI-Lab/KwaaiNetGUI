@@ -139,6 +139,15 @@ const ClientFrame$json = {
       '9': 0,
       '10': 'network'
     },
+    {
+      '1': 'connect',
+      '3': 18,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.ConnectRequest',
+      '9': 0,
+      '10': 'connect'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -155,8 +164,8 @@ final $typed_data.Uint8List clientFrameDescriptor = $convert.base64Decode(
     'ZjYW5jZWwSRwoOYmxvY2tfY292ZXJhZ2UYDyABKAsyHi5rd2FhaS52MS5CbG9ja0NvdmVyYWdl'
     'UmVxdWVzdEgAUg1ibG9ja0NvdmVyYWdlElAKEXN0b3JhZ2VfZGlzY292ZXJ5GBAgASgLMiEua3'
     'dhYWkudjEuU3RvcmFnZURpc2NvdmVyeVJlcXVlc3RIAFIQc3RvcmFnZURpc2NvdmVyeRI0Cgdu'
-    'ZXR3b3JrGBEgASgLMhgua3dhYWkudjEuTmV0d29ya1JlcXVlc3RIAFIHbmV0d29ya0IGCgRib2'
-    'R5');
+    'ZXR3b3JrGBEgASgLMhgua3dhYWkudjEuTmV0d29ya1JlcXVlc3RIAFIHbmV0d29yaxI0Cgdjb2'
+    '5uZWN0GBIgASgLMhgua3dhYWkudjEuQ29ubmVjdFJlcXVlc3RIAFIHY29ubmVjdEIGCgRib2R5');
 
 @$core.Deprecated('Use serverFrameDescriptor instead')
 const ServerFrame$json = {
@@ -235,6 +244,15 @@ const ServerFrame$json = {
       '9': 0,
       '10': 'network'
     },
+    {
+      '1': 'connect',
+      '3': 18,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.ConnectReply',
+      '9': 0,
+      '10': 'connect'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -250,7 +268,8 @@ final $typed_data.Uint8List serverFrameDescriptor = $convert.base64Decode(
     'MS5TdGF0dXNSZXBseUgAUgZzdGF0dXMSRgoOYmxvY2tfY292ZXJhZ2UYDyABKAsyHS5rd2FhaS'
     '52MS5CbG9ja0NvdmVyYWdlVXBkYXRlSABSDWJsb2NrQ292ZXJhZ2USMwoHc3RvcmFnZRgQIAEo'
     'CzIXLmt3YWFpLnYxLlN0b3JhZ2VVcGRhdGVIAFIHc3RvcmFnZRIzCgduZXR3b3JrGBEgASgLMh'
-    'cua3dhYWkudjEuTmV0d29ya1VwZGF0ZUgAUgduZXR3b3JrQgYKBGJvZHk=');
+    'cua3dhYWkudjEuTmV0d29ya1VwZGF0ZUgAUgduZXR3b3JrEjIKB2Nvbm5lY3QYEiABKAsyFi5r'
+    'd2FhaS52MS5Db25uZWN0UmVwbHlIAFIHY29ubmVjdEIGCgRib2R5');
 
 @$core.Deprecated('Use cancelDescriptor instead')
 const Cancel$json = {
@@ -728,6 +747,32 @@ final $typed_data.Uint8List networkUpdateDescriptor = $convert.base64Decode(
     'GAMgASgLMhQua3dhYWkudjEuU2VsZlN0YXR1c1IKc2VsZlN0YXR1cxI1Cgljb25uZWN0ZWQYBC'
     'ADKAsyFy5rd2FhaS52MS5Db25uZWN0ZWRQZWVyUgljb25uZWN0ZWQSLwoHcm91dGluZxgFIAMo'
     'CzIVLmt3YWFpLnYxLlJvdXRpbmdQZWVyUgdyb3V0aW5n');
+
+@$core.Deprecated('Use connectRequestDescriptor instead')
+const ConnectRequest$json = {
+  '1': 'ConnectRequest',
+  '2': [
+    {'1': 'peer_id', '3': 1, '4': 1, '5': 9, '10': 'peerId'},
+  ],
+};
+
+/// Descriptor for `ConnectRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List connectRequestDescriptor = $convert
+    .base64Decode('Cg5Db25uZWN0UmVxdWVzdBIXCgdwZWVyX2lkGAEgASgJUgZwZWVySWQ=');
+
+@$core.Deprecated('Use connectReplyDescriptor instead')
+const ConnectReply$json = {
+  '1': 'ConnectReply',
+  '2': [
+    {'1': 'connected', '3': 1, '4': 1, '5': 8, '10': 'connected'},
+    {'1': 'error', '3': 2, '4': 1, '5': 9, '10': 'error'},
+  ],
+};
+
+/// Descriptor for `ConnectReply`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List connectReplyDescriptor = $convert.base64Decode(
+    'CgxDb25uZWN0UmVwbHkSHAoJY29ubmVjdGVkGAEgASgIUgljb25uZWN0ZWQSFAoFZXJyb3IYAi'
+    'ABKAlSBWVycm9y');
 
 @$core.Deprecated('Use chatMessageDescriptor instead')
 const ChatMessage$json = {
