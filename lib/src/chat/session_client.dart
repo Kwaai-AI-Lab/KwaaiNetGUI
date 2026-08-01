@@ -270,6 +270,48 @@ class SessionClient {
     return StorageDiscoveryOperation(id: id, updates: updates);
   }
 
+  /// Subscribe to local p2p state: connections, DHT routing table and this
+  /// node's own reachability.
+  ///
+  /// Unlike the two subscriptions above, updates are not purely periodic — a
+  /// reachability change is pushed as it happens. `NetworkUpdate.reason` says
+  /// which it was, so a caller can react to a NAT transition immediately while
+  /// treating peer-table churn as routine.
+  ///
+  /// Requires the daemon to be running the native p2p stack; otherwise the
+  /// stream errors with SessionOpError(code=UNIMPLEMENTED).
+  NetworkOperation networkSubscribe({
+    int intervalSecs = 5,
+  }) {
+    ensureOpen();
+    if (_closed || _outbound == null) {
+      return NetworkOperation(
+        id: null,
+        updates: Stream<pb.NetworkUpdate>.error(
+          SessionEndedError(
+            kind: SessionEndKind.localClose,
+            reason: 'session not open',
+          ),
+        ),
+      );
+    }
+    final id = _nextId++;
+    final controller = StreamController<pb.ServerFrame>();
+    _routers[id] = controller;
+    _outbound!.add(pb.ClientFrame()
+      ..id = Int64(id)
+      ..network = (pb.NetworkRequest()
+        ..subscribe = true
+        ..intervalSecs = intervalSecs));
+    // No silence watchdog, for the same reason as the other two: the daemon
+    // heartbeats an unchanged snapshot, so genuine silence is already
+    // distinguishable, and session-end errors propagate through the router.
+    final updates = controller.stream
+        .where((f) => f.whichBody() == pb.ServerFrame_Body.network)
+        .map((f) => f.network);
+    return NetworkOperation(id: id, updates: updates);
+  }
+
   /// Cancel an in-flight operation. The target operation's stream will
   /// error with SessionOpError(code=CANCELLED).
   Future<void> cancel(int operationId) async {
@@ -465,6 +507,16 @@ class StorageDiscoveryOperation {
 
   final int? id;
   final Stream<pb.StorageUpdate> updates;
+}
+
+/// An in-flight network subscription: its update stream plus the server
+/// operation id needed to [SessionClient.cancel] it. Same id semantics as
+/// [SessionOperation] — null means no frame was ever sent.
+class NetworkOperation {
+  NetworkOperation({required this.id, required this.updates});
+
+  final int? id;
+  final Stream<pb.NetworkUpdate> updates;
 }
 
 /// Thrown into a per-op stream when the server emits Error for that id.

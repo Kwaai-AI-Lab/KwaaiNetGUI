@@ -52,6 +52,68 @@ class StorageReachability extends $pb.ProtobufEnum {
   const StorageReachability._(super.value, super.name);
 }
 
+/// Why a NetworkUpdate was sent.
+///
+/// Without this a client cannot tell a routine sample from a genuine
+/// event, and would have to infer it by diffing successive snapshots.
+class UpdateReason extends $pb.ProtobufEnum {
+  /// The refresh timer fired and something changed, or this is the
+  /// single update of a one-shot request.
+  static const UpdateReason UPDATE_REASON_TICK =
+      UpdateReason._(0, _omitEnumNames ? '' : 'UPDATE_REASON_TICK');
+
+  /// Reachability, relay use, or announceability moved. Sent
+  /// immediately rather than on the next tick boundary.
+  static const UpdateReason UPDATE_REASON_REACHABILITY =
+      UpdateReason._(1, _omitEnumNames ? '' : 'UPDATE_REASON_REACHABILITY');
+
+  /// The connected-peer or routing set changed since the last update.
+  static const UpdateReason UPDATE_REASON_PEERS =
+      UpdateReason._(2, _omitEnumNames ? '' : 'UPDATE_REASON_PEERS');
+
+  /// Nothing changed. Sent periodically so a client can distinguish a
+  /// quiet network from a stalled feed.
+  static const UpdateReason UPDATE_REASON_HEARTBEAT =
+      UpdateReason._(3, _omitEnumNames ? '' : 'UPDATE_REASON_HEARTBEAT');
+
+  static const $core.List<UpdateReason> values = <UpdateReason>[
+    UPDATE_REASON_TICK,
+    UPDATE_REASON_REACHABILITY,
+    UPDATE_REASON_PEERS,
+    UPDATE_REASON_HEARTBEAT,
+  ];
+
+  static final $core.List<UpdateReason?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static UpdateReason? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const UpdateReason._(super.value, super.name);
+}
+
+/// How a connection reaches the peer.
+class PeerConnKind extends $pb.ProtobufEnum {
+  /// A plain transport address — directly dialable.
+  static const PeerConnKind PEER_CONN_KIND_DIRECT =
+      PeerConnKind._(0, _omitEnumNames ? '' : 'PEER_CONN_KIND_DIRECT');
+
+  /// The path runs through a circuit relay.
+  static const PeerConnKind PEER_CONN_KIND_RELAY =
+      PeerConnKind._(1, _omitEnumNames ? '' : 'PEER_CONN_KIND_RELAY');
+
+  static const $core.List<PeerConnKind> values = <PeerConnKind>[
+    PEER_CONN_KIND_DIRECT,
+    PEER_CONN_KIND_RELAY,
+  ];
+
+  static final $core.List<PeerConnKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 1);
+  static PeerConnKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const PeerConnKind._(super.value, super.name);
+}
+
 class Error_Code extends $pb.ProtobufEnum {
   static const Error_Code UNKNOWN =
       Error_Code._(0, _omitEnumNames ? '' : 'UNKNOWN');

@@ -358,6 +358,30 @@ class KwaaiRpcClient {
     }
   }
 
+  /// Live local-p2p feed: connections, DHT routing table and this node's own
+  /// reachability. The daemon samples every [intervalSecs] and additionally
+  /// pushes immediately on a reachability change; the daemon-side operation is
+  /// cancelled when the listener unsubscribes.
+  ///
+  /// Errors with SessionOpError(code=UNIMPLEMENTED) when the daemon is running
+  /// the Go p2p stack, which cannot supply this view. As with the two streams
+  /// above, this doesn't reset the channel — the provider resubscribes when
+  /// connectivity returns.
+  Stream<pb.NetworkUpdate> networkStream({
+    int intervalSecs = 5,
+  }) async* {
+    final session = await _sessionOrInit();
+    final op = session.networkSubscribe(intervalSecs: intervalSecs);
+    try {
+      yield* op.updates;
+    } finally {
+      final id = op.id;
+      if (id != null) {
+        await cancelOperation(id);
+      }
+    }
+  }
+
   /// Version of the *running* daemon, read from `StatusReply.version`.
   ///
   /// Returns null when the daemon isn't reachable, or when it predates the

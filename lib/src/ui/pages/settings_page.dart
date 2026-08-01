@@ -22,6 +22,7 @@ import '../widgets/kwaai_dropdown.dart';
 import '../widgets/kwaai_heading.dart';
 import '../widgets/kwaai_status_bar.dart';
 import '../widgets/kwaai_text_field.dart';
+import 'peers_tab.dart';
 import 'sharding_tab.dart';
 import 'storage_tab.dart';
 
@@ -254,6 +255,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       const StorageTab()
                     else
                       const SizedBox.shrink(),
+                    // Same again: mounting this subscribes to the daemon's
+                    // live swarm state, which it samples every 5s.
+                    if (_selectedTab == _peersTabIndex)
+                      const PeersTab()
+                    else
+                      const SizedBox.shrink(),
                     const _ContributeTab(),
                     const _NetworkTab(),
                     const _AppearanceTab(),
@@ -368,6 +375,9 @@ const _settingsNavEntries = <_SettingsNavEntry>[
   ),
   _SettingsNavEntry(Icons.grid_view_outlined, Icons.grid_view, 'Sharding'),
   _SettingsNavEntry(Icons.storage_outlined, Icons.storage, 'VPK'),
+  // Live p2p state. Named "Peers" rather than "Network" because that name is
+  // already taken below by the bind/initial-peers *configuration* tab.
+  _SettingsNavEntry(Icons.hub_outlined, Icons.hub, 'Peers'),
   _SettingsNavEntry(
     Icons.volunteer_activism_outlined,
     Icons.volunteer_activism,
@@ -385,6 +395,7 @@ const _settingsNavEntries = <_SettingsNavEntry>[
 /// the DHT — or dialling storage nodes — for a view nobody is looking at.
 const _shardingTabIndex = 1;
 const _storageTabIndex = 2;
+const _peersTabIndex = 3;
 
 class _SettingsNav extends StatelessWidget {
   const _SettingsNav({

@@ -29,6 +29,7 @@ enum ClientFrame_Body {
   cancel,
   blockCoverage,
   storageDiscovery,
+  network,
   notSet
 }
 
@@ -55,6 +56,7 @@ class ClientFrame extends $pb.GeneratedMessage {
     Cancel? cancel,
     BlockCoverageRequest? blockCoverage,
     StorageDiscoveryRequest? storageDiscovery,
+    NetworkRequest? network,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -65,6 +67,7 @@ class ClientFrame extends $pb.GeneratedMessage {
     if (cancel != null) result.cancel = cancel;
     if (blockCoverage != null) result.blockCoverage = blockCoverage;
     if (storageDiscovery != null) result.storageDiscovery = storageDiscovery;
+    if (network != null) result.network = network;
     return result;
   }
 
@@ -85,13 +88,14 @@ class ClientFrame extends $pb.GeneratedMessage {
     14: ClientFrame_Body.cancel,
     15: ClientFrame_Body.blockCoverage,
     16: ClientFrame_Body.storageDiscovery,
+    17: ClientFrame_Body.network,
     0: ClientFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ClientFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingRequest>(10, _omitFieldNames ? '' : 'ping',
@@ -109,6 +113,8 @@ class ClientFrame extends $pb.GeneratedMessage {
     ..aOM<StorageDiscoveryRequest>(
         16, _omitFieldNames ? '' : 'storageDiscovery',
         subBuilder: StorageDiscoveryRequest.create)
+    ..aOM<NetworkRequest>(17, _omitFieldNames ? '' : 'network',
+        subBuilder: NetworkRequest.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -137,6 +143,7 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
+  @$pb.TagNumber(17)
   ClientFrame_Body whichBody() => _ClientFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
@@ -145,6 +152,7 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
+  @$pb.TagNumber(17)
   void clearBody() => $_clearField($_whichOneof(0));
 
   /// Operation correlation id. Pick any non-zero value unused by an
@@ -238,8 +246,8 @@ class ClientFrame extends $pb.GeneratedMessage {
   BlockCoverageRequest ensureBlockCoverage() => $_ensure(6);
 
   /// VPK storage-node discovery. Like block_coverage, but for the
-  /// `_kwaai.vpk.nodes` DHT registry. Note that even a one-shot
-  /// request yields *two* StorageUpdate replies — see
+  /// `_kwaai.vpk.nodes` DHT registry. Note that a one-shot request
+  /// yields *two* StorageUpdate replies before Done — see
   /// StorageUpdate.probes_pending.
   @$pb.TagNumber(16)
   StorageDiscoveryRequest get storageDiscovery => $_getN(7);
@@ -251,6 +259,22 @@ class ClientFrame extends $pb.GeneratedMessage {
   void clearStorageDiscovery() => $_clearField(16);
   @$pb.TagNumber(16)
   StorageDiscoveryRequest ensureStorageDiscovery() => $_ensure(7);
+
+  /// Local p2p state: connections, DHT routing table and this
+  /// node's own reachability. Unlike the two above it queries no
+  /// DHT — it reads the swarm — so it is cheap enough to poll at a
+  /// few seconds. Reachability changes push out of band rather than
+  /// waiting for the next tick; see NetworkUpdate.reason.
+  @$pb.TagNumber(17)
+  NetworkRequest get network => $_getN(8);
+  @$pb.TagNumber(17)
+  set network(NetworkRequest value) => $_setField(17, value);
+  @$pb.TagNumber(17)
+  $core.bool hasNetwork() => $_has(8);
+  @$pb.TagNumber(17)
+  void clearNetwork() => $_clearField(17);
+  @$pb.TagNumber(17)
+  NetworkRequest ensureNetwork() => $_ensure(8);
 }
 
 enum ServerFrame_Body {
@@ -261,6 +285,7 @@ enum ServerFrame_Body {
   status,
   blockCoverage,
   storage,
+  network,
   notSet
 }
 
@@ -277,6 +302,7 @@ class ServerFrame extends $pb.GeneratedMessage {
     StatusReply? status,
     BlockCoverageUpdate? blockCoverage,
     StorageUpdate? storage,
+    NetworkUpdate? network,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -287,6 +313,7 @@ class ServerFrame extends $pb.GeneratedMessage {
     if (status != null) result.status = status;
     if (blockCoverage != null) result.blockCoverage = blockCoverage;
     if (storage != null) result.storage = storage;
+    if (network != null) result.network = network;
     return result;
   }
 
@@ -307,13 +334,14 @@ class ServerFrame extends $pb.GeneratedMessage {
     14: ServerFrame_Body.status,
     15: ServerFrame_Body.blockCoverage,
     16: ServerFrame_Body.storage,
+    17: ServerFrame_Body.network,
     0: ServerFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ServerFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingReply>(10, _omitFieldNames ? '' : 'pong',
@@ -328,6 +356,8 @@ class ServerFrame extends $pb.GeneratedMessage {
         subBuilder: BlockCoverageUpdate.create)
     ..aOM<StorageUpdate>(16, _omitFieldNames ? '' : 'storage',
         subBuilder: StorageUpdate.create)
+    ..aOM<NetworkUpdate>(17, _omitFieldNames ? '' : 'network',
+        subBuilder: NetworkUpdate.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -356,6 +386,7 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
+  @$pb.TagNumber(17)
   ServerFrame_Body whichBody() => _ServerFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
@@ -364,6 +395,7 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
   @$pb.TagNumber(16)
+  @$pb.TagNumber(17)
   void clearBody() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -464,6 +496,20 @@ class ServerFrame extends $pb.GeneratedMessage {
   void clearStorage() => $_clearField(16);
   @$pb.TagNumber(16)
   StorageUpdate ensureStorage() => $_ensure(7);
+
+  /// Snapshot of local p2p state. One arrives for a one-shot
+  /// NetworkRequest; a subscription delivers one per refresh
+  /// interval, plus one immediately whenever reachability changes.
+  @$pb.TagNumber(17)
+  NetworkUpdate get network => $_getN(8);
+  @$pb.TagNumber(17)
+  set network(NetworkUpdate value) => $_setField(17, value);
+  @$pb.TagNumber(17)
+  $core.bool hasNetwork() => $_has(8);
+  @$pb.TagNumber(17)
+  void clearNetwork() => $_clearField(17);
+  @$pb.TagNumber(17)
+  NetworkUpdate ensureNetwork() => $_ensure(8);
 }
 
 /// Sent from client → server to abort an in-flight operation by id.
@@ -1714,11 +1760,20 @@ class StoragePeer extends $pb.GeneratedMessage {
 
 /// Snapshot of the VPK storage nodes visible from this daemon.
 ///
-/// A discovery round emits two of these: the first as soon as the DHT
-/// answers (`probes_pending` true, every peer UNKNOWN), the second once
-/// the health probes resolve. The DHT lookup is fast and the probes are
-/// not — splitting them lets a client render the registry immediately
-/// rather than holding a blank view until the slowest dial times out.
+/// The first discovery round emits two of these: one as soon as the DHT
+/// answers (`probes_pending` true, every peer UNKNOWN), and one once the
+/// health probes resolve. The DHT lookup is fast and the probes are not —
+/// splitting them lets a client render the registry immediately rather
+/// than holding a blank view until the slowest dial times out.
+///
+/// Subsequent rounds emit at most one update, and only when something
+/// actually changed: re-sending the pending phase would throw a client's
+/// status column back to "checking" every round, and an unchanged
+/// resolved snapshot is suppressed. A client should therefore treat
+/// silence as "nothing has changed", not as a stalled feed — an unchanged
+/// snapshot is still sent periodically as a heartbeat, so a feed that
+/// goes quiet for much longer than the discovery interval is genuinely
+/// wedged.
 class StorageUpdate extends $pb.GeneratedMessage {
   factory StorageUpdate({
     $core.String? serverTime,
@@ -1780,10 +1835,11 @@ class StorageUpdate extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearServerTime() => $_clearField(1);
 
-  /// True on the first update of a round: the peer list is complete
-  /// but reachability is still resolving, so a client should show the
-  /// rows in a pending state rather than as unreachable. Always false
-  /// when `skip_probes` was set — nothing is pending in that case.
+  /// True on the pending update that opens the *first* round: the peer
+  /// list is complete but reachability is still resolving, so a client
+  /// should show the rows in a pending state rather than as
+  /// unreachable. Never set on later rounds, and never when
+  /// `skip_probes` was set.
   @$pb.TagNumber(2)
   $core.bool get probesPending => $_getBF(1);
   @$pb.TagNumber(2)
@@ -1797,6 +1853,577 @@ class StorageUpdate extends $pb.GeneratedMessage {
   /// ordering is stable across rounds.
   @$pb.TagNumber(3)
   $pb.PbList<StoragePeer> get peers => $_getList(2);
+}
+
+/// `kwaainet p2p peers list`, and more — local swarm state.
+///
+/// Requires the native p2p stack. The Go p2p daemon's control protocol
+/// reports only (peer id, addresses) per connection, so direction,
+/// protocols, latency and the routing table have nowhere to come from;
+/// rather than serve a mostly-blank view the daemon answers
+/// UNIMPLEMENTED, which a client should treat as permanent for the
+/// daemon's lifetime. UNAVAILABLE means something different here — the
+/// native node is still starting and a retry will succeed.
+class NetworkRequest extends $pb.GeneratedMessage {
+  factory NetworkRequest({
+    $core.bool? subscribe,
+    $core.int? intervalSecs,
+  }) {
+    final result = create();
+    if (subscribe != null) result.subscribe = subscribe;
+    if (intervalSecs != null) result.intervalSecs = intervalSecs;
+    return result;
+  }
+
+  NetworkRequest._();
+
+  factory NetworkRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory NetworkRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'NetworkRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'subscribe')
+    ..aI(2, _omitFieldNames ? '' : 'intervalSecs',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  NetworkRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  NetworkRequest copyWith(void Function(NetworkRequest) updates) =>
+      super.copyWith((message) => updates(message as NetworkRequest))
+          as NetworkRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static NetworkRequest create() => NetworkRequest._();
+  @$core.override
+  NetworkRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static NetworkRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<NetworkRequest>(create);
+  static NetworkRequest? _defaultInstance;
+
+  /// When true the operation stays open and the server pushes updates
+  /// until the client sends a Cancel body for this op id. When false a
+  /// single update is sent followed by Done.
+  @$pb.TagNumber(1)
+  $core.bool get subscribe => $_getBF(0);
+  @$pb.TagNumber(1)
+  set subscribe($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSubscribe() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSubscribe() => $_clearField(1);
+
+  /// Refresh cadence for subscriptions, in seconds. 0 means the server
+  /// default (5s). Ignored when `subscribe` is false.
+  ///
+  /// This is the *sampling* floor, not the whole story: connections and
+  /// the routing table have no event source and so are polled, but
+  /// reachability changes are pushed the moment they happen. See
+  /// NetworkUpdate.reason.
+  @$pb.TagNumber(2)
+  $core.int get intervalSecs => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set intervalSecs($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasIntervalSecs() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearIntervalSecs() => $_clearField(2);
+}
+
+/// One live connection.
+///
+/// Per connection, not per peer: a peer reachable both directly and over
+/// a relay appears twice, which is what makes a hole-punch upgrade
+/// visible while it happens.
+class ConnectedPeer extends $pb.GeneratedMessage {
+  factory ConnectedPeer({
+    $core.String? peerId,
+    $core.String? addr,
+    PeerConnKind? kind,
+    $core.String? direction,
+    $core.bool? isBootstrap,
+    $core.bool? isTrustedRelay,
+    $core.Iterable<$core.String>? protocols,
+    $core.int? rttMs,
+    $core.String? agentVersion,
+  }) {
+    final result = create();
+    if (peerId != null) result.peerId = peerId;
+    if (addr != null) result.addr = addr;
+    if (kind != null) result.kind = kind;
+    if (direction != null) result.direction = direction;
+    if (isBootstrap != null) result.isBootstrap = isBootstrap;
+    if (isTrustedRelay != null) result.isTrustedRelay = isTrustedRelay;
+    if (protocols != null) result.protocols.addAll(protocols);
+    if (rttMs != null) result.rttMs = rttMs;
+    if (agentVersion != null) result.agentVersion = agentVersion;
+    return result;
+  }
+
+  ConnectedPeer._();
+
+  factory ConnectedPeer.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ConnectedPeer.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ConnectedPeer',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'peerId')
+    ..aOS(2, _omitFieldNames ? '' : 'addr')
+    ..aE<PeerConnKind>(3, _omitFieldNames ? '' : 'kind',
+        enumValues: PeerConnKind.values)
+    ..aOS(4, _omitFieldNames ? '' : 'direction')
+    ..aOB(5, _omitFieldNames ? '' : 'isBootstrap')
+    ..aOB(6, _omitFieldNames ? '' : 'isTrustedRelay')
+    ..pPS(7, _omitFieldNames ? '' : 'protocols')
+    ..aI(8, _omitFieldNames ? '' : 'rttMs', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(9, _omitFieldNames ? '' : 'agentVersion')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConnectedPeer clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConnectedPeer copyWith(void Function(ConnectedPeer) updates) =>
+      super.copyWith((message) => updates(message as ConnectedPeer))
+          as ConnectedPeer;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ConnectedPeer create() => ConnectedPeer._();
+  @$core.override
+  ConnectedPeer createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ConnectedPeer getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ConnectedPeer>(create);
+  static ConnectedPeer? _defaultInstance;
+
+  /// libp2p peer id, base58.
+  @$pb.TagNumber(1)
+  $core.String get peerId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set peerId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPeerId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPeerId() => $_clearField(1);
+
+  /// The connection's multiaddr — the remote address for outbound
+  /// connections, the observed send-back address for inbound ones.
+  @$pb.TagNumber(2)
+  $core.String get addr => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set addr($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAddr() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAddr() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  PeerConnKind get kind => $_getN(2);
+  @$pb.TagNumber(3)
+  set kind(PeerConnKind value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasKind() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearKind() => $_clearField(3);
+
+  /// "inbound" if the peer dialed us, "outbound" if we dialed them.
+  @$pb.TagNumber(4)
+  $core.String get direction => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set direction($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDirection() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDirection() => $_clearField(4);
+
+  /// Set when this peer is one of our configured bootstrap nodes.
+  @$pb.TagNumber(5)
+  $core.bool get isBootstrap => $_getBF(4);
+  @$pb.TagNumber(5)
+  set isBootstrap($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasIsBootstrap() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearIsBootstrap() => $_clearField(5);
+
+  /// Set when this peer is one of our configured trusted relays.
+  @$pb.TagNumber(6)
+  $core.bool get isTrustedRelay => $_getBF(5);
+  @$pb.TagNumber(6)
+  set isTrustedRelay($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasIsTrustedRelay() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearIsTrustedRelay() => $_clearField(6);
+
+  /// Protocols the peer advertised over identify. Empty until identify
+  /// completes, which is shortly *after* the connection establishes —
+  /// empty means "not yet known", not "speaks nothing".
+  @$pb.TagNumber(7)
+  $pb.PbList<$core.String> get protocols => $_getList(6);
+
+  /// Most recent ping round-trip time. 0 means no ping has completed
+  /// yet, not zero latency.
+  @$pb.TagNumber(8)
+  $core.int get rttMs => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set rttMs($core.int value) => $_setUnsignedInt32(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasRttMs() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearRttMs() => $_clearField(8);
+
+  /// The peer's advertised software version. May be empty.
+  @$pb.TagNumber(9)
+  $core.String get agentVersion => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set agentVersion($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasAgentVersion() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearAgentVersion() => $_clearField(9);
+}
+
+/// One entry in the Kademlia routing table.
+///
+/// The routing table and the connected set overlap but neither contains
+/// the other: k-buckets hold a bounded number of entries per distance
+/// range, the table deliberately retains peers we are not currently
+/// connected to, and kad stays in client mode (adding nothing) until
+/// reachability resolves. A young node can have live connections and an
+/// empty table.
+class RoutingPeer extends $pb.GeneratedMessage {
+  factory RoutingPeer({
+    $core.String? peerId,
+    $core.bool? connected,
+  }) {
+    final result = create();
+    if (peerId != null) result.peerId = peerId;
+    if (connected != null) result.connected = connected;
+    return result;
+  }
+
+  RoutingPeer._();
+
+  factory RoutingPeer.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RoutingPeer.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RoutingPeer',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'peerId')
+    ..aOB(2, _omitFieldNames ? '' : 'connected')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RoutingPeer clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RoutingPeer copyWith(void Function(RoutingPeer) updates) =>
+      super.copyWith((message) => updates(message as RoutingPeer))
+          as RoutingPeer;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RoutingPeer create() => RoutingPeer._();
+  @$core.override
+  RoutingPeer createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RoutingPeer getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RoutingPeer>(create);
+  static RoutingPeer? _defaultInstance;
+
+  /// libp2p peer id, base58.
+  @$pb.TagNumber(1)
+  $core.String get peerId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set peerId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPeerId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPeerId() => $_clearField(1);
+
+  /// Whether this peer also appears in NetworkUpdate.connected.
+  @$pb.TagNumber(2)
+  $core.bool get connected => $_getBF(1);
+  @$pb.TagNumber(2)
+  set connected($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasConnected() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearConnected() => $_clearField(2);
+}
+
+/// This node's own position in the network.
+class SelfStatus extends $pb.GeneratedMessage {
+  factory SelfStatus({
+    $core.String? peerId,
+    $core.String? reachability,
+    $core.String? reachabilitySource,
+    $core.bool? usingRelay,
+    $core.bool? announceable,
+    $core.Iterable<$core.String>? listenAddrs,
+    $core.Iterable<$core.String>? observedAddrs,
+    $core.Iterable<$core.String>? relayAddrs,
+  }) {
+    final result = create();
+    if (peerId != null) result.peerId = peerId;
+    if (reachability != null) result.reachability = reachability;
+    if (reachabilitySource != null)
+      result.reachabilitySource = reachabilitySource;
+    if (usingRelay != null) result.usingRelay = usingRelay;
+    if (announceable != null) result.announceable = announceable;
+    if (listenAddrs != null) result.listenAddrs.addAll(listenAddrs);
+    if (observedAddrs != null) result.observedAddrs.addAll(observedAddrs);
+    if (relayAddrs != null) result.relayAddrs.addAll(relayAddrs);
+    return result;
+  }
+
+  SelfStatus._();
+
+  factory SelfStatus.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SelfStatus.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SelfStatus',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'peerId')
+    ..aOS(2, _omitFieldNames ? '' : 'reachability')
+    ..aOS(3, _omitFieldNames ? '' : 'reachabilitySource')
+    ..aOB(4, _omitFieldNames ? '' : 'usingRelay')
+    ..aOB(5, _omitFieldNames ? '' : 'announceable')
+    ..pPS(6, _omitFieldNames ? '' : 'listenAddrs')
+    ..pPS(7, _omitFieldNames ? '' : 'observedAddrs')
+    ..pPS(8, _omitFieldNames ? '' : 'relayAddrs')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SelfStatus clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SelfStatus copyWith(void Function(SelfStatus) updates) =>
+      super.copyWith((message) => updates(message as SelfStatus)) as SelfStatus;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SelfStatus create() => SelfStatus._();
+  @$core.override
+  SelfStatus createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SelfStatus getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SelfStatus>(create);
+  static SelfStatus? _defaultInstance;
+
+  /// Our libp2p peer id, base58.
+  @$pb.TagNumber(1)
+  $core.String get peerId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set peerId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPeerId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPeerId() => $_clearField(1);
+
+  /// "unknown" until a verdict is reached, then "public" or "private".
+  /// Announcing is deferred while unknown.
+  @$pb.TagNumber(2)
+  $core.String get reachability => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set reachability($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasReachability() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearReachability() => $_clearField(2);
+
+  /// What produced the verdict, weakest evidence first: "identify"
+  /// (enough distinct peers reported the same address), "upnp" (the
+  /// local gateway says it mapped us), "autonat" (a peer dialed us back
+  /// and got through) or "declared" (operator configuration — an
+  /// instruction, not evidence at all). Empty unless reachability is
+  /// "public": a private or undecided verdict has no source.
+  @$pb.TagNumber(3)
+  $core.String get reachabilitySource => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set reachabilitySource($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasReachabilitySource() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearReachabilitySource() => $_clearField(3);
+
+  /// Whether at least one *confirmed* circuit reservation is live. A
+  /// requested-but-unanswered reservation does not count.
+  @$pb.TagNumber(4)
+  $core.bool get usingRelay => $_getBF(3);
+  @$pb.TagNumber(4)
+  set usingRelay($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasUsingRelay() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearUsingRelay() => $_clearField(4);
+
+  /// Whether there is any point announcing to the DHT yet. False only
+  /// while reachability is unknown.
+  @$pb.TagNumber(5)
+  $core.bool get announceable => $_getBF(4);
+  @$pb.TagNumber(5)
+  set announceable($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasAnnounceable() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearAnnounceable() => $_clearField(5);
+
+  /// The swarm's listen addresses.
+  @$pb.TagNumber(6)
+  $pb.PbList<$core.String> get listenAddrs => $_getList(5);
+
+  /// Addresses peers reported observing us at — our external-address
+  /// candidates. Ordered by the number of distinct peers that agreed,
+  /// most-confirmed first.
+  @$pb.TagNumber(7)
+  $pb.PbList<$core.String> get observedAddrs => $_getList(6);
+
+  /// Addresses of confirmed circuit-relay reservations. Empty when not
+  /// relaying.
+  @$pb.TagNumber(8)
+  $pb.PbList<$core.String> get relayAddrs => $_getList(7);
+}
+
+/// Snapshot of local p2p state.
+///
+/// A subscription suppresses unchanged snapshots, so a client should read
+/// silence as "nothing changed" rather than as a stalled feed — an
+/// unchanged snapshot is still sent periodically as a heartbeat, so a
+/// feed quiet for much longer than the heartbeat is genuinely wedged.
+class NetworkUpdate extends $pb.GeneratedMessage {
+  factory NetworkUpdate({
+    $core.String? serverTime,
+    UpdateReason? reason,
+    SelfStatus? selfStatus,
+    $core.Iterable<ConnectedPeer>? connected,
+    $core.Iterable<RoutingPeer>? routing,
+  }) {
+    final result = create();
+    if (serverTime != null) result.serverTime = serverTime;
+    if (reason != null) result.reason = reason;
+    if (selfStatus != null) result.selfStatus = selfStatus;
+    if (connected != null) result.connected.addAll(connected);
+    if (routing != null) result.routing.addAll(routing);
+    return result;
+  }
+
+  NetworkUpdate._();
+
+  factory NetworkUpdate.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory NetworkUpdate.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'NetworkUpdate',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'serverTime')
+    ..aE<UpdateReason>(2, _omitFieldNames ? '' : 'reason',
+        enumValues: UpdateReason.values)
+    ..aOM<SelfStatus>(3, _omitFieldNames ? '' : 'selfStatus',
+        subBuilder: SelfStatus.create)
+    ..pPM<ConnectedPeer>(4, _omitFieldNames ? '' : 'connected',
+        subBuilder: ConnectedPeer.create)
+    ..pPM<RoutingPeer>(5, _omitFieldNames ? '' : 'routing',
+        subBuilder: RoutingPeer.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  NetworkUpdate clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  NetworkUpdate copyWith(void Function(NetworkUpdate) updates) =>
+      super.copyWith((message) => updates(message as NetworkUpdate))
+          as NetworkUpdate;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static NetworkUpdate create() => NetworkUpdate._();
+  @$core.override
+  NetworkUpdate createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static NetworkUpdate getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<NetworkUpdate>(create);
+  static NetworkUpdate? _defaultInstance;
+
+  /// Daemon wall-clock time of this snapshot, RFC 3339.
+  @$pb.TagNumber(1)
+  $core.String get serverTime => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set serverTime($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasServerTime() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearServerTime() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  UpdateReason get reason => $_getN(1);
+  @$pb.TagNumber(2)
+  set reason(UpdateReason value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasReason() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearReason() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  SelfStatus get selfStatus => $_getN(2);
+  @$pb.TagNumber(3)
+  set selfStatus(SelfStatus value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSelfStatus() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSelfStatus() => $_clearField(3);
+  @$pb.TagNumber(3)
+  SelfStatus ensureSelfStatus() => $_ensure(2);
+
+  /// One entry per live connection, ordered bootstrap → trusted relay →
+  /// direct → relayed, then by peer id, so the ordering is stable
+  /// across updates.
+  @$pb.TagNumber(4)
+  $pb.PbList<ConnectedPeer> get connected => $_getList(3);
+
+  /// The Kademlia routing table, sorted by peer id.
+  @$pb.TagNumber(5)
+  $pb.PbList<RoutingPeer> get routing => $_getList(4);
 }
 
 class ChatMessage extends $pb.GeneratedMessage {

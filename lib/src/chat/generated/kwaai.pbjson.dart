@@ -31,6 +31,37 @@ final $typed_data.Uint8List storageReachabilityDescriptor = $convert.base64Decod
     'IiCh5TVE9SQUdFX1JFQUNIQUJJTElUWV9SRUFDSEFCTEUQARIkCiBTVE9SQUdFX1JFQUNIQUJJ'
     'TElUWV9VTlJFQUNIQUJMRRAC');
 
+@$core.Deprecated('Use updateReasonDescriptor instead')
+const UpdateReason$json = {
+  '1': 'UpdateReason',
+  '2': [
+    {'1': 'UPDATE_REASON_TICK', '2': 0},
+    {'1': 'UPDATE_REASON_REACHABILITY', '2': 1},
+    {'1': 'UPDATE_REASON_PEERS', '2': 2},
+    {'1': 'UPDATE_REASON_HEARTBEAT', '2': 3},
+  ],
+};
+
+/// Descriptor for `UpdateReason`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List updateReasonDescriptor = $convert.base64Decode(
+    'CgxVcGRhdGVSZWFzb24SFgoSVVBEQVRFX1JFQVNPTl9USUNLEAASHgoaVVBEQVRFX1JFQVNPTl'
+    '9SRUFDSEFCSUxJVFkQARIXChNVUERBVEVfUkVBU09OX1BFRVJTEAISGwoXVVBEQVRFX1JFQVNP'
+    'Tl9IRUFSVEJFQVQQAw==');
+
+@$core.Deprecated('Use peerConnKindDescriptor instead')
+const PeerConnKind$json = {
+  '1': 'PeerConnKind',
+  '2': [
+    {'1': 'PEER_CONN_KIND_DIRECT', '2': 0},
+    {'1': 'PEER_CONN_KIND_RELAY', '2': 1},
+  ],
+};
+
+/// Descriptor for `PeerConnKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List peerConnKindDescriptor = $convert.base64Decode(
+    'CgxQZWVyQ29ubktpbmQSGQoVUEVFUl9DT05OX0tJTkRfRElSRUNUEAASGAoUUEVFUl9DT05OX0'
+    'tJTkRfUkVMQVkQAQ==');
+
 @$core.Deprecated('Use clientFrameDescriptor instead')
 const ClientFrame$json = {
   '1': 'ClientFrame',
@@ -99,6 +130,15 @@ const ClientFrame$json = {
       '9': 0,
       '10': 'storageDiscovery'
     },
+    {
+      '1': 'network',
+      '3': 17,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.NetworkRequest',
+      '9': 0,
+      '10': 'network'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -114,8 +154,9 @@ final $typed_data.Uint8List clientFrameDescriptor = $convert.base64Decode(
     'c1JlcXVlc3RIAFIGc3RhdHVzEioKBmNhbmNlbBgOIAEoCzIQLmt3YWFpLnYxLkNhbmNlbEgAUg'
     'ZjYW5jZWwSRwoOYmxvY2tfY292ZXJhZ2UYDyABKAsyHi5rd2FhaS52MS5CbG9ja0NvdmVyYWdl'
     'UmVxdWVzdEgAUg1ibG9ja0NvdmVyYWdlElAKEXN0b3JhZ2VfZGlzY292ZXJ5GBAgASgLMiEua3'
-    'dhYWkudjEuU3RvcmFnZURpc2NvdmVyeVJlcXVlc3RIAFIQc3RvcmFnZURpc2NvdmVyeUIGCgRi'
-    'b2R5');
+    'dhYWkudjEuU3RvcmFnZURpc2NvdmVyeVJlcXVlc3RIAFIQc3RvcmFnZURpc2NvdmVyeRI0Cgdu'
+    'ZXR3b3JrGBEgASgLMhgua3dhYWkudjEuTmV0d29ya1JlcXVlc3RIAFIHbmV0d29ya0IGCgRib2'
+    'R5');
 
 @$core.Deprecated('Use serverFrameDescriptor instead')
 const ServerFrame$json = {
@@ -185,6 +226,15 @@ const ServerFrame$json = {
       '9': 0,
       '10': 'storage'
     },
+    {
+      '1': 'network',
+      '3': 17,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.NetworkUpdate',
+      '9': 0,
+      '10': 'network'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -199,7 +249,8 @@ final $typed_data.Uint8List serverFrameDescriptor = $convert.base64Decode(
     'ABKAsyDy5rd2FhaS52MS5FcnJvckgAUgVlcnJvchIvCgZzdGF0dXMYDiABKAsyFS5rd2FhaS52'
     'MS5TdGF0dXNSZXBseUgAUgZzdGF0dXMSRgoOYmxvY2tfY292ZXJhZ2UYDyABKAsyHS5rd2FhaS'
     '52MS5CbG9ja0NvdmVyYWdlVXBkYXRlSABSDWJsb2NrQ292ZXJhZ2USMwoHc3RvcmFnZRgQIAEo'
-    'CzIXLmt3YWFpLnYxLlN0b3JhZ2VVcGRhdGVIAFIHc3RvcmFnZUIGCgRib2R5');
+    'CzIXLmt3YWFpLnYxLlN0b3JhZ2VVcGRhdGVIAFIHc3RvcmFnZRIzCgduZXR3b3JrGBEgASgLMh'
+    'cua3dhYWkudjEuTmV0d29ya1VwZGF0ZUgAUgduZXR3b3JrQgYKBGJvZHk=');
 
 @$core.Deprecated('Use cancelDescriptor instead')
 const Cancel$json = {
@@ -533,6 +584,144 @@ final $typed_data.Uint8List storageUpdateDescriptor = $convert.base64Decode(
     'Cg1TdG9yYWdlVXBkYXRlEh8KC3NlcnZlcl90aW1lGAEgASgJUgpzZXJ2ZXJUaW1lEiUKDnByb2'
     'Jlc19wZW5kaW5nGAIgASgIUg1wcm9iZXNQZW5kaW5nEisKBXBlZXJzGAMgAygLMhUua3dhYWku'
     'djEuU3RvcmFnZVBlZXJSBXBlZXJz');
+
+@$core.Deprecated('Use networkRequestDescriptor instead')
+const NetworkRequest$json = {
+  '1': 'NetworkRequest',
+  '2': [
+    {'1': 'subscribe', '3': 1, '4': 1, '5': 8, '10': 'subscribe'},
+    {'1': 'interval_secs', '3': 2, '4': 1, '5': 13, '10': 'intervalSecs'},
+  ],
+};
+
+/// Descriptor for `NetworkRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List networkRequestDescriptor = $convert.base64Decode(
+    'Cg5OZXR3b3JrUmVxdWVzdBIcCglzdWJzY3JpYmUYASABKAhSCXN1YnNjcmliZRIjCg1pbnRlcn'
+    'ZhbF9zZWNzGAIgASgNUgxpbnRlcnZhbFNlY3M=');
+
+@$core.Deprecated('Use connectedPeerDescriptor instead')
+const ConnectedPeer$json = {
+  '1': 'ConnectedPeer',
+  '2': [
+    {'1': 'peer_id', '3': 1, '4': 1, '5': 9, '10': 'peerId'},
+    {'1': 'addr', '3': 2, '4': 1, '5': 9, '10': 'addr'},
+    {
+      '1': 'kind',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.kwaai.v1.PeerConnKind',
+      '10': 'kind'
+    },
+    {'1': 'direction', '3': 4, '4': 1, '5': 9, '10': 'direction'},
+    {'1': 'is_bootstrap', '3': 5, '4': 1, '5': 8, '10': 'isBootstrap'},
+    {'1': 'is_trusted_relay', '3': 6, '4': 1, '5': 8, '10': 'isTrustedRelay'},
+    {'1': 'protocols', '3': 7, '4': 3, '5': 9, '10': 'protocols'},
+    {'1': 'rtt_ms', '3': 8, '4': 1, '5': 13, '10': 'rttMs'},
+    {'1': 'agent_version', '3': 9, '4': 1, '5': 9, '10': 'agentVersion'},
+  ],
+};
+
+/// Descriptor for `ConnectedPeer`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List connectedPeerDescriptor = $convert.base64Decode(
+    'Cg1Db25uZWN0ZWRQZWVyEhcKB3BlZXJfaWQYASABKAlSBnBlZXJJZBISCgRhZGRyGAIgASgJUg'
+    'RhZGRyEioKBGtpbmQYAyABKA4yFi5rd2FhaS52MS5QZWVyQ29ubktpbmRSBGtpbmQSHAoJZGly'
+    'ZWN0aW9uGAQgASgJUglkaXJlY3Rpb24SIQoMaXNfYm9vdHN0cmFwGAUgASgIUgtpc0Jvb3RzdH'
+    'JhcBIoChBpc190cnVzdGVkX3JlbGF5GAYgASgIUg5pc1RydXN0ZWRSZWxheRIcCglwcm90b2Nv'
+    'bHMYByADKAlSCXByb3RvY29scxIVCgZydHRfbXMYCCABKA1SBXJ0dE1zEiMKDWFnZW50X3Zlcn'
+    'Npb24YCSABKAlSDGFnZW50VmVyc2lvbg==');
+
+@$core.Deprecated('Use routingPeerDescriptor instead')
+const RoutingPeer$json = {
+  '1': 'RoutingPeer',
+  '2': [
+    {'1': 'peer_id', '3': 1, '4': 1, '5': 9, '10': 'peerId'},
+    {'1': 'connected', '3': 2, '4': 1, '5': 8, '10': 'connected'},
+  ],
+};
+
+/// Descriptor for `RoutingPeer`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List routingPeerDescriptor = $convert.base64Decode(
+    'CgtSb3V0aW5nUGVlchIXCgdwZWVyX2lkGAEgASgJUgZwZWVySWQSHAoJY29ubmVjdGVkGAIgAS'
+    'gIUgljb25uZWN0ZWQ=');
+
+@$core.Deprecated('Use selfStatusDescriptor instead')
+const SelfStatus$json = {
+  '1': 'SelfStatus',
+  '2': [
+    {'1': 'peer_id', '3': 1, '4': 1, '5': 9, '10': 'peerId'},
+    {'1': 'reachability', '3': 2, '4': 1, '5': 9, '10': 'reachability'},
+    {
+      '1': 'reachability_source',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '10': 'reachabilitySource'
+    },
+    {'1': 'using_relay', '3': 4, '4': 1, '5': 8, '10': 'usingRelay'},
+    {'1': 'announceable', '3': 5, '4': 1, '5': 8, '10': 'announceable'},
+    {'1': 'listen_addrs', '3': 6, '4': 3, '5': 9, '10': 'listenAddrs'},
+    {'1': 'observed_addrs', '3': 7, '4': 3, '5': 9, '10': 'observedAddrs'},
+    {'1': 'relay_addrs', '3': 8, '4': 3, '5': 9, '10': 'relayAddrs'},
+  ],
+};
+
+/// Descriptor for `SelfStatus`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List selfStatusDescriptor = $convert.base64Decode(
+    'CgpTZWxmU3RhdHVzEhcKB3BlZXJfaWQYASABKAlSBnBlZXJJZBIiCgxyZWFjaGFiaWxpdHkYAi'
+    'ABKAlSDHJlYWNoYWJpbGl0eRIvChNyZWFjaGFiaWxpdHlfc291cmNlGAMgASgJUhJyZWFjaGFi'
+    'aWxpdHlTb3VyY2USHwoLdXNpbmdfcmVsYXkYBCABKAhSCnVzaW5nUmVsYXkSIgoMYW5ub3VuY2'
+    'VhYmxlGAUgASgIUgxhbm5vdW5jZWFibGUSIQoMbGlzdGVuX2FkZHJzGAYgAygJUgtsaXN0ZW5B'
+    'ZGRycxIlCg5vYnNlcnZlZF9hZGRycxgHIAMoCVINb2JzZXJ2ZWRBZGRycxIfCgtyZWxheV9hZG'
+    'RycxgIIAMoCVIKcmVsYXlBZGRycw==');
+
+@$core.Deprecated('Use networkUpdateDescriptor instead')
+const NetworkUpdate$json = {
+  '1': 'NetworkUpdate',
+  '2': [
+    {'1': 'server_time', '3': 1, '4': 1, '5': 9, '10': 'serverTime'},
+    {
+      '1': 'reason',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.kwaai.v1.UpdateReason',
+      '10': 'reason'
+    },
+    {
+      '1': 'self_status',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.SelfStatus',
+      '10': 'selfStatus'
+    },
+    {
+      '1': 'connected',
+      '3': 4,
+      '4': 3,
+      '5': 11,
+      '6': '.kwaai.v1.ConnectedPeer',
+      '10': 'connected'
+    },
+    {
+      '1': 'routing',
+      '3': 5,
+      '4': 3,
+      '5': 11,
+      '6': '.kwaai.v1.RoutingPeer',
+      '10': 'routing'
+    },
+  ],
+};
+
+/// Descriptor for `NetworkUpdate`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List networkUpdateDescriptor = $convert.base64Decode(
+    'Cg1OZXR3b3JrVXBkYXRlEh8KC3NlcnZlcl90aW1lGAEgASgJUgpzZXJ2ZXJUaW1lEi4KBnJlYX'
+    'NvbhgCIAEoDjIWLmt3YWFpLnYxLlVwZGF0ZVJlYXNvblIGcmVhc29uEjUKC3NlbGZfc3RhdHVz'
+    'GAMgASgLMhQua3dhYWkudjEuU2VsZlN0YXR1c1IKc2VsZlN0YXR1cxI1Cgljb25uZWN0ZWQYBC'
+    'ADKAsyFy5rd2FhaS52MS5Db25uZWN0ZWRQZWVyUgljb25uZWN0ZWQSLwoHcm91dGluZxgFIAMo'
+    'CzIVLmt3YWFpLnYxLlJvdXRpbmdQZWVyUgdyb3V0aW5n');
 
 @$core.Deprecated('Use chatMessageDescriptor instead')
 const ChatMessage$json = {
