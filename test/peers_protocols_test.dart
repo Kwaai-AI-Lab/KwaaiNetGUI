@@ -136,11 +136,12 @@ void main() {
       expect(describeProtocol('/ipfs/id/push/1.0.0'), contains('push'));
     });
 
-    test('DCUtR is named, since the view uses that name elsewhere', () {
-      // The PATH column labels an upgraded connection "DCUtR"; the protocol
-      // description should use the same word rather than "hole punching", so
-      // the two read as the same thing.
+    test('DCUtR names the mechanism, which the PATH column does not', () {
+      // The PATH column says "p2p" — what an upgraded connection *means* to
+      // the reader. The protocol description names the mechanism that produced
+      // it, which is the level a protocol list operates at.
       expect(describeProtocol('/libp2p/dcutr'), contains('DCUtR'));
+      expect(describeProtocol('/libp2p/dcutr'), contains('hole punching'));
     });
   });
 }

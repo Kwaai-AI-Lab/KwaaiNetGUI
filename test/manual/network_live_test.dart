@@ -47,7 +47,7 @@ void main() {
           final path = p.kind == pbenum.PeerConnKind.PEER_CONN_KIND_RELAY
               ? 'relay'
               : p.dcutr
-              ? 'DCUtR'
+              ? 'p2p'
               : 'direct';
           // ignore: avoid_print
           print(

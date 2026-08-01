@@ -1249,11 +1249,12 @@ class _EmptyRow extends StatelessWidget {
 /// in for one they opened — and the word beside it says only what the arrow
 /// cannot.
 ///
-/// DCUtR is called out by name rather than folded into "direct" because the two
-/// are not the same achievement: a plain direct path means there was no NAT in
-/// the way, while a DCUtR path means one was traversed. On a node reporting
-/// private reachability the latter is the difference between "nothing works"
-/// and "hole punching is working".
+/// A hole-punched path is labelled "p2p" rather than folded into "direct",
+/// because the two are not the same achievement: a plain direct path means
+/// there was no NAT in the way, while a punched one means a NAT was traversed.
+/// On a node reporting private reachability that is the difference between
+/// "nothing works" and "hole punching is working". The mechanism is DCUtR;
+/// "p2p" is what it means to the reader.
 class _PathCell extends StatelessWidget {
   const _PathCell({required this.kind, this.dcutr = false, this.direction});
 
@@ -1270,7 +1271,7 @@ class _PathCell extends StatelessWidget {
     final (label, color) = relayed
         ? ('relay', kwaai.semanticWarning)
         : dcutr
-        ? ('DCUtR', kwaai.accentPrimary)
+        ? ('p2p', kwaai.accentPrimary)
         : ('direct', kwaai.statusRunning);
 
     final inbound = direction == 'inbound';
