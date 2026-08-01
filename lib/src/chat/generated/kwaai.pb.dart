@@ -1958,6 +1958,7 @@ class ConnectedPeer extends $pb.GeneratedMessage {
     $core.int? rttMs,
     $core.String? agentVersion,
     $core.bool? dcutr,
+    $core.String? via,
   }) {
     final result = create();
     if (peerId != null) result.peerId = peerId;
@@ -1970,6 +1971,7 @@ class ConnectedPeer extends $pb.GeneratedMessage {
     if (rttMs != null) result.rttMs = rttMs;
     if (agentVersion != null) result.agentVersion = agentVersion;
     if (dcutr != null) result.dcutr = dcutr;
+    if (via != null) result.via = via;
     return result;
   }
 
@@ -1997,6 +1999,7 @@ class ConnectedPeer extends $pb.GeneratedMessage {
     ..aI(8, _omitFieldNames ? '' : 'rttMs', fieldType: $pb.PbFieldType.OU3)
     ..aOS(9, _omitFieldNames ? '' : 'agentVersion')
     ..aOB(10, _omitFieldNames ? '' : 'dcutr')
+    ..aOS(11, _omitFieldNames ? '' : 'via')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2122,6 +2125,23 @@ class ConnectedPeer extends $pb.GeneratedMessage {
   $core.bool hasDcutr() => $_has(9);
   @$pb.TagNumber(10)
   void clearDcutr() => $_clearField(10);
+
+  /// The relay an inbound connection arrived through, when it was
+  /// relayed. Empty otherwise.
+  ///
+  /// An inbound relayed connection's `addr` is a bare `/p2p/<peer>`: it
+  /// names who reached us and says nothing about how. This is the local
+  /// end of that connection — our circuit listener — and is the only
+  /// place the relay's address and identity appear. Outbound needs no
+  /// equivalent, since the dialled address already carries the relay.
+  @$pb.TagNumber(11)
+  $core.String get via => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set via($core.String value) => $_setString(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasVia() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearVia() => $_clearField(11);
 }
 
 /// One entry in the Kademlia routing table.

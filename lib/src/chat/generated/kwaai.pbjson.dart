@@ -619,6 +619,7 @@ const ConnectedPeer$json = {
     {'1': 'protocols', '3': 7, '4': 3, '5': 9, '10': 'protocols'},
     {'1': 'rtt_ms', '3': 8, '4': 1, '5': 13, '10': 'rttMs'},
     {'1': 'agent_version', '3': 9, '4': 1, '5': 9, '10': 'agentVersion'},
+    {'1': 'via', '3': 11, '4': 1, '5': 9, '10': 'via'},
     {'1': 'dcutr', '3': 10, '4': 1, '5': 8, '10': 'dcutr'},
   ],
 };
@@ -630,7 +631,8 @@ final $typed_data.Uint8List connectedPeerDescriptor = $convert.base64Decode(
     'ZWN0aW9uGAQgASgJUglkaXJlY3Rpb24SIQoMaXNfYm9vdHN0cmFwGAUgASgIUgtpc0Jvb3RzdH'
     'JhcBIoChBpc190cnVzdGVkX3JlbGF5GAYgASgIUg5pc1RydXN0ZWRSZWxheRIcCglwcm90b2Nv'
     'bHMYByADKAlSCXByb3RvY29scxIVCgZydHRfbXMYCCABKA1SBXJ0dE1zEiMKDWFnZW50X3Zlcn'
-    'Npb24YCSABKAlSDGFnZW50VmVyc2lvbhIUCgVkY3V0chgKIAEoCFIFZGN1dHI=');
+    'Npb24YCSABKAlSDGFnZW50VmVyc2lvbhIQCgN2aWEYCyABKAlSA3ZpYRIUCgVkY3V0chgKIAEo'
+    'CFIFZGN1dHI=');
 
 @$core.Deprecated('Use routingPeerDescriptor instead')
 const RoutingPeer$json = {

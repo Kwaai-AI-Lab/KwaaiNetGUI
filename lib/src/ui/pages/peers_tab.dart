@@ -857,7 +857,18 @@ class _PeerTable extends StatelessWidget {
                           ],
                         ),
                       ),
-                      DataCell(Text(r.primary?.addr ?? '—', style: monoStyle)),
+                      DataCell(
+                        Text(
+                          // `via` when the address alone says nothing about the
+                          // path — see the connections panel.
+                          switch (r.primary) {
+                            null => '—',
+                            final p when p.via.isNotEmpty => p.via,
+                            final p => p.addr,
+                          },
+                          style: monoStyle,
+                        ),
+                      ),
                     ],
                   ),
               ],
@@ -998,21 +1009,24 @@ class _PeerConnections extends StatelessWidget {
                         style: theme.textTheme.bodySmall,
                       ),
                     ),
-                    // Labelled, because on a relayed inbound connection this is
-                    // a bare /p2p/<id> — which looks exactly like the peer id
-                    // in the header above and is otherwise indistinguishable
-                    // from it.
+                    // For an inbound relayed connection `addr` is a bare
+                    // /p2p/<peer> — it names who reached us and nothing about
+                    // how. `via` carries the relay, which is the part worth
+                    // showing, so prefer it when present.
                     Text('via', style: labelStyle),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        c.addr,
+                        c.via.isNotEmpty ? c.via : c.addr,
                         style: monoStyle,
                         softWrap: false,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    _CopyButton(text: c.addr, label: 'Address'),
+                    _CopyButton(
+                      text: c.via.isNotEmpty ? c.via : c.addr,
+                      label: 'Address',
+                    ),
                   ],
                 ),
               ),
@@ -1264,13 +1278,12 @@ class _PathCell extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
-          // Relayed paths keep their own glyph — the route is the notable
-          // thing there, not who dialled.
-          relayed
-              ? Icons.alt_route
-              : inbound
-              ? Icons.arrow_back
-              : Icons.arrow_forward,
+          // Direction matters for a relayed path too, and differently: an
+          // outbound relay is us reaching a peer we cannot dial directly,
+          // while an inbound one is a peer reaching us through a relay we
+          // hold a reservation with. Those are different facts about who is
+          // behind what, so the arrow points either way here as well.
+          inbound ? Icons.arrow_back : Icons.arrow_forward,
           size: 14,
           color: color,
         ),
