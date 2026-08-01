@@ -70,13 +70,17 @@ Widget _host(pb.NetworkUpdate update, {Size size = const Size(900, 700)}) {
 }
 
 void main() {
-  testWidgets('lays out both tables without hanging or overflowing',
+  testWidgets('lays out the merged table without hanging or overflowing',
       (tester) async {
     await tester.pumpWidget(_host(_update()));
     await tester.pump();
 
-    expect(find.text('CONNECTIONS'), findsOneWidget);
-    expect(find.text('DHT ROUTING TABLE'), findsOneWidget);
+    expect(find.text('PEERS'), findsOneWidget);
+    // The two state columns are what make the merged table readable: they say
+    // which of connected / in-routing-table each peer is, so a peer in only one
+    // of the two sets is visibly distinct rather than simply absent.
+    expect(find.text('CONN'), findsOneWidget);
+    expect(find.text('DHT'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -212,9 +216,8 @@ void main() {
     );
     await tester.pump();
 
-    // Scroll to the bottom section to prove the outer list is really
-    // scrollable rather than merely clipped.
-    await tester.drag(find.text('CONNECTIONS'), const Offset(0, -600));
+    // Scroll the table to prove it is really scrollable rather than clipped.
+    await tester.drag(find.byType(DataTable), const Offset(0, -600));
     await tester.pump();
     expect(tester.takeException(), isNull);
   });
