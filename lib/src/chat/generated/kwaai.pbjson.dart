@@ -665,6 +665,7 @@ const SelfStatus$json = {
     {'1': 'listen_addrs', '3': 6, '4': 3, '5': 9, '10': 'listenAddrs'},
     {'1': 'observed_addrs', '3': 7, '4': 3, '5': 9, '10': 'observedAddrs'},
     {'1': 'relay_addrs', '3': 8, '4': 3, '5': 9, '10': 'relayAddrs'},
+    {'1': 'local_protocols', '3': 9, '4': 3, '5': 9, '10': 'localProtocols'},
   ],
 };
 
@@ -675,7 +676,8 @@ final $typed_data.Uint8List selfStatusDescriptor = $convert.base64Decode(
     'aWxpdHlTb3VyY2USHwoLdXNpbmdfcmVsYXkYBCABKAhSCnVzaW5nUmVsYXkSIgoMYW5ub3VuY2'
     'VhYmxlGAUgASgIUgxhbm5vdW5jZWFibGUSIQoMbGlzdGVuX2FkZHJzGAYgAygJUgtsaXN0ZW5B'
     'ZGRycxIlCg5vYnNlcnZlZF9hZGRycxgHIAMoCVINb2JzZXJ2ZWRBZGRycxIfCgtyZWxheV9hZG'
-    'RycxgIIAMoCVIKcmVsYXlBZGRycw==');
+    'RycxgIIAMoCVIKcmVsYXlBZGRycxInCg9sb2NhbF9wcm90b2NvbHMYCSADKAlSDmxvY2FsUHJv'
+    'dG9jb2xz');
 
 @$core.Deprecated('Use networkUpdateDescriptor instead')
 const NetworkUpdate$json = {

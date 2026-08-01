@@ -332,6 +332,12 @@ class _SelfStatusHeader extends StatelessWidget {
         if (s != null) ...[
           const SizedBox(height: 8),
           _AddressLine(label: 'Peer ID', values: [s.peerId]),
+          // What we serve, directly under our identity and above what we can
+          // reach — it belongs with "who am I" rather than with the addresses.
+          // Reading it beside a peer's protocol list is how you tell whether a
+          // capability gap is theirs or ours.
+          if (s.localProtocols.isNotEmpty)
+            _ProtocolLines(protocols: s.localProtocols, label: 'Serving'),
           // Each of these collapses to its first entry, so scope order decides
           // what the user sees without expanding: the public address if there
           // is one, then LAN, then loopback or a wildcard bind.
@@ -599,7 +605,12 @@ class _TableSection extends StatelessWidget {
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 190),
             child: SingleChildScrollView(
-              child: _PeerConnections(row: selected),
+              child: _PeerConnections(
+                row: selected,
+                // Same toggle the row uses, so closing here and re-clicking
+                // the row cannot disagree about what is selected.
+                onClose: () => onSelectPeer(selected.peerId),
+              ),
             ),
           ),
         ],
@@ -886,9 +897,13 @@ class _StateMark extends StatelessWidget {
 /// Pinned below the table rather than spliced into it: a DataRow cannot span
 /// columns, so an inline detail had to live inside one cell and overflowed it.
 class _PeerConnections extends StatelessWidget {
-  const _PeerConnections({required this.row});
+  const _PeerConnections({required this.row, required this.onClose});
 
   final PeerRow row;
+
+  /// Dismisses the panel. Clicking the selected row again does the same, but
+  /// that is not discoverable from looking at it.
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -931,7 +946,18 @@ class _PeerConnections extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              _CopyButton(text: row.peerId, label: 'Peer ID'),
+              // Close, not copy. The panel opens by selecting a row, so it
+              // needs a visible way out — clicking the row again works but is
+              // not discoverable.
+              IconButton(
+                icon: const Icon(Icons.close, size: 14),
+                iconSize: 14,
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+                tooltip: 'Close',
+                onPressed: onClose,
+              ),
             ],
           ),
           if (row.connections.isEmpty)
@@ -1032,9 +1058,13 @@ class _PeerConnections extends StatelessWidget {
 /// should not be mostly protocol list — with the same "and N more" toggle the
 /// address lines use.
 class _ProtocolLines extends StatefulWidget {
-  const _ProtocolLines({required this.protocols});
+  const _ProtocolLines({required this.protocols, this.label = 'Protocols'});
 
   final List<String> protocols;
+
+  /// Row label. "Protocols" for a peer's list, "Serving" for our own — the
+  /// distinction matters when the two sit on the same page.
+  final String label;
 
   @override
   State<_ProtocolLines> createState() => _ProtocolLinesState();
@@ -1067,7 +1097,7 @@ class _ProtocolLinesState extends State<_ProtocolLines> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 74, child: Text('Protocols', style: labelStyle)),
+          SizedBox(width: 74, child: Text(widget.label, style: labelStyle)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1096,9 +1126,13 @@ class _ProtocolLinesState extends State<_ProtocolLines> {
                       Flexible(
                         child: Text(
                           // An unknown id describes itself, which would render
-                          // the same text twice; leave the gloss empty instead.
+                          // the same text twice. Say so rather than leaving the
+                          // gloss blank: an empty cell reads as a rendering
+                          // fault, where this reads as "we have no description
+                          // for this one" — which is the truth, and a prompt to
+                          // add it.
                           describeProtocol(shown[i]) == shown[i]
-                              ? ''
+                              ? 'No description'
                               : describeProtocol(shown[i]),
                           style: descStyle,
                           softWrap: false,

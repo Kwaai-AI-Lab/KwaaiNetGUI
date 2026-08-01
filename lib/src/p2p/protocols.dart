@@ -26,6 +26,12 @@ const protocolDescriptions = <String, String>{
   // ── libp2p core ────────────────────────────────────────────────────────
   '/ipfs/id/+': 'Identify — exchanges peer id, addresses and capabilities',
   '/ipfs/id/push/+': 'Identify push — sends updates when its details change',
+  // Note the namespace: /p2p/, not /ipfs/. An older extension that predates
+  // the /ipfs/id/push/ naming, so it needs its own key rather than being
+  // caught by an /ipfs/id/+ pattern.
+  '/p2p/id/delta/+':
+      'Identify delta — sends only the protocols that changed, not a full '
+          'identify',
   '/ipfs/ping/+': 'Ping — liveness and round-trip time',
   '/ipfs/kad/+': 'Kademlia DHT — serves peer and content lookups',
 

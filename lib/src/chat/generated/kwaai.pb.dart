@@ -2228,6 +2228,7 @@ class SelfStatus extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? listenAddrs,
     $core.Iterable<$core.String>? observedAddrs,
     $core.Iterable<$core.String>? relayAddrs,
+    $core.Iterable<$core.String>? localProtocols,
   }) {
     final result = create();
     if (peerId != null) result.peerId = peerId;
@@ -2239,6 +2240,7 @@ class SelfStatus extends $pb.GeneratedMessage {
     if (listenAddrs != null) result.listenAddrs.addAll(listenAddrs);
     if (observedAddrs != null) result.observedAddrs.addAll(observedAddrs);
     if (relayAddrs != null) result.relayAddrs.addAll(relayAddrs);
+    if (localProtocols != null) result.localProtocols.addAll(localProtocols);
     return result;
   }
 
@@ -2263,6 +2265,7 @@ class SelfStatus extends $pb.GeneratedMessage {
     ..pPS(6, _omitFieldNames ? '' : 'listenAddrs')
     ..pPS(7, _omitFieldNames ? '' : 'observedAddrs')
     ..pPS(8, _omitFieldNames ? '' : 'relayAddrs')
+    ..pPS(9, _omitFieldNames ? '' : 'localProtocols')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2355,6 +2358,16 @@ class SelfStatus extends $pb.GeneratedMessage {
   /// relaying.
   @$pb.TagNumber(8)
   $pb.PbList<$core.String> get relayAddrs => $_getList(7);
+
+  /// Protocols this node serves to peers, sorted.
+  ///
+  /// The handlers actually registered rather than everything the swarm
+  /// might negotiate: libp2p keeps its full advertised set private, and
+  /// this is the more useful answer anyway — it is what this node will
+  /// *do* for a peer, which is what a reader comparing it against a
+  /// peer's protocol list wants to know.
+  @$pb.TagNumber(9)
+  $pb.PbList<$core.String> get localProtocols => $_getList(8);
 }
 
 /// Snapshot of local p2p state.

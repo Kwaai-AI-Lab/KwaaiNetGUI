@@ -24,9 +24,14 @@ void main() {
         '/kwaai/p2p/hello/1.0.0',
         '/kwaai/shard-proxy/1.0.0',
         '/libp2p/autonat/1.0.0',
+        '/libp2p/circuit/relay/0.1.0',
         '/libp2p/circuit/relay/0.2.0/hop',
         '/libp2p/circuit/relay/0.2.0/stop',
         '/libp2p/dcutr',
+        // Namespaced under /p2p/ rather than /ipfs/ — an older p2pd peer
+        // advertises this, and it slipped through the first version of the
+        // table because /ipfs/id/+ does not reach it.
+        '/p2p/id/delta/1.0.0',
       ];
 
       for (final id in seenOnTheWire) {

@@ -192,6 +192,43 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('shows what this node serves, beside what peers offer',
+      (tester) async {
+    // The comparison is the point: reading our list next to a peer's is how
+    // you tell whether a missing capability is theirs or ours.
+    final update = _update();
+    update.selfStatus.localProtocols.addAll([
+      '/ipfs/kad/1.0.0',
+      '/kwaai/inference/1.0.0',
+      '/kwaai/p2p/hello/1.0.0',
+    ]);
+
+    await tester.pumpWidget(_host(update, size: const Size(1100, 800)));
+    await tester.pump();
+
+    // Labelled "Serving", not "Protocols" — both appear on this page and the
+    // distinction is which node they belong to.
+    expect(find.text('Serving'), findsOneWidget);
+    expect(find.text('and 2 more'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the connections panel can be closed', (tester) async {
+    await tester.pumpWidget(_host(_update(connected: 3, routing: 3)));
+    await tester.pump();
+
+    await tester.tap(find.text('direct').first);
+    await tester.pump();
+    expect(find.textContaining('CONNECTIONS'), findsOneWidget);
+
+    // Clicking the row again also closes it, but that is not discoverable
+    // from looking at the panel — hence the button.
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pump();
+    expect(find.textContaining('CONNECTIONS'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('an idle page costs nothing per frame', (tester) async {
     // The hang was here, and it is invisible to a rebuild benchmark: with no
     // events arriving at all, the page was still burning ~14ms every frame,
