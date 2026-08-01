@@ -103,4 +103,57 @@ void main() {
     // make the composer visibly jump on every send.
     expect(streaming.size, idle.size);
   });
+
+  testWidgets('hint text is vertically centred in the pill',
+      (tester) async {
+    await tester.pumpWidget(_host());
+    await tester.pumpAndSettle();
+
+    final pill = tester.getRect(_pill().first);
+    final hint = tester.getRect(find.text('Message kwaainet…'));
+
+    // The field's height is font-metric dependent and does not equal
+    // the button diameter; the composer centres it in a min-height box
+    // instead. If this drifts, the hint reads visibly high or low in
+    // the pill (this regressed on macOS, where SF Pro's metrics differ
+    // from the test font's — a symmetric result here is necessary but
+    // not sufficient, so also eyeball a real build when touching this).
+    expect(hint.top - pill.top,
+        moreOrLessEquals(pill.bottom - hint.bottom, epsilon: 0.5),
+        reason: 'hint should sit as far from the pill top as the bottom');
+  });
+
+  testWidgets('pill does not expand to fill a bounded-height parent',
+      (tester) async {
+    // Regression: the centring used a bare alignment, and Align fills
+    // *bounded* height constraints — fine in the chat page's unbounded
+    // Column, but ballooning the pill to the full height of any
+    // fixed-height parent. heightFactor forces child-based sizing.
+    await tester.pumpWidget(MaterialApp(
+      theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
+      home: Scaffold(
+        body: Center(
+          child: SizedBox(
+            width: 600,
+            height: 400, // bounded, unlike the chat page
+            child: Center(
+              child: KwaaiChatComposer(
+                controller: TextEditingController(),
+                focusNode: FocusNode(),
+                enabled: true,
+                onSend: () {},
+                hintText: 'Message kwaainet…',
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final pill = tester.getRect(_pill().first);
+    expect(pill.height, lessThan(60),
+        reason: 'a collapsed composer must stay one line tall even when '
+            'its parent offers bounded height (got ${pill.height})');
+  });
 }

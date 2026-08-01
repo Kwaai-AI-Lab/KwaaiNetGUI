@@ -9,11 +9,24 @@ import '../theme/kwaai_theme.dart';
 /// Also drives the pill's corner radius (button radius + this), which is
 /// what makes the two curves concentric — an equal gap the whole way
 /// around the corner rather than only at the sides.
-const double _kButtonInset = 6;
+///
+/// Public because callers that put their own controls alongside the
+/// composer need to inset them by the same amount to line up with the
+/// send button — see the New Chat button on the chat input bar.
+const double kComposerButtonInset = 6;
 
 /// Diameter of the circular send/stop button. Both buttons use it so
 /// swapping between them can't shift the layout.
-const double _kButtonDiameter = 32;
+///
+/// Public for the same reason as [kComposerButtonInset]: a sibling
+/// control left at Material's default 48x48 tap target would be taller
+/// than the collapsed pill and would drive the row's height instead.
+const double kComposerButtonDiameter = 32;
+
+// Short aliases so the geometry reads compactly in this file's layout
+// code, which references them a dozen times.
+const double _kButtonInset = kComposerButtonInset;
+const double _kButtonDiameter = kComposerButtonDiameter;
 
 /// Multi-line chat composer. Distinct primitive from [KwaaiTextField]:
 /// pill-rounded, grows upward as the user types or wraps, no
@@ -134,19 +147,48 @@ class KwaaiChatComposer extends StatelessWidget {
       ),
       child: Row(
         // `end` so a wrapping field grows upward while the trailing
-        // controls stay put at the bottom. The button opts out of this
-        // via its own alignment below — see the SizedBox comment.
+        // controls stay put at the bottom.
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
-            child: _ComposerField(
-              controller: controller,
-              focusNode: focusNode,
-              enabled: enabled,
-              onSend: _canSend ? onSend : null,
-              hintText: hintText,
-              minLines: minLines,
-              maxLines: maxLines,
+            // The field's own height is whatever the platform font's
+            // line metrics make it — it does NOT reliably equal
+            // _kButtonDiameter, and every scheme that assumed it would
+            // (padding tuned to the line height, textAlignVertical
+            // against a min-height constraint) left the text riding
+            // high or low once the real font's metrics differed from
+            // the test font's. So don't assume: give the field a box
+            // at least as tall as the button and centre it in that box.
+            // Collapsed, the surplus splits evenly above and below the
+            // text — centred by construction. Wrapped past one line,
+            // the child is taller than the minimum, the alignment has
+            // nothing left to distribute, and the box grows upward
+            // exactly as before.
+            //
+            // heightFactor: 1.0 matters: a bare Align (or Container
+            // with `alignment:`) *fills* bounded height constraints,
+            // so the pill would balloon inside any fixed-height parent
+            // and only accidentally work in the chat page's unbounded
+            // Column. The factor forces child-based sizing everywhere,
+            // and the ConstrainedBox then imposes the button-height
+            // floor for the alignment to distribute.
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                minHeight: _kButtonDiameter,
+              ),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                heightFactor: 1.0,
+                child: _ComposerField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  enabled: enabled,
+                  onSend: _canSend ? onSend : null,
+                  hintText: hintText,
+                  minLines: minLines,
+                  maxLines: maxLines,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 6),
@@ -235,7 +277,21 @@ class _ComposerField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final hintStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+
+    // The theme's bodyMedium sets height: 1.25 (see _macOSTextTheme).
+    // Flutter's default leading distribution is proportional to the
+    // font's ascent/descent, and system faces are ascent-heavy — so the
+    // extra quarter-line of leading lands mostly above the baseline's
+    // headroom, reading as text that rides low. `even` splits the
+    // leading symmetrically so the glyphs sit in the middle of their
+    // line box. Kept as a copyWith on the theme style: the macOS theme
+    // leaves fontFamily null and lets the engine supply the system
+    // face, so a standalone TextStyle would silently swap fonts and
+    // change the very metrics being tuned.
+    final baseStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      leadingDistribution: TextLeadingDistribution.even,
+    );
+    final hintStyle = baseStyle?.copyWith(
       color: scheme.onSurfaceVariant.withValues(alpha: 0.55),
     );
 
@@ -271,15 +327,15 @@ class _ComposerField extends StatelessWidget {
           textInputAction: TextInputAction.newline,
           minLines: minLines,
           maxLines: maxLines,
-          style: Theme.of(context).textTheme.bodyMedium,
+          style: baseStyle,
           decoration: InputDecoration(
             isCollapsed: true,
-            // Sized so a single line of text makes the field exactly as
-            // tall as the send/stop button (_kButtonDiameter). Any taller
-            // and the button — bottom-aligned in an `end`-aligned Row —
-            // gets the surplus dumped above it, which visibly breaks the
-            // concentric trailing corner.
-            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            // Zero: with isCollapsed the field is exactly its text
+            // lines, and the parent's aligned min-height box (see
+            // KwaaiChatComposer.build) centres that block in the pill.
+            // Padding here would just inflate the block the parent has
+            // to centre, for no visual gain.
+            contentPadding: EdgeInsets.zero,
             border: InputBorder.none,
             focusedBorder: InputBorder.none,
             enabledBorder: InputBorder.none,

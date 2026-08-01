@@ -504,20 +504,45 @@ class _ChatInputBarState extends ConsumerState<_ChatInputBar> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        // Symmetric vertically: an asymmetric inset (more below than
+        // above) makes the pill hang low in its band. The composer's
+        // own _kButtonInset already spaces the controls inside the
+        // pill, so this only needs to separate the pill from the
+        // transcript above and the window edge below.
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+          // `end` would sit this row's 32px New Chat button flush on the
+          // bottom edge while the send button sits _kButtonInset up from
+          // the pill's inner edge — two different baselines, so the icon
+          // reads misaligned. Centring matches them on the collapsed
+          // pill; when the composer grows upward New Chat stays centred
+          // against it, which is the sane place for a whole-conversation
+          // action anyway.
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // New Chat sits outside the composer pill so it reads as a
-            // distinct workspace action, not part of the input. Bottom-
-            // aligned with the Send button when the composer expands.
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: IconButton(
-                tooltip: 'New chat',
-                icon: const Icon(Icons.add_comment_outlined),
-                onPressed: hasTranscript ? _newChat : () {},
-                color: onSurface.withValues(alpha: hasTranscript ? 0.85 : 0.45),
+            // distinct workspace action, not part of the input.
+            //
+            // Sized explicitly to the composer's own button geometry:
+            // left to its default 48x48 Material tap target it would be
+            // taller than the collapsed pill and would drive the row's
+            // height, pushing the input visibly downward.
+            IconButton(
+              tooltip: 'New chat',
+              // A touch larger than the send arrow's 18: that glyph is
+              // backed by a filled 32px circle while this one is bare,
+              // and a bare outline at 18 reads undersized next to it.
+              icon: const Icon(Icons.add_comment_outlined, size: 22),
+              onPressed: hasTranscript ? _newChat : () {},
+              color: onSurface.withValues(alpha: hasTranscript ? 0.85 : 0.45),
+              style: IconButton.styleFrom(
+                minimumSize: const Size(
+                  kComposerButtonDiameter,
+                  kComposerButtonDiameter,
+                ),
+                padding: EdgeInsets.zero,
+                shape: const CircleBorder(),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
             const SizedBox(width: 6),
@@ -744,29 +769,56 @@ class _ChatTranscriptState extends ConsumerState<_ChatTranscript> {
 ///
 /// Shows the most recent error in the transcript and nothing when there
 /// is none, so a failure clears as soon as the next turn starts.
-class _ChatErrorBar extends ConsumerWidget {
+class _ChatErrorBar extends ConsumerStatefulWidget {
   const _ChatErrorBar({required this.path});
 
   final ChatPath path;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final messages = ref.watch(chatTranscriptProvider(path));
+  ConsumerState<_ChatErrorBar> createState() => _ChatErrorBarState();
+}
+
+class _ChatErrorBarState extends ConsumerState<_ChatErrorBar> {
+  /// The error the user has closed, held by identity. Dismissal is a
+  /// view concern only — the message keeps its [ChatMessage.error] so
+  /// the transcript's truncation marker still renders — and it is
+  /// scoped to this one error, so the next failure raises the bar
+  /// again rather than being silently swallowed.
+  ChatError? _dismissed;
+
+  @override
+  Widget build(BuildContext context) {
+    final messages = ref.watch(chatTranscriptProvider(widget.path));
     ChatError? latest;
     for (final m in messages) {
       if (m.error != null) latest = m.error;
     }
-    if (latest == null) return const SizedBox.shrink();
+    if (latest == null || identical(latest, _dismissed)) {
+      return const SizedBox.shrink();
+    }
     // Keyed by identity so switching to a different error collapses any
     // expanded details rather than carrying the old disclosure state over.
-    return _ChatErrorBadge(key: ObjectKey(latest), error: latest);
+    final error = latest;
+    return _ChatErrorBadge(
+      key: ObjectKey(error),
+      error: error,
+      onDismiss: () => setState(() => _dismissed = error),
+    );
   }
 }
 
 class _ChatErrorBadge extends StatefulWidget {
-  const _ChatErrorBadge({super.key, required this.error});
+  const _ChatErrorBadge({
+    super.key,
+    required this.error,
+    required this.onDismiss,
+  });
 
   final ChatError error;
+
+  /// Closes the bar. The error stays on its message — this only stops
+  /// it occupying space above the composer once the user has read it.
+  final VoidCallback onDismiss;
 
   @override
   State<_ChatErrorBadge> createState() => _ChatErrorBadgeState();
@@ -806,6 +858,27 @@ class _ChatErrorBadgeState extends State<_ChatErrorBadge> {
                     style: Theme.of(
                       context,
                     ).textTheme.bodyMedium?.copyWith(color: dest),
+                  ),
+                ),
+                // Close sits at the top right, aligned with the headline's
+                // first line rather than centred on a multi-line message.
+                // Negative right margin pulls it back toward the bar's
+                // edge, recovering the icon button's own padding so it
+                // reads as inset by the same 12px as the text.
+                const SizedBox(width: 8),
+                Transform.translate(
+                  offset: const Offset(4, -2),
+                  child: IconButton(
+                    tooltip: 'Dismiss',
+                    onPressed: widget.onDismiss,
+                    icon: const Icon(Icons.close, size: 14),
+                    style: IconButton.styleFrom(
+                      foregroundColor: dest.withValues(alpha: 0.7),
+                      minimumSize: const Size(20, 20),
+                      padding: EdgeInsets.zero,
+                      shape: const CircleBorder(),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                   ),
                 ),
               ],
