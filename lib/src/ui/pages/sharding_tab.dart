@@ -240,15 +240,20 @@ class _ShardingTabState extends ConsumerState<ShardingTab> {
 /// kwaai-cli's reputation store. Declaration order is the ranking, which
 /// is what the filter dropdown lists them by.
 enum _TrustTier {
-  unknown('UNKNOWN'),
-  known('KNOWN'),
-  verified('VERIFIED'),
-  trusted('TRUSTED');
+  unknown('UNKNOWN', 'Unknown'),
+  known('KNOWN', 'Known'),
+  verified('VERIFIED', 'Verified'),
+  trusted('TRUSTED', 'Trusted');
 
-  const _TrustTier(this.wire);
+  const _TrustTier(this.wire, this.label);
 
   /// The string the daemon puts on the wire in `BlockPeer.trust_tier`.
   final String wire;
+
+  /// How the tier is written in the UI. Separate from [wire] so the
+  /// filter still matches the daemon's own casing while the dropdown
+  /// reads as prose rather than as a constant.
+  final String label;
 }
 
 /// Parses a wire tier. Null for the empty string the daemon sends when
@@ -423,7 +428,7 @@ class _TrustFilter extends StatelessWidget {
         items: [
           const KwaaiDropdownItem(value: null, label: 'All peers'),
           for (final tier in _TrustTier.values.reversed)
-            KwaaiDropdownItem(value: tier, label: tier.wire),
+            KwaaiDropdownItem(value: tier, label: tier.label),
         ],
         onChanged: onChanged,
       ),
