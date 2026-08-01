@@ -972,6 +972,12 @@ class _PeerConnections extends StatelessWidget {
                         style: theme.textTheme.bodySmall,
                       ),
                     ),
+                    // Labelled, because on a relayed inbound connection this is
+                    // a bare /p2p/<id> — which looks exactly like the peer id
+                    // in the header above and is otherwise indistinguishable
+                    // from it.
+                    Text('via', style: labelStyle),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         c.addr,
