@@ -46,21 +46,22 @@ const staleTick = Duration(seconds: 5);
 /// fits the bar, not the other way round.
 const _captionBarHeight = 28.0;
 
-/// Settings tab visualising live model block coverage: a viewport-filling
+/// Settings tab visualising how the model is sharded across the network:
+/// which peers serve which blocks, and where the gaps are. A viewport-filling
 /// grid of blocks coloured by how many peers serve each one, over a peer
 /// table (the same view `kwaainet shard chain` prints in the terminal).
 ///
 /// Data arrives through [blockCoverageProvider], a gRPC subscription the
 /// daemon pushes to whenever coverage changes — plus a heartbeat while it
 /// doesn't, which is what [staleAfter] measures against.
-class BlocksTab extends ConsumerStatefulWidget {
-  const BlocksTab({super.key});
+class ShardingTab extends ConsumerStatefulWidget {
+  const ShardingTab({super.key});
 
   @override
-  ConsumerState<BlocksTab> createState() => _BlocksTabState();
+  ConsumerState<ShardingTab> createState() => _ShardingTabState();
 }
 
-class _BlocksTabState extends ConsumerState<BlocksTab> {
+class _ShardingTabState extends ConsumerState<ShardingTab> {
   /// Block whose peers the table is filtered to. Null = show every peer.
   int? _selectedBlock;
 

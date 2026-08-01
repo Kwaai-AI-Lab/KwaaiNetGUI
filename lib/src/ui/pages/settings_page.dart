@@ -22,7 +22,7 @@ import '../widgets/kwaai_dropdown.dart';
 import '../widgets/kwaai_heading.dart';
 import '../widgets/kwaai_status_bar.dart';
 import '../widgets/kwaai_text_field.dart';
-import 'blocks_tab.dart';
+import 'sharding_tab.dart';
 
 /// Fill color for unselected/secondary controls — segmented-button segments
 /// and secondary buttons (e.g. Stop daemon).
@@ -239,11 +239,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   children: [
                     _buildStatusTab(),
                     // Mounted only while selected: the IndexedStack builds
-                    // every child even offscreen, and building BlocksTab is
+                    // every child even offscreen, and building ShardingTab is
                     // what opens (autoDispose: and closes) its live
                     // block-coverage subscription to the daemon.
-                    if (_selectedTab == _blocksTabIndex)
-                      const BlocksTab()
+                    if (_selectedTab == _shardingTabIndex)
+                      const ShardingTab()
                     else
                       const SizedBox.shrink(),
                     const _ContributeTab(),
@@ -358,7 +358,7 @@ const _settingsNavEntries = <_SettingsNavEntry>[
     Icons.monitor_heart,
     'Status',
   ),
-  _SettingsNavEntry(Icons.grid_view_outlined, Icons.grid_view, 'Blocks'),
+  _SettingsNavEntry(Icons.grid_view_outlined, Icons.grid_view, 'Sharding'),
   _SettingsNavEntry(
     Icons.volunteer_activism_outlined,
     Icons.volunteer_activism,
@@ -370,10 +370,10 @@ const _settingsNavEntries = <_SettingsNavEntry>[
   _SettingsNavEntry(Icons.info_outline, Icons.info, 'About'),
 ];
 
-/// Index of the Blocks tab in [_settingsNavEntries] / the IndexedStack.
-/// The Blocks tab holds a live gRPC subscription, so unlike its read-only
+/// Index of the Sharding tab in [_settingsNavEntries] / the IndexedStack.
+/// That tab holds a live gRPC subscription, so unlike its read-only
 /// siblings it is only mounted while actually selected.
-const _blocksTabIndex = 1;
+const _shardingTabIndex = 1;
 
 class _SettingsNav extends StatelessWidget {
   const _SettingsNav({

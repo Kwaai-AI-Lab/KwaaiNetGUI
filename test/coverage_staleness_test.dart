@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:kwaainet_gui/src/ui/pages/blocks_tab.dart';
+import 'package:kwaainet_gui/src/ui/pages/sharding_tab.dart';
 
 /// The staleness cue exists because the daemon suppresses block-coverage
 /// updates that would say nothing new (see `HEARTBEAT` in
