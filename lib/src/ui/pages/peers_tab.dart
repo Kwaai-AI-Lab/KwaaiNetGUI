@@ -9,6 +9,7 @@ import '../../chat/generated/kwaai.pbenum.dart' as pbenum;
 import '../../chat/session_client.dart';
 import '../../daemon/daemon_state.dart';
 import '../../daemon/peers_state.dart';
+import '../../p2p/protocols.dart';
 import '../theme/kwaai_theme.dart';
 import '../widgets/service_status_view.dart';
 
@@ -337,15 +338,21 @@ class _SelfStatusHeader extends StatelessWidget {
           if (s.listenAddrs.isNotEmpty)
             _AddressLine(
               label: 'Listening',
+              itemLabel: 'Address',
               values: sortByScope(s.listenAddrs),
             ),
           if (s.observedAddrs.isNotEmpty)
             _AddressLine(
               label: 'Observed',
+              itemLabel: 'Address',
               values: sortByScope(summariseObservedAddrs(s.observedAddrs)),
             ),
           if (s.relayAddrs.isNotEmpty)
-            _AddressLine(label: 'Relays', values: sortByScope(s.relayAddrs)),
+            _AddressLine(
+              label: 'Relays',
+              itemLabel: 'Address',
+              values: sortByScope(s.relayAddrs),
+            ),
         ],
         if (s == null)
           Padding(
@@ -441,10 +448,16 @@ class _AddressLine extends StatefulWidget {
     required this.label,
     required this.values,
     this.mono = true,
+    this.itemLabel,
   });
 
   final String label;
   final List<String> values;
+
+  /// What one entry is called, for the per-line copy buttons. The column label
+  /// names the group ("Listening"), which reads wrong on a button that copies a
+  /// single entry from it. Falls back to [label] when unset.
+  final String? itemLabel;
 
   /// Monospace the values. True for addresses and peer ids, where character
   /// alignment aids comparison; false for prose, which reads badly in mono.
@@ -517,7 +530,7 @@ class _AddressLineState extends State<_AddressLine> {
                       // space, and the address it shares the row with truncates
                       // to make room.
                       if (hidden > 0 && i == 0) ...[
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 12),
                         // A plain tappable Text rather than a TextButton: this
                         // page rebuilds often and Material buttons bring an ink
                         // controller each. No animation, no per-frame cost.
@@ -532,15 +545,23 @@ class _AddressLineState extends State<_AddressLine> {
                           ),
                         ),
                       ],
+                      // One copy button per line, copying that line alone.
+                      // A single button copying every value was fine while only
+                      // one was shown, but once expanded it silently gave you
+                      // the whole list when you clicked next to one address.
+                      const SizedBox(width: 12),
+                      _CopyButton(
+                        text: shown[i],
+                        // "Copy address", not "Copy Listening" — the column
+                        // label names the group, which reads wrong on a button
+                        // that copies one entry from it.
+                        label: widget.itemLabel ?? widget.label,
+                      ),
                     ],
                   ),
               ],
             ),
           ),
-          if (values.isNotEmpty)
-            // Copies every value, not just the visible one — the collapse is a
-            // display choice and shouldn't quietly narrow what you get.
-            _CopyButton(text: values.join('\n'), label: widget.label),
         ],
       ),
     );
@@ -788,8 +809,10 @@ class _PeerTable extends StatelessWidget {
               columns: [
                 DataColumn(label: Text('CONN', style: headStyle)),
                 DataColumn(label: Text('DHT', style: headStyle)),
+                // PATH carries direction in its arrow, so there is no separate
+                // DIR column: the arrow used to point right regardless, which
+                // made it decoration beside a column holding the actual fact.
                 DataColumn(label: Text('PATH', style: headStyle)),
-                DataColumn(label: Text('DIR', style: headStyle)),
                 DataColumn(label: Text('RTT', style: headStyle), numeric: true),
                 DataColumn(label: Text('ROLE', style: headStyle)),
                 DataColumn(label: Text('VERSION', style: headStyle)),
@@ -815,10 +838,8 @@ class _PeerTable extends StatelessWidget {
                             : _PathCell(
                                 kind: r.primary!.kind,
                                 dcutr: r.anyDcutr,
+                                direction: r.primary!.direction,
                               ),
-                      ),
-                      DataCell(
-                        Text(r.primary?.direction ?? '—', style: cellStyle),
                       ),
                       DataCell(
                         Text(
@@ -968,13 +989,10 @@ class _PeerConnections extends StatelessWidget {
                     // room than the 74px label column beside them.
                     SizedBox(
                       width: 88,
-                      child: _PathCell(kind: c.kind, dcutr: c.dcutr),
-                    ),
-                    SizedBox(
-                      width: 72,
-                      child: Text(
-                        c.direction,
-                        style: theme.textTheme.bodySmall,
+                      child: _PathCell(
+                        kind: c.kind,
+                        dcutr: c.dcutr,
+                        direction: c.direction,
                       ),
                     ),
                     SizedBox(
@@ -1025,6 +1043,7 @@ class _PeerConnections extends StatelessWidget {
             // address lines use, so the interaction is identical.
             _AddressLine(
               label: 'Protocols',
+              itemLabel: 'Protocol',
               values: [for (final p in protocols) describeProtocol(p)],
               mono: false,
             ),
@@ -1097,8 +1116,13 @@ class _EmptyRow extends StatelessWidget {
   }
 }
 
-/// How the connection reaches the peer: relayed, plain direct, or direct via
-/// DCUtR.
+/// How the connection reaches the peer, and which side opened it.
+///
+/// One cell rather than two: the arrow was pointing right whatever the
+/// direction, so it was decoration next to a column that carried the actual
+/// fact. Now it points the way the dial went — out for a connection we opened,
+/// in for one they opened — and the word beside it says only what the arrow
+/// cannot.
 ///
 /// DCUtR is called out by name rather than folded into "direct" because the two
 /// are not the same achievement: a plain direct path means there was no NAT in
@@ -1106,24 +1130,39 @@ class _EmptyRow extends StatelessWidget {
 /// private reachability the latter is the difference between "nothing works"
 /// and "hole punching is working".
 class _PathCell extends StatelessWidget {
-  const _PathCell({required this.kind, this.dcutr = false});
+  const _PathCell({required this.kind, this.dcutr = false, this.direction});
 
   final pbenum.PeerConnKind kind;
   final bool dcutr;
+
+  /// "inbound" / "outbound", or null when there is no connection to describe.
+  final String? direction;
 
   @override
   Widget build(BuildContext context) {
     final kwaai = context.kwaai;
     final relayed = kind == pbenum.PeerConnKind.PEER_CONN_KIND_RELAY;
-    final (label, icon, color) = relayed
-        ? ('relay', Icons.alt_route, kwaai.semanticWarning)
+    final (label, color) = relayed
+        ? ('relay', kwaai.semanticWarning)
         : dcutr
-        ? ('DCUtR', Icons.bolt, kwaai.accentPrimary)
-        : ('direct', Icons.arrow_right_alt, kwaai.statusRunning);
+        ? ('DCUtR', kwaai.accentPrimary)
+        : ('direct', kwaai.statusRunning);
+
+    final inbound = direction == 'inbound';
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: color),
+        Icon(
+          // Relayed paths keep their own glyph — the route is the notable
+          // thing there, not who dialled.
+          relayed
+              ? Icons.alt_route
+              : inbound
+              ? Icons.arrow_back
+              : Icons.arrow_forward,
+          size: 14,
+          color: color,
+        ),
         const SizedBox(width: 5),
         Text(
           label,
@@ -1161,58 +1200,6 @@ class _RoleCell extends StatelessWidget {
     return Text('—', style: theme.textTheme.bodySmall);
   }
 }
-
-/// What each libp2p protocol id means, in plain words.
-///
-/// Protocol ids are stable, versioned identifiers — a peer advertising
-/// `/libp2p/dcutr` is saying something specific and unchanging — so a lookup
-/// table is exact rather than a heuristic. Reading a peer's capabilities off
-/// raw ids means knowing the ecosystem by heart; this is the difference between
-/// "can this peer relay for me?" being obvious or requiring a search.
-///
-/// Unknown ids are shown verbatim rather than dropped: a peer running something
-/// this build has never heard of is worth seeing, not hiding.
-///
-/// Public for `test/peers_protocols_test.dart`.
-const protocolDescriptions = <String, String>{
-  // ── libp2p core ────────────────────────────────────────────────────────
-  '/ipfs/id/1.0.0': 'Identify — exchanges peer id, addresses and capabilities',
-  '/ipfs/id/push/1.0.0':
-      'Identify push — sends updates when its details change',
-  '/ipfs/ping/1.0.0': 'Ping — liveness and round-trip time',
-  '/ipfs/kad/1.0.0': 'Kademlia DHT — serves peer and content lookups',
-
-  // ── NAT traversal ──────────────────────────────────────────────────────
-  '/libp2p/autonat/1.0.0':
-      'AutoNAT — dials peers back to test their reachability',
-  '/libp2p/circuit/relay/0.2.0/hop':
-      'Circuit relay (hop) — willing to relay traffic for other peers',
-  '/libp2p/circuit/relay/0.2.0/stop':
-      'Circuit relay (stop) — can be reached through a relay',
-  '/libp2p/circuit/relay/0.1.0': 'Circuit relay v1 — legacy relay protocol',
-  '/libp2p/dcutr': 'DCUtR — coordinates hole punching to upgrade relayed paths',
-
-  // ── KwaaiNet ───────────────────────────────────────────────────────────
-  '/kwaai/p2p/hello/1.0.0': 'Hello — accepts direct messages from any peer',
-  '/kwaai/inference/1.0.0':
-      'Inference — serves transformer blocks for distributed inference',
-  '/kwaai/inference-mux/1.0.0':
-      'Inference mux — concurrent GPU inference over one persistent stream',
-  '/kwaai/ollama-proxy/1.0.0':
-      'Ollama proxy — tunnels HTTP inference to Ollama',
-  '/kwaai/shard-proxy/1.0.0':
-      'Shard proxy — tunnels HTTP inference to the local shard API',
-
-  // ── hivemind DHT ───────────────────────────────────────────────────────
-  'DHTProtocol.rpc_ping': 'Hivemind DHT — liveness probe',
-  'DHTProtocol.rpc_store': 'Hivemind DHT — stores records',
-  'DHTProtocol.rpc_find': 'Hivemind DHT — serves record lookups',
-};
-
-/// A human description for `id`, or the id itself when unrecognised.
-///
-/// Public for `test/peers_protocols_test.dart`.
-String describeProtocol(String id) => protocolDescriptions[id] ?? id;
 
 /// How widely reachable an address is. Ordering is the ranking.
 ///

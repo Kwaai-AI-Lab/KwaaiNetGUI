@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:kwaainet_gui/src/ui/pages/peers_tab.dart';
+import 'package:kwaainet_gui/src/p2p/protocols.dart';
 
 /// Protocol ids are stable, versioned identifiers, so describing them from a
 /// lookup table is exact rather than a heuristic. These tests pin the ids this
@@ -30,15 +30,14 @@ void main() {
       ];
 
       for (final id in seenOnTheWire) {
-        expect(
-          protocolDescriptions.containsKey(id),
-          isTrue,
-          reason: '$id is advertised on the live network but has no description',
-        );
+        // Assert through describeProtocol rather than containsKey: keys are
+        // wildcard patterns, so an exact-key check would say "missing" for
+        // every id the table describes by family.
         expect(
           describeProtocol(id),
           isNot(id),
-          reason: '$id should render as prose, not as its own id',
+          reason: '$id is advertised on the live network but falls through to '
+              'its raw id — no description matches it',
         );
       }
     });
@@ -78,6 +77,58 @@ void main() {
       expect(hop, isNot(stop));
       expect(hop.toLowerCase(), contains('relay'));
       expect(stop.toLowerCase(), contains('relay'));
+    });
+
+    test('a version bump keeps its description', () {
+      // The reason for wildcards at all: an exact table silently degrades to
+      // raw ids the moment a peer upgrades, which is exactly when you are
+      // looking at the page.
+      expect(
+        describeProtocol('/ipfs/kad/2.0.0'),
+        describeProtocol('/ipfs/kad/1.0.0'),
+      );
+      expect(
+        describeProtocol('/kwaai/inference/3.1.4'),
+        describeProtocol('/kwaai/inference/1.0.0'),
+      );
+    });
+
+    test('a wildcard matches one segment, not many', () {
+      // `+` is MQTT's single-level wildcard. If it spanned segments,
+      // /ipfs/kad/+ would swallow /ipfs/kad/1.0.0/extra — and, worse,
+      // /libp2p/circuit/relay/+ would swallow both hop and stop.
+      expect(
+        describeProtocol('/ipfs/kad/1.0.0/extra'),
+        '/ipfs/kad/1.0.0/extra',
+      );
+      // Nor should it match a *missing* segment.
+      expect(describeProtocol('/ipfs/kad'), '/ipfs/kad');
+    });
+
+    test('relay hop and stop stay apart across versions', () {
+      // The case that forced per-segment matching: the version sits before the
+      // discriminator, so a prefix match would merge these two opposite roles.
+      final hop = describeProtocol('/libp2p/circuit/relay/0.3.0/hop');
+      final stop = describeProtocol('/libp2p/circuit/relay/0.3.0/stop');
+      expect(hop, isNot(stop));
+      expect(hop, contains('hop'));
+      expect(stop, contains('stop'));
+    });
+
+    test('an exact key beats a wildcard one', () {
+      // Circuit relay v1 has no hop/stop suffix and is described on its own
+      // terms, not as a version of the v2 family.
+      expect(
+        describeProtocol('/libp2p/circuit/relay/0.1.0'),
+        contains('legacy'),
+      );
+    });
+
+    test('sibling paths of different depth do not collide', () {
+      // /ipfs/id/+ and /ipfs/id/push/+ differ only in length, which is what
+      // segment-count matching relies on to tell them apart.
+      expect(describeProtocol('/ipfs/id/1.0.0'), contains('Identify —'));
+      expect(describeProtocol('/ipfs/id/push/1.0.0'), contains('push'));
     });
 
     test('DCUtR is named, since the view uses that name elsewhere', () {
