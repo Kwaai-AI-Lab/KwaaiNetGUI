@@ -916,15 +916,12 @@ class _PeerConnections extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(
-                row.connections.isEmpty
-                    ? 'NO CONNECTIONS'
-                    : row.connections.length == 1
-                    ? 'CONNECTION'
-                    : '${row.connections.length} CONNECTIONS',
-                style: labelStyle,
-              ),
-              const SizedBox(width: 10),
+              // Always plural: "CONNECTIONS" heads the section whatever it
+              // contains, rather than the count changing the noun.
+              Text('${row.connections.length} CONNECTIONS', style: labelStyle),
+              const SizedBox(width: 14),
+              Text('Peer ID', style: labelStyle),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   row.peerId,
