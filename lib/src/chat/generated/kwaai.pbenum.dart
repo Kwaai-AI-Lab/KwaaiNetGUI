@@ -14,6 +14,44 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
+/// Whether a discovered node answered a storage RPC.
+///
+/// Reachability is a property of *this* node's route to the peer, not of
+/// the peer itself: a node behind a NAT that we cannot traverse is
+/// unreachable from here and fine from elsewhere.
+class StorageReachability extends $pb.ProtobufEnum {
+  /// Not probed yet. Every peer holds this in the first update of a
+  /// round, and keeps it for the whole round when `skip_probes` is set.
+  static const StorageReachability STORAGE_REACHABILITY_UNKNOWN =
+      StorageReachability._(
+          0, _omitEnumNames ? '' : 'STORAGE_REACHABILITY_UNKNOWN');
+
+  /// Answered a /kwaai/storage/1.0.0 health RPC. `capacity_gb_free`
+  /// and `tenant_count` on this peer are live values from that reply.
+  static const StorageReachability STORAGE_REACHABILITY_REACHABLE =
+      StorageReachability._(
+          1, _omitEnumNames ? '' : 'STORAGE_REACHABILITY_REACHABLE');
+
+  /// Advertised in the DHT but did not answer — offline, or running a
+  /// build without the storage protocol.
+  static const StorageReachability STORAGE_REACHABILITY_UNREACHABLE =
+      StorageReachability._(
+          2, _omitEnumNames ? '' : 'STORAGE_REACHABILITY_UNREACHABLE');
+
+  static const $core.List<StorageReachability> values = <StorageReachability>[
+    STORAGE_REACHABILITY_UNKNOWN,
+    STORAGE_REACHABILITY_REACHABLE,
+    STORAGE_REACHABILITY_UNREACHABLE,
+  ];
+
+  static final $core.List<StorageReachability?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static StorageReachability? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const StorageReachability._(super.value, super.name);
+}
+
 class Error_Code extends $pb.ProtobufEnum {
   static const Error_Code UNKNOWN =
       Error_Code._(0, _omitEnumNames ? '' : 'UNKNOWN');

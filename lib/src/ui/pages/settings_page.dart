@@ -23,6 +23,7 @@ import '../widgets/kwaai_heading.dart';
 import '../widgets/kwaai_status_bar.dart';
 import '../widgets/kwaai_text_field.dart';
 import 'sharding_tab.dart';
+import 'storage_tab.dart';
 
 /// Fill color for unselected/secondary controls — segmented-button segments
 /// and secondary buttons (e.g. Stop daemon).
@@ -246,6 +247,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       const ShardingTab()
                     else
                       const SizedBox.shrink(),
+                    // Same treatment, and for the same reason: mounting
+                    // this opens a subscription that makes the daemon
+                    // dial every advertised storage node.
+                    if (_selectedTab == _storageTabIndex)
+                      const StorageTab()
+                    else
+                      const SizedBox.shrink(),
                     const _ContributeTab(),
                     const _NetworkTab(),
                     const _AppearanceTab(),
@@ -359,6 +367,7 @@ const _settingsNavEntries = <_SettingsNavEntry>[
     'Status',
   ),
   _SettingsNavEntry(Icons.grid_view_outlined, Icons.grid_view, 'Sharding'),
+  _SettingsNavEntry(Icons.storage_outlined, Icons.storage, 'VPK'),
   _SettingsNavEntry(
     Icons.volunteer_activism_outlined,
     Icons.volunteer_activism,
@@ -370,10 +379,12 @@ const _settingsNavEntries = <_SettingsNavEntry>[
   _SettingsNavEntry(Icons.info_outline, Icons.info, 'About'),
 ];
 
-/// Index of the Sharding tab in [_settingsNavEntries] / the IndexedStack.
-/// That tab holds a live gRPC subscription, so unlike its read-only
-/// siblings it is only mounted while actually selected.
+/// Indices of the tabs in [_settingsNavEntries] / the IndexedStack that
+/// hold live gRPC subscriptions. Unlike their read-only siblings these
+/// are only mounted while actually selected, so the daemon isn't polling
+/// the DHT — or dialling storage nodes — for a view nobody is looking at.
 const _shardingTabIndex = 1;
+const _storageTabIndex = 2;
 
 class _SettingsNav extends StatelessWidget {
   const _SettingsNav({
@@ -1309,12 +1320,12 @@ bool _peersEqual(List<String> a, List<String> b) {
 /// user is on Contribute (and vice versa).
 bool _tabDirty(int tab, ConfigSnapshot draft, ConfigSnapshot snapshot) {
   switch (tab) {
-    case 2: // Contribute
+    case 3: // Contribute
       return draft.model != snapshot.model ||
           draft.shardingEnabled != snapshot.shardingEnabled ||
           draft.storageEnabled != snapshot.storageEnabled ||
           draft.storageCapacityGb != snapshot.storageCapacityGb;
-    case 3: // Network
+    case 4: // Network
       return draft.port != snapshot.port ||
           draft.publicIp != snapshot.publicIp ||
           !_peersEqual(draft.initialPeers, snapshot.initialPeers) ||

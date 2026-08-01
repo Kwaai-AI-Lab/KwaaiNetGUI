@@ -230,6 +230,46 @@ class SessionClient {
     return BlockCoverageOperation(id: id, updates: updates);
   }
 
+  /// Live VPK storage-node feed. Each discovery round pushes two updates
+  /// — the DHT registry with `probesPending` set, then the same peers
+  /// with reachability resolved — repeating every [intervalSecs] until
+  /// the operation is [cancel]led (or the session ends).
+  ///
+  /// The default cadence matches the daemon's: a round dials every
+  /// advertised node, so this is deliberately far slower than the
+  /// block-coverage feed.
+  StorageDiscoveryOperation storageDiscoverySubscribe({
+    int intervalSecs = 30,
+  }) {
+    ensureOpen();
+    if (_closed || _outbound == null) {
+      return StorageDiscoveryOperation(
+        id: null,
+        updates: Stream<pb.StorageUpdate>.error(
+          SessionEndedError(
+            kind: SessionEndKind.localClose,
+            reason: 'session not open',
+          ),
+        ),
+      );
+    }
+    final id = _nextId++;
+    final controller = StreamController<pb.ServerFrame>();
+    _routers[id] = controller;
+    _outbound!.add(pb.ClientFrame()
+      ..id = Int64(id)
+      ..storageDiscovery = (pb.StorageDiscoveryRequest()
+        ..subscribe = true
+        ..intervalSecs = intervalSecs));
+    // As with block coverage, no silence watchdog: a subscription is
+    // legitimately quiet while the daemon's p2p layer comes up, and
+    // session-end errors already propagate through the router.
+    final updates = controller.stream
+        .where((f) => f.whichBody() == pb.ServerFrame_Body.storage)
+        .map((f) => f.storage);
+    return StorageDiscoveryOperation(id: id, updates: updates);
+  }
+
   /// Cancel an in-flight operation. The target operation's stream will
   /// error with SessionOpError(code=CANCELLED).
   Future<void> cancel(int operationId) async {
@@ -415,6 +455,16 @@ class BlockCoverageOperation {
 
   final int? id;
   final Stream<pb.BlockCoverageUpdate> updates;
+}
+
+/// An in-flight storage-discovery subscription: its update stream plus
+/// the server operation id needed to [SessionClient.cancel] it. Same id
+/// semantics as [SessionOperation] — null means no frame was ever sent.
+class StorageDiscoveryOperation {
+  StorageDiscoveryOperation({required this.id, required this.updates});
+
+  final int? id;
+  final Stream<pb.StorageUpdate> updates;
 }
 
 /// Thrown into a per-op stream when the server emits Error for that id.

@@ -28,6 +28,7 @@ enum ClientFrame_Body {
   status,
   cancel,
   blockCoverage,
+  storageDiscovery,
   notSet
 }
 
@@ -53,6 +54,7 @@ class ClientFrame extends $pb.GeneratedMessage {
     StatusRequest? status,
     Cancel? cancel,
     BlockCoverageRequest? blockCoverage,
+    StorageDiscoveryRequest? storageDiscovery,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -62,6 +64,7 @@ class ClientFrame extends $pb.GeneratedMessage {
     if (status != null) result.status = status;
     if (cancel != null) result.cancel = cancel;
     if (blockCoverage != null) result.blockCoverage = blockCoverage;
+    if (storageDiscovery != null) result.storageDiscovery = storageDiscovery;
     return result;
   }
 
@@ -81,13 +84,14 @@ class ClientFrame extends $pb.GeneratedMessage {
     13: ClientFrame_Body.status,
     14: ClientFrame_Body.cancel,
     15: ClientFrame_Body.blockCoverage,
+    16: ClientFrame_Body.storageDiscovery,
     0: ClientFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ClientFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingRequest>(10, _omitFieldNames ? '' : 'ping',
@@ -102,6 +106,9 @@ class ClientFrame extends $pb.GeneratedMessage {
         subBuilder: Cancel.create)
     ..aOM<BlockCoverageRequest>(15, _omitFieldNames ? '' : 'blockCoverage',
         subBuilder: BlockCoverageRequest.create)
+    ..aOM<StorageDiscoveryRequest>(
+        16, _omitFieldNames ? '' : 'storageDiscovery',
+        subBuilder: StorageDiscoveryRequest.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -129,6 +136,7 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
+  @$pb.TagNumber(16)
   ClientFrame_Body whichBody() => _ClientFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
@@ -136,6 +144,7 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
+  @$pb.TagNumber(16)
   void clearBody() => $_clearField($_whichOneof(0));
 
   /// Operation correlation id. Pick any non-zero value unused by an
@@ -227,6 +236,21 @@ class ClientFrame extends $pb.GeneratedMessage {
   void clearBlockCoverage() => $_clearField(15);
   @$pb.TagNumber(15)
   BlockCoverageRequest ensureBlockCoverage() => $_ensure(6);
+
+  /// VPK storage-node discovery. Like block_coverage, but for the
+  /// `_kwaai.vpk.nodes` DHT registry. Note that even a one-shot
+  /// request yields *two* StorageUpdate replies — see
+  /// StorageUpdate.probes_pending.
+  @$pb.TagNumber(16)
+  StorageDiscoveryRequest get storageDiscovery => $_getN(7);
+  @$pb.TagNumber(16)
+  set storageDiscovery(StorageDiscoveryRequest value) => $_setField(16, value);
+  @$pb.TagNumber(16)
+  $core.bool hasStorageDiscovery() => $_has(7);
+  @$pb.TagNumber(16)
+  void clearStorageDiscovery() => $_clearField(16);
+  @$pb.TagNumber(16)
+  StorageDiscoveryRequest ensureStorageDiscovery() => $_ensure(7);
 }
 
 enum ServerFrame_Body {
@@ -236,6 +260,7 @@ enum ServerFrame_Body {
   error,
   status,
   blockCoverage,
+  storage,
   notSet
 }
 
@@ -251,6 +276,7 @@ class ServerFrame extends $pb.GeneratedMessage {
     Error? error,
     StatusReply? status,
     BlockCoverageUpdate? blockCoverage,
+    StorageUpdate? storage,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -260,6 +286,7 @@ class ServerFrame extends $pb.GeneratedMessage {
     if (error != null) result.error = error;
     if (status != null) result.status = status;
     if (blockCoverage != null) result.blockCoverage = blockCoverage;
+    if (storage != null) result.storage = storage;
     return result;
   }
 
@@ -279,13 +306,14 @@ class ServerFrame extends $pb.GeneratedMessage {
     13: ServerFrame_Body.error,
     14: ServerFrame_Body.status,
     15: ServerFrame_Body.blockCoverage,
+    16: ServerFrame_Body.storage,
     0: ServerFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ServerFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingReply>(10, _omitFieldNames ? '' : 'pong',
@@ -298,6 +326,8 @@ class ServerFrame extends $pb.GeneratedMessage {
         subBuilder: StatusReply.create)
     ..aOM<BlockCoverageUpdate>(15, _omitFieldNames ? '' : 'blockCoverage',
         subBuilder: BlockCoverageUpdate.create)
+    ..aOM<StorageUpdate>(16, _omitFieldNames ? '' : 'storage',
+        subBuilder: StorageUpdate.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -325,6 +355,7 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
+  @$pb.TagNumber(16)
   ServerFrame_Body whichBody() => _ServerFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
@@ -332,6 +363,7 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   @$pb.TagNumber(14)
   @$pb.TagNumber(15)
+  @$pb.TagNumber(16)
   void clearBody() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -418,6 +450,20 @@ class ServerFrame extends $pb.GeneratedMessage {
   void clearBlockCoverage() => $_clearField(15);
   @$pb.TagNumber(15)
   BlockCoverageUpdate ensureBlockCoverage() => $_ensure(6);
+
+  /// Snapshot of discovered VPK storage nodes. Arrives in pairs
+  /// per discovery round: one with probes_pending set, then one
+  /// with reachability resolved.
+  @$pb.TagNumber(16)
+  StorageUpdate get storage => $_getN(7);
+  @$pb.TagNumber(16)
+  set storage(StorageUpdate value) => $_setField(16, value);
+  @$pb.TagNumber(16)
+  $core.bool hasStorage() => $_has(7);
+  @$pb.TagNumber(16)
+  void clearStorage() => $_clearField(16);
+  @$pb.TagNumber(16)
+  StorageUpdate ensureStorage() => $_ensure(7);
 }
 
 /// Sent from client → server to abort an in-flight operation by id.
@@ -1390,6 +1436,367 @@ class BlockCoverageUpdate extends $pb.GeneratedMessage {
   /// All discovered block servers, sorted by start_block.
   @$pb.TagNumber(7)
   $pb.PbList<BlockPeer> get peers => $_getList(6);
+}
+
+/// `kwaainet vpk discover` — VPK storage nodes from the DHT.
+class StorageDiscoveryRequest extends $pb.GeneratedMessage {
+  factory StorageDiscoveryRequest({
+    $core.bool? subscribe,
+    $core.int? intervalSecs,
+    $core.bool? skipProbes,
+  }) {
+    final result = create();
+    if (subscribe != null) result.subscribe = subscribe;
+    if (intervalSecs != null) result.intervalSecs = intervalSecs;
+    if (skipProbes != null) result.skipProbes = skipProbes;
+    return result;
+  }
+
+  StorageDiscoveryRequest._();
+
+  factory StorageDiscoveryRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory StorageDiscoveryRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StorageDiscoveryRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'subscribe')
+    ..aI(2, _omitFieldNames ? '' : 'intervalSecs',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOB(3, _omitFieldNames ? '' : 'skipProbes')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StorageDiscoveryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StorageDiscoveryRequest copyWith(
+          void Function(StorageDiscoveryRequest) updates) =>
+      super.copyWith((message) => updates(message as StorageDiscoveryRequest))
+          as StorageDiscoveryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static StorageDiscoveryRequest create() => StorageDiscoveryRequest._();
+  @$core.override
+  StorageDiscoveryRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static StorageDiscoveryRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<StorageDiscoveryRequest>(create);
+  static StorageDiscoveryRequest? _defaultInstance;
+
+  /// When true the operation stays open and the server runs a fresh
+  /// discovery round every `interval_secs` until the client sends a
+  /// Cancel body for this op id. When false a single round runs and
+  /// the op ends with Done.
+  @$pb.TagNumber(1)
+  $core.bool get subscribe => $_getBF(0);
+  @$pb.TagNumber(1)
+  set subscribe($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSubscribe() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSubscribe() => $_clearField(1);
+
+  /// Discovery cadence for subscriptions, in seconds. 0 means the
+  /// server default (30s). Ignored when `subscribe` is false.
+  ///
+  /// Slower than block coverage by default: each round dials every
+  /// advertised node, so a tight interval spends real network work to
+  /// observe a registry that only changes on the ~120s announce cycle.
+  @$pb.TagNumber(2)
+  $core.int get intervalSecs => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set intervalSecs($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasIntervalSecs() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearIntervalSecs() => $_clearField(2);
+
+  /// Skip the reachability probes and report DHT records only. Yields
+  /// a single StorageUpdate per round with every peer left UNKNOWN,
+  /// for callers that just want the advertised registry cheaply.
+  @$pb.TagNumber(3)
+  $core.bool get skipProbes => $_getBF(2);
+  @$pb.TagNumber(3)
+  set skipProbes($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSkipProbes() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSkipProbes() => $_clearField(3);
+}
+
+/// One VPK-capable node, as advertised in the DHT and (optionally)
+/// confirmed by a live health probe.
+class StoragePeer extends $pb.GeneratedMessage {
+  factory StoragePeer({
+    $core.String? peerId,
+    $core.String? publicName,
+    $core.String? mode,
+    $core.String? vpkVersion,
+    $core.double? capacityGb,
+    $core.int? tenantCount,
+    StorageReachability? reachability,
+    $core.double? capacityGbFree,
+    $core.double? trustScore,
+    $core.String? trustTier,
+  }) {
+    final result = create();
+    if (peerId != null) result.peerId = peerId;
+    if (publicName != null) result.publicName = publicName;
+    if (mode != null) result.mode = mode;
+    if (vpkVersion != null) result.vpkVersion = vpkVersion;
+    if (capacityGb != null) result.capacityGb = capacityGb;
+    if (tenantCount != null) result.tenantCount = tenantCount;
+    if (reachability != null) result.reachability = reachability;
+    if (capacityGbFree != null) result.capacityGbFree = capacityGbFree;
+    if (trustScore != null) result.trustScore = trustScore;
+    if (trustTier != null) result.trustTier = trustTier;
+    return result;
+  }
+
+  StoragePeer._();
+
+  factory StoragePeer.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory StoragePeer.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StoragePeer',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'peerId')
+    ..aOS(2, _omitFieldNames ? '' : 'publicName')
+    ..aOS(3, _omitFieldNames ? '' : 'mode')
+    ..aOS(4, _omitFieldNames ? '' : 'vpkVersion')
+    ..aD(5, _omitFieldNames ? '' : 'capacityGb')
+    ..aI(6, _omitFieldNames ? '' : 'tenantCount',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aE<StorageReachability>(7, _omitFieldNames ? '' : 'reachability',
+        enumValues: StorageReachability.values)
+    ..aD(8, _omitFieldNames ? '' : 'capacityGbFree')
+    ..aD(9, _omitFieldNames ? '' : 'trustScore')
+    ..aOS(10, _omitFieldNames ? '' : 'trustTier')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StoragePeer clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StoragePeer copyWith(void Function(StoragePeer) updates) =>
+      super.copyWith((message) => updates(message as StoragePeer))
+          as StoragePeer;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static StoragePeer create() => StoragePeer._();
+  @$core.override
+  StoragePeer createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static StoragePeer getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<StoragePeer>(create);
+  static StoragePeer? _defaultInstance;
+
+  /// libp2p peer id, base58.
+  @$pb.TagNumber(1)
+  $core.String get peerId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set peerId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPeerId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPeerId() => $_clearField(1);
+
+  /// Human-readable name the node announced (may be empty).
+  @$pb.TagNumber(2)
+  $core.String get publicName => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set publicName($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPublicName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPublicName() => $_clearField(2);
+
+  /// VPK role: "bob" (client), "eve" (server), or "both".
+  @$pb.TagNumber(3)
+  $core.String get mode => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set mode($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMode() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMode() => $_clearField(3);
+
+  /// VPK version string the node announced (may be empty).
+  @$pb.TagNumber(4)
+  $core.String get vpkVersion => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set vpkVersion($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasVpkVersion() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearVpkVersion() => $_clearField(4);
+
+  /// Capacity the node advertised in its DHT record, in GB. Always
+  /// present — this is what the registry claims.
+  @$pb.TagNumber(5)
+  $core.double get capacityGb => $_getN(4);
+  @$pb.TagNumber(5)
+  set capacityGb($core.double value) => $_setDouble(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCapacityGb() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCapacityGb() => $_clearField(5);
+
+  /// Tenants the node advertised in its DHT record.
+  @$pb.TagNumber(6)
+  $core.int get tenantCount => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set tenantCount($core.int value) => $_setUnsignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasTenantCount() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTenantCount() => $_clearField(6);
+
+  /// Whether this node answered a health probe this round.
+  @$pb.TagNumber(7)
+  StorageReachability get reachability => $_getN(6);
+  @$pb.TagNumber(7)
+  set reachability(StorageReachability value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasReachability() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearReachability() => $_clearField(7);
+
+  /// Free capacity in GB, from the health probe. Only meaningful when
+  /// `reachability` is REACHABLE; 0 otherwise.
+  @$pb.TagNumber(8)
+  $core.double get capacityGbFree => $_getN(7);
+  @$pb.TagNumber(8)
+  set capacityGbFree($core.double value) => $_setDouble(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasCapacityGbFree() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearCapacityGbFree() => $_clearField(8);
+
+  /// Local reputation score in [0, 1]. Only meaningful when
+  /// `trust_tier` is non-empty.
+  @$pb.TagNumber(9)
+  $core.double get trustScore => $_getN(8);
+  @$pb.TagNumber(9)
+  set trustScore($core.double value) => $_setDouble(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasTrustScore() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearTrustScore() => $_clearField(9);
+
+  /// Trust tier label ("UNKNOWN" / "KNOWN" / "VERIFIED" / "TRUSTED").
+  /// Empty when the local reputation system is disabled.
+  @$pb.TagNumber(10)
+  $core.String get trustTier => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set trustTier($core.String value) => $_setString(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasTrustTier() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearTrustTier() => $_clearField(10);
+}
+
+/// Snapshot of the VPK storage nodes visible from this daemon.
+///
+/// A discovery round emits two of these: the first as soon as the DHT
+/// answers (`probes_pending` true, every peer UNKNOWN), the second once
+/// the health probes resolve. The DHT lookup is fast and the probes are
+/// not — splitting them lets a client render the registry immediately
+/// rather than holding a blank view until the slowest dial times out.
+class StorageUpdate extends $pb.GeneratedMessage {
+  factory StorageUpdate({
+    $core.String? serverTime,
+    $core.bool? probesPending,
+    $core.Iterable<StoragePeer>? peers,
+  }) {
+    final result = create();
+    if (serverTime != null) result.serverTime = serverTime;
+    if (probesPending != null) result.probesPending = probesPending;
+    if (peers != null) result.peers.addAll(peers);
+    return result;
+  }
+
+  StorageUpdate._();
+
+  factory StorageUpdate.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory StorageUpdate.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StorageUpdate',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'serverTime')
+    ..aOB(2, _omitFieldNames ? '' : 'probesPending')
+    ..pPM<StoragePeer>(3, _omitFieldNames ? '' : 'peers',
+        subBuilder: StoragePeer.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StorageUpdate clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StorageUpdate copyWith(void Function(StorageUpdate) updates) =>
+      super.copyWith((message) => updates(message as StorageUpdate))
+          as StorageUpdate;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static StorageUpdate create() => StorageUpdate._();
+  @$core.override
+  StorageUpdate createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static StorageUpdate getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<StorageUpdate>(create);
+  static StorageUpdate? _defaultInstance;
+
+  /// Daemon wall-clock time of this snapshot, RFC 3339.
+  @$pb.TagNumber(1)
+  $core.String get serverTime => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set serverTime($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasServerTime() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearServerTime() => $_clearField(1);
+
+  /// True on the first update of a round: the peer list is complete
+  /// but reachability is still resolving, so a client should show the
+  /// rows in a pending state rather than as unreachable. Always false
+  /// when `skip_probes` was set — nothing is pending in that case.
+  @$pb.TagNumber(2)
+  $core.bool get probesPending => $_getBF(1);
+  @$pb.TagNumber(2)
+  set probesPending($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasProbesPending() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearProbesPending() => $_clearField(2);
+
+  /// All discovered nodes, sorted by public_name then peer_id so the
+  /// ordering is stable across rounds.
+  @$pb.TagNumber(3)
+  $pb.PbList<StoragePeer> get peers => $_getList(2);
 }
 
 class ChatMessage extends $pb.GeneratedMessage {

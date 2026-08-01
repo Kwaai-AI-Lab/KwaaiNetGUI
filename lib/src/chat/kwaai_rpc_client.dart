@@ -337,6 +337,27 @@ class KwaaiRpcClient {
     }
   }
 
+  /// Live VPK storage-node feed. The daemon runs a discovery round every
+  /// [intervalSecs], each pushing two updates (registry, then resolved
+  /// reachability); the daemon-side operation is cancelled when the
+  /// listener unsubscribes. Errors on session/channel teardown — the
+  /// storage provider resubscribes when connectivity returns, so like
+  /// [blockCoverageStream] this doesn't reset the channel itself.
+  Stream<pb.StorageUpdate> storageDiscoveryStream({
+    int intervalSecs = 30,
+  }) async* {
+    final session = await _sessionOrInit();
+    final op = session.storageDiscoverySubscribe(intervalSecs: intervalSecs);
+    try {
+      yield* op.updates;
+    } finally {
+      final id = op.id;
+      if (id != null) {
+        await cancelOperation(id);
+      }
+    }
+  }
+
   /// Version of the *running* daemon, read from `StatusReply.version`.
   ///
   /// Returns null when the daemon isn't reachable, or when it predates the

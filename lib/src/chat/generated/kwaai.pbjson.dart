@@ -15,6 +15,22 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+@$core.Deprecated('Use storageReachabilityDescriptor instead')
+const StorageReachability$json = {
+  '1': 'StorageReachability',
+  '2': [
+    {'1': 'STORAGE_REACHABILITY_UNKNOWN', '2': 0},
+    {'1': 'STORAGE_REACHABILITY_REACHABLE', '2': 1},
+    {'1': 'STORAGE_REACHABILITY_UNREACHABLE', '2': 2},
+  ],
+};
+
+/// Descriptor for `StorageReachability`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List storageReachabilityDescriptor = $convert.base64Decode(
+    'ChNTdG9yYWdlUmVhY2hhYmlsaXR5EiAKHFNUT1JBR0VfUkVBQ0hBQklMSVRZX1VOS05PV04QAB'
+    'IiCh5TVE9SQUdFX1JFQUNIQUJJTElUWV9SRUFDSEFCTEUQARIkCiBTVE9SQUdFX1JFQUNIQUJJ'
+    'TElUWV9VTlJFQUNIQUJMRRAC');
+
 @$core.Deprecated('Use clientFrameDescriptor instead')
 const ClientFrame$json = {
   '1': 'ClientFrame',
@@ -74,6 +90,15 @@ const ClientFrame$json = {
       '9': 0,
       '10': 'blockCoverage'
     },
+    {
+      '1': 'storage_discovery',
+      '3': 16,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.StorageDiscoveryRequest',
+      '9': 0,
+      '10': 'storageDiscovery'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -88,7 +113,9 @@ final $typed_data.Uint8List clientFrameDescriptor = $convert.base64Decode(
     'RSdW5SZXF1ZXN0SABSCHNoYXJkUnVuEjEKBnN0YXR1cxgNIAEoCzIXLmt3YWFpLnYxLlN0YXR1'
     'c1JlcXVlc3RIAFIGc3RhdHVzEioKBmNhbmNlbBgOIAEoCzIQLmt3YWFpLnYxLkNhbmNlbEgAUg'
     'ZjYW5jZWwSRwoOYmxvY2tfY292ZXJhZ2UYDyABKAsyHi5rd2FhaS52MS5CbG9ja0NvdmVyYWdl'
-    'UmVxdWVzdEgAUg1ibG9ja0NvdmVyYWdlQgYKBGJvZHk=');
+    'UmVxdWVzdEgAUg1ibG9ja0NvdmVyYWdlElAKEXN0b3JhZ2VfZGlzY292ZXJ5GBAgASgLMiEua3'
+    'dhYWkudjEuU3RvcmFnZURpc2NvdmVyeVJlcXVlc3RIAFIQc3RvcmFnZURpc2NvdmVyeUIGCgRi'
+    'b2R5');
 
 @$core.Deprecated('Use serverFrameDescriptor instead')
 const ServerFrame$json = {
@@ -149,6 +176,15 @@ const ServerFrame$json = {
       '9': 0,
       '10': 'blockCoverage'
     },
+    {
+      '1': 'storage',
+      '3': 16,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.StorageUpdate',
+      '9': 0,
+      '10': 'storage'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -162,7 +198,8 @@ final $typed_data.Uint8List serverFrameDescriptor = $convert.base64Decode(
     'BXRva2VuEiQKBGRvbmUYDCABKAsyDi5rd2FhaS52MS5Eb25lSABSBGRvbmUSJwoFZXJyb3IYDS'
     'ABKAsyDy5rd2FhaS52MS5FcnJvckgAUgVlcnJvchIvCgZzdGF0dXMYDiABKAsyFS5rd2FhaS52'
     'MS5TdGF0dXNSZXBseUgAUgZzdGF0dXMSRgoOYmxvY2tfY292ZXJhZ2UYDyABKAsyHS5rd2FhaS'
-    '52MS5CbG9ja0NvdmVyYWdlVXBkYXRlSABSDWJsb2NrQ292ZXJhZ2VCBgoEYm9keQ==');
+    '52MS5CbG9ja0NvdmVyYWdlVXBkYXRlSABSDWJsb2NrQ292ZXJhZ2USMwoHc3RvcmFnZRgQIAEo'
+    'CzIXLmt3YWFpLnYxLlN0b3JhZ2VVcGRhdGVIAFIHc3RvcmFnZUIGCgRib2R5');
 
 @$core.Deprecated('Use cancelDescriptor instead')
 const Cancel$json = {
@@ -423,6 +460,79 @@ final $typed_data.Uint8List blockCoverageUpdateDescriptor = $convert.base64Decod
     'dG90YWxfYmxvY2tzGAQgASgNUgt0b3RhbEJsb2NrcxIlCg5jb3ZlcmVkX2Jsb2NrcxgFIAEoDV'
     'INY292ZXJlZEJsb2NrcxIjCg1mdWxsX2NvdmVyYWdlGAYgASgIUgxmdWxsQ292ZXJhZ2USKQoF'
     'cGVlcnMYByADKAsyEy5rd2FhaS52MS5CbG9ja1BlZXJSBXBlZXJz');
+
+@$core.Deprecated('Use storageDiscoveryRequestDescriptor instead')
+const StorageDiscoveryRequest$json = {
+  '1': 'StorageDiscoveryRequest',
+  '2': [
+    {'1': 'subscribe', '3': 1, '4': 1, '5': 8, '10': 'subscribe'},
+    {'1': 'interval_secs', '3': 2, '4': 1, '5': 13, '10': 'intervalSecs'},
+    {'1': 'skip_probes', '3': 3, '4': 1, '5': 8, '10': 'skipProbes'},
+  ],
+};
+
+/// Descriptor for `StorageDiscoveryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List storageDiscoveryRequestDescriptor = $convert.base64Decode(
+    'ChdTdG9yYWdlRGlzY292ZXJ5UmVxdWVzdBIcCglzdWJzY3JpYmUYASABKAhSCXN1YnNjcmliZR'
+    'IjCg1pbnRlcnZhbF9zZWNzGAIgASgNUgxpbnRlcnZhbFNlY3MSHwoLc2tpcF9wcm9iZXMYAyAB'
+    'KAhSCnNraXBQcm9iZXM=');
+
+@$core.Deprecated('Use storagePeerDescriptor instead')
+const StoragePeer$json = {
+  '1': 'StoragePeer',
+  '2': [
+    {'1': 'peer_id', '3': 1, '4': 1, '5': 9, '10': 'peerId'},
+    {'1': 'public_name', '3': 2, '4': 1, '5': 9, '10': 'publicName'},
+    {'1': 'mode', '3': 3, '4': 1, '5': 9, '10': 'mode'},
+    {'1': 'vpk_version', '3': 4, '4': 1, '5': 9, '10': 'vpkVersion'},
+    {'1': 'capacity_gb', '3': 5, '4': 1, '5': 1, '10': 'capacityGb'},
+    {'1': 'tenant_count', '3': 6, '4': 1, '5': 13, '10': 'tenantCount'},
+    {
+      '1': 'reachability',
+      '3': 7,
+      '4': 1,
+      '5': 14,
+      '6': '.kwaai.v1.StorageReachability',
+      '10': 'reachability'
+    },
+    {'1': 'capacity_gb_free', '3': 8, '4': 1, '5': 1, '10': 'capacityGbFree'},
+    {'1': 'trust_score', '3': 9, '4': 1, '5': 1, '10': 'trustScore'},
+    {'1': 'trust_tier', '3': 10, '4': 1, '5': 9, '10': 'trustTier'},
+  ],
+};
+
+/// Descriptor for `StoragePeer`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List storagePeerDescriptor = $convert.base64Decode(
+    'CgtTdG9yYWdlUGVlchIXCgdwZWVyX2lkGAEgASgJUgZwZWVySWQSHwoLcHVibGljX25hbWUYAi'
+    'ABKAlSCnB1YmxpY05hbWUSEgoEbW9kZRgDIAEoCVIEbW9kZRIfCgt2cGtfdmVyc2lvbhgEIAEo'
+    'CVIKdnBrVmVyc2lvbhIfCgtjYXBhY2l0eV9nYhgFIAEoAVIKY2FwYWNpdHlHYhIhCgx0ZW5hbn'
+    'RfY291bnQYBiABKA1SC3RlbmFudENvdW50EkEKDHJlYWNoYWJpbGl0eRgHIAEoDjIdLmt3YWFp'
+    'LnYxLlN0b3JhZ2VSZWFjaGFiaWxpdHlSDHJlYWNoYWJpbGl0eRIoChBjYXBhY2l0eV9nYl9mcm'
+    'VlGAggASgBUg5jYXBhY2l0eUdiRnJlZRIfCgt0cnVzdF9zY29yZRgJIAEoAVIKdHJ1c3RTY29y'
+    'ZRIdCgp0cnVzdF90aWVyGAogASgJUgl0cnVzdFRpZXI=');
+
+@$core.Deprecated('Use storageUpdateDescriptor instead')
+const StorageUpdate$json = {
+  '1': 'StorageUpdate',
+  '2': [
+    {'1': 'server_time', '3': 1, '4': 1, '5': 9, '10': 'serverTime'},
+    {'1': 'probes_pending', '3': 2, '4': 1, '5': 8, '10': 'probesPending'},
+    {
+      '1': 'peers',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.kwaai.v1.StoragePeer',
+      '10': 'peers'
+    },
+  ],
+};
+
+/// Descriptor for `StorageUpdate`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List storageUpdateDescriptor = $convert.base64Decode(
+    'Cg1TdG9yYWdlVXBkYXRlEh8KC3NlcnZlcl90aW1lGAEgASgJUgpzZXJ2ZXJUaW1lEiUKDnByb2'
+    'Jlc19wZW5kaW5nGAIgASgIUg1wcm9iZXNQZW5kaW5nEisKBXBlZXJzGAMgAygLMhUua3dhYWku'
+    'djEuU3RvcmFnZVBlZXJSBXBlZXJz');
 
 @$core.Deprecated('Use chatMessageDescriptor instead')
 const ChatMessage$json = {
