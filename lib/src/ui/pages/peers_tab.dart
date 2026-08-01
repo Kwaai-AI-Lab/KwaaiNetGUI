@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../chat/generated/kwaai.pb.dart' as pb;
@@ -78,15 +79,27 @@ class _PeersTabState extends ConsumerState<PeersTab> {
   /// appear during silence. Nothing else would rebuild the view.
   Timer? _staleTicker;
 
+  /// Whether the view was stale at the last tick.
+  ///
+  /// The ticker only calls setState when this *changes*. Rebuilding the whole
+  /// page every 5s to redraw one chip is what makes a tab with two data tables
+  /// on it feel wedged — the staleness cue is a binary state, so it only needs
+  /// a rebuild when it flips.
+  bool _wasStale = false;
+
   @override
   void initState() {
     super.initState();
-    _staleTicker = Timer.periodic(
-      peersStaleTick,
-      (_) {
-        if (mounted) setState(() {});
-      },
-    );
+    _staleTicker = Timer.periodic(peersStaleTick, (_) {
+      if (!mounted) return;
+      final arrived = _lastArrived;
+      final stale =
+          arrived != null &&
+          DateTime.now().difference(arrived) > peersStaleAfter;
+      if (stale != _wasStale) {
+        setState(() => _wasStale = stale);
+      }
+    });
   }
 
   @override
@@ -99,7 +112,11 @@ class _PeersTabState extends ConsumerState<PeersTab> {
   Widget build(BuildContext context) {
     final network = ref.watch(peersProvider);
     final fresh = network.valueOrNull;
-    if (fresh != null) {
+    // Identity, not equality: `valueOrNull` re-serves the last emitted value on
+    // every rebuild, so stamping the arrival time whenever it is non-null would
+    // reset the clock each tick and the staleness cue could never fire. Only a
+    // genuinely new object is a new arrival.
+    if (fresh != null && !identical(fresh, _last)) {
       _last = fresh;
       _lastArrived = DateTime.now();
     }
@@ -140,7 +157,9 @@ class _PeersTabState extends ConsumerState<PeersTab> {
     }
 
     final arrived = _lastArrived;
-    final staleFor = arrived == null ? null : DateTime.now().difference(arrived);
+    final staleFor = arrived == null
+        ? null
+        : DateTime.now().difference(arrived);
     final stale = staleFor != null && staleFor > peersStaleAfter;
 
     return Column(
@@ -170,8 +189,8 @@ class _PeersTabState extends ConsumerState<PeersTab> {
   }
 
   void _togglePeer(String peerId) => setState(() {
-        _selectedPeerId = _selectedPeerId == peerId ? null : peerId;
-      });
+    _selectedPeerId = _selectedPeerId == peerId ? null : peerId;
+  });
 }
 
 /// Secondary detail under the unavailable headline: the daemon's own message,
@@ -191,7 +210,8 @@ class _UnavailableDetail extends StatelessWidget {
     // Only surfaced for the one code that names a specific, fixable cause.
     // Anything else gets the message alone.
     final needsNative =
-        error is SessionOpError && (error as SessionOpError).code == _unimplemented;
+        error is SessionOpError &&
+        (error as SessionOpError).code == _unimplemented;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -224,6 +244,41 @@ class _UnavailableDetail extends StatelessWidget {
 /// `Error.Code.UNIMPLEMENTED` from kwaai.proto.
 const _unimplemented = 6;
 
+/// Copies a value to the clipboard.
+///
+/// Replaces selectable text on this page: the addresses and peer ids here are
+/// the things a user wants to paste elsewhere, but making them selectable costs
+/// a text-editing pipeline per line on every rebuild, and this page rebuilds
+/// often. A button is built once and does the same job.
+class _CopyButton extends StatelessWidget {
+  const _CopyButton({required this.text, required this.label});
+
+  final String text;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.copy_outlined, size: 13),
+      iconSize: 13,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+      tooltip: 'Copy $label',
+      onPressed: () async {
+        await Clipboard.setData(ClipboardData(text: text));
+        if (!context.mounted) return;
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(
+            content: Text('$label copied'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// This node's own position: reachability, relay use, and the addresses it
 /// listens on or has been observed at.
 class _SelfStatusHeader extends StatelessWidget {
@@ -250,20 +305,25 @@ class _SelfStatusHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        // Wrap, not Row: the badge text grows with the reachability source and
+        // the counts grow with the network, so on a narrow window this line
+        // genuinely cannot fit. Wrapping re-flows it instead of overflowing.
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 6,
           children: [
             Text('This node', style: theme.textTheme.titleSmall),
-            const SizedBox(width: 12),
             if (s != null) _ReachabilityBadge(self: s),
-            const Spacer(),
             if (stale && staleFor != null)
               _StaleChip(staleFor: staleFor!)
             else
               Text(
                 '$connectedCount connected · $routingCount in routing table',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.textTheme.bodySmall?.color
-                      ?.withValues(alpha: 0.75),
+                  color: theme.textTheme.bodySmall?.color?.withValues(
+                    alpha: 0.75,
+                  ),
                 ),
               ),
           ],
@@ -324,10 +384,10 @@ class _ReachabilityBadge extends StatelessWidget {
       ),
       child: Text(
         parts.join(' · '),
-        style: Theme.of(context)
-            .textTheme
-            .bodySmall
-            ?.copyWith(color: color, fontWeight: FontWeight.w600),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -349,10 +409,9 @@ class _StaleChip extends StatelessWidget {
       ),
       child: Text(
         'No update for ${staleFor.inSeconds}s',
-        style: Theme.of(context)
-            .textTheme
-            .bodySmall
-            ?.copyWith(color: kwaai.semanticWarning),
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: kwaai.semanticWarning),
       ),
     );
   }
@@ -384,8 +443,16 @@ class _AddressLine extends StatelessWidget {
         children: [
           SizedBox(width: 74, child: Text(label, style: labelStyle)),
           Expanded(
-            child: SelectableText(values.join('\n'), style: monoStyle),
+            // Plain Text, not SelectableText. This page rebuilds on every
+            // update *and* every stale tick, and each SelectableText builds a
+            // gesture-recognizer and text-editing pipeline on construction —
+            // enough, repeated across the address lines, to blow the frame
+            // budget and make the tab feel wedged. Copying an address is served
+            // by the tap-to-copy button instead, which costs nothing to build.
+            child: Text(values.join('\n'), style: monoStyle),
           ),
+          if (values.isNotEmpty)
+            _CopyButton(text: values.join('\n'), label: label),
         ],
       ),
     );
@@ -398,6 +465,13 @@ class _AddressLine extends StatelessWidget {
 /// and the routing table overlap without either containing the other, so
 /// nesting them would imply a containment that does not hold. The `IN TABLE` /
 /// `CONNECTED` columns make the overlap visible instead.
+///
+/// Each section gets a *bounded* share of the height and scrolls internally.
+/// That bound is load-bearing, not cosmetic: a `DataTable` sizes itself to its
+/// content, and inside a vertically-scrolling parent it is laid out against an
+/// unbounded height, which costs ~25ms per frame at twenty rows versus ~0.1ms
+/// when bounded. Putting these tables in a ListView is what made this page
+/// feel like it hung. `test/peers_layout_test.dart` measures it.
 class _TableSection extends StatelessWidget {
   const _TableSection({
     required this.connected,
@@ -414,47 +488,133 @@ class _TableSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final routingIds = {for (final r in routing) r.peerId};
+    // First match: a peer with both a direct and a relayed path has two rows,
+    // and their protocol lists come from the same identify, so either serves.
+    final selectedConnection = selectedPeerId == null
+        ? null
+        : connected.where((p) => p.peerId == selectedPeerId).firstOrNull;
 
-    return ListView(
-      padding: EdgeInsets.zero,
+    // Connections get the larger share: it is the primary table, and routing
+    // entries are one narrow column. Both are flex rather than fixed so the
+    // split holds at any window height.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Caption(
           title: 'CONNECTIONS',
           detail: connected.isEmpty
               ? null
               : '${connected.length} live '
-                  '${connected.length == 1 ? 'connection' : 'connections'}',
+                    '${connected.length == 1 ? 'connection' : 'connections'}',
         ),
-        if (connected.isEmpty)
-          const _EmptyRow(text: 'No active connections.')
-        else
-          _ConnectedTable(
-            peers: connected,
-            routingIds: routingIds,
-            selectedPeerId: selectedPeerId,
-            onSelectPeer: onSelectPeer,
-          ),
+        Expanded(
+          flex: 3,
+          child: connected.isEmpty
+              ? const _EmptyRow(text: 'No active connections.')
+              : _ConnectedTable(
+                  peers: connected,
+                  routingIds: routingIds,
+                  selectedPeerId: selectedPeerId,
+                  onSelectPeer: onSelectPeer,
+                ),
+        ),
+        // Detail for the selected connection. One widget for the whole table
+        // rather than a tooltip per row — same information, none of the
+        // per-row animation cost.
+        if (selectedConnection != null)
+          _SelectedPeerDetail(peer: selectedConnection),
+        Divider(height: 1, color: context.kwaai.divider),
         _Caption(
           title: 'DHT ROUTING TABLE',
           detail: routing.isEmpty
               ? null
               : '${routing.length} known '
-                  '${routing.length == 1 ? 'peer' : 'peers'}',
+                    '${routing.length == 1 ? 'peer' : 'peers'}',
         ),
-        if (routing.isEmpty)
-          // Not an error state. Kademlia stays in client mode — adding
-          // nothing — until reachability resolves, so a node that has just
-          // started legitimately has connections and an empty table.
-          const _EmptyRow(
-            text: 'Empty. The routing table fills once reachability is known.',
-          )
-        else
-          _RoutingTable(
-            peers: routing,
-            selectedPeerId: selectedPeerId,
-            onSelectPeer: onSelectPeer,
-          ),
+        Expanded(
+          flex: 2,
+          child: routing.isEmpty
+              // Not an error state. Kademlia stays in client mode — adding
+              // nothing — until reachability resolves, so a node that has just
+              // started legitimately has connections and an empty table.
+              ? const _EmptyRow(
+                  text:
+                      'Empty. The routing table fills once reachability is known.',
+                )
+              : _RoutingTable(
+                  peers: routing,
+                  selectedPeerId: selectedPeerId,
+                  onSelectPeer: onSelectPeer,
+                ),
+        ),
       ],
+    );
+  }
+}
+
+/// Full detail for the selected connection — chiefly the protocol list, which
+/// the table shows only as a count.
+class _SelectedPeerDetail extends StatelessWidget {
+  const _SelectedPeerDetail({required this.peer});
+
+  final pb.ConnectedPeer peer;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final kwaai = context.kwaai;
+    final monoStyle = theme.textTheme.bodySmall?.copyWith(
+      fontFamily: 'Menlo',
+      fontFamilyFallback: const ['Consolas', 'monospace'],
+    );
+    final labelStyle = theme.textTheme.labelSmall?.copyWith(
+      letterSpacing: 0.6,
+      color: theme.textTheme.labelSmall?.color?.withValues(alpha: 0.75),
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+      color: kwaai.accentPrimary.withValues(alpha: 0.06),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('SELECTED', style: labelStyle),
+              const SizedBox(width: 10),
+              Expanded(child: Text(peer.peerId, style: monoStyle)),
+              _CopyButton(text: peer.peerId, label: 'Peer ID'),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(width: 74, child: Text('Address', style: labelStyle)),
+              Expanded(child: Text(peer.addr, style: monoStyle)),
+              _CopyButton(text: peer.addr, label: 'Address'),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(width: 74, child: Text('Protocols', style: labelStyle)),
+              Expanded(
+                child: Text(
+                  peer.protocols.isEmpty
+                      // Not "speaks nothing": identify completes shortly after
+                      // the connection does.
+                      ? 'Identify has not completed yet'
+                      : peer.protocols.join('\n'),
+                  style: monoStyle,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -538,96 +698,97 @@ class _ConnectedTable extends StatelessWidget {
     );
     final selectedFill = kwaai.accentPrimary.withValues(alpha: 0.16);
 
+    // Vertical scroll outside, horizontal inside — the same nesting the VPK
+    // table uses. The outer one is what gives the DataTable a bounded height
+    // to lay out against; without it (a ListView parent, say) the table is
+    // measured against infinity on every frame.
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minWidth: constraints.maxWidth),
-          child: DataTable(
-            headingRowHeight: 32,
-            dataRowMinHeight: 30,
-            dataRowMaxHeight: 34,
-            columnSpacing: 20,
-            horizontalMargin: 16,
-            showCheckboxColumn: false,
-            columns: [
-              DataColumn(label: Text('PATH', style: headStyle)),
-              DataColumn(label: Text('DIR', style: headStyle)),
-              DataColumn(label: Text('RTT', style: headStyle), numeric: true),
-              DataColumn(label: Text('ROLE', style: headStyle)),
-              DataColumn(label: Text('IN TABLE', style: headStyle)),
-              DataColumn(label: Text('VERSION', style: headStyle)),
-              DataColumn(label: Text('PROTOCOLS', style: headStyle), numeric: true),
-              DataColumn(label: Text('PEER ID', style: headStyle)),
-              DataColumn(label: Text('ADDRESS', style: headStyle)),
-            ],
-            rows: [
-              for (final p in peers)
-                DataRow(
-                  selected: p.peerId == selectedPeerId,
-                  color: WidgetStateProperty.resolveWith(
-                    (states) => states.contains(WidgetState.selected)
-                        ? selectedFill
-                        : null,
-                  ),
-                  onSelectChanged: (_) => onSelectPeer(p.peerId),
-                  cells: [
-                    DataCell(_PathCell(kind: p.kind)),
-                    DataCell(Text(p.direction, style: cellStyle)),
-                    DataCell(
-                      Text(
-                        // 0 means no ping has completed yet, not zero latency.
-                        p.rttMs == 0 ? '—' : '${p.rttMs} ms',
-                        style: cellStyle,
-                      ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: DataTable(
+              headingRowHeight: 32,
+              dataRowMinHeight: 30,
+              dataRowMaxHeight: 34,
+              columnSpacing: 20,
+              horizontalMargin: 16,
+              showCheckboxColumn: false,
+              columns: [
+                DataColumn(label: Text('PATH', style: headStyle)),
+                DataColumn(label: Text('DIR', style: headStyle)),
+                DataColumn(label: Text('RTT', style: headStyle), numeric: true),
+                DataColumn(label: Text('ROLE', style: headStyle)),
+                DataColumn(label: Text('IN TABLE', style: headStyle)),
+                DataColumn(label: Text('VERSION', style: headStyle)),
+                DataColumn(
+                  label: Text('PROTOCOLS', style: headStyle),
+                  numeric: true,
+                ),
+                DataColumn(label: Text('PEER ID', style: headStyle)),
+                DataColumn(label: Text('ADDRESS', style: headStyle)),
+              ],
+              rows: [
+                for (final p in peers)
+                  DataRow(
+                    selected: p.peerId == selectedPeerId,
+                    color: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.selected)
+                          ? selectedFill
+                          : null,
                     ),
-                    DataCell(_RoleCell(peer: p)),
-                    DataCell(
-                      Icon(
-                        routingIds.contains(p.peerId)
-                            ? Icons.check
-                            : Icons.remove,
-                        size: 14,
-                        color: routingIds.contains(p.peerId)
-                            ? kwaai.statusRunning
-                            : theme.dividerColor,
+                    onSelectChanged: (_) => onSelectPeer(p.peerId),
+                    cells: [
+                      DataCell(_PathCell(kind: p.kind)),
+                      DataCell(Text(p.direction, style: cellStyle)),
+                      DataCell(
+                        Text(
+                          // 0 means no ping has completed yet, not zero latency.
+                          p.rttMs == 0 ? '—' : '${p.rttMs} ms',
+                          style: cellStyle,
+                        ),
                       ),
-                    ),
-                    DataCell(
-                      Text(
-                        p.agentVersion.isEmpty ? '—' : p.agentVersion,
-                        style: cellStyle,
+                      DataCell(_RoleCell(peer: p)),
+                      DataCell(
+                        Icon(
+                          routingIds.contains(p.peerId)
+                              ? Icons.check
+                              : Icons.remove,
+                          size: 14,
+                          color: routingIds.contains(p.peerId)
+                              ? kwaai.statusRunning
+                              : theme.dividerColor,
+                        ),
                       ),
-                    ),
-                    DataCell(
+                      DataCell(
+                        Text(
+                          p.agentVersion.isEmpty ? '—' : p.agentVersion,
+                          style: cellStyle,
+                        ),
+                      ),
                       // Collapsed to a count: the list is long and mostly
                       // uninteresting per row, but its size is a quick read on
-                      // whether identify has landed.
-                      Tooltip(
-                        message: p.protocols.isEmpty
-                            ? 'Identify has not completed yet'
-                            : p.protocols.join('\n'),
-                        child: Text(
+                      // whether identify has landed. Selecting the row shows
+                      // the full list below the table.
+                      //
+                      // No Tooltip here, and none on the address. A Tooltip
+                      // runs an AnimationController, so one per cell means two
+                      // per row all ticking every frame: 0.05ms/frame becomes
+                      // ~14ms at twenty rows, which is what made this page feel
+                      // like it hung. `test/peers_layout_test.dart` guards it.
+                      DataCell(
+                        Text(
                           p.protocols.isEmpty ? '—' : '${p.protocols.length}',
                           style: cellStyle,
                         ),
                       ),
-                    ),
-                    DataCell(
-                      Text(
-                        _shortPeerId(p.peerId),
-                        style: monoStyle,
-                      ),
-                    ),
-                    DataCell(
-                      Tooltip(
-                        message: p.addr,
-                        child: Text(p.addr, style: monoStyle),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
+                      DataCell(Text(_shortPeerId(p.peerId), style: monoStyle)),
+                      DataCell(Text(p.addr, style: monoStyle)),
+                    ],
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -658,46 +819,52 @@ class _RoutingTable extends StatelessWidget {
     );
     final selectedFill = kwaai.accentPrimary.withValues(alpha: 0.16);
 
+    // Vertical scroll outside, horizontal inside — the same nesting the VPK
+    // table uses. The outer one is what gives the DataTable a bounded height
+    // to lay out against; without it (a ListView parent, say) the table is
+    // measured against infinity on every frame.
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minWidth: constraints.maxWidth),
-          child: DataTable(
-            headingRowHeight: 32,
-            dataRowMinHeight: 30,
-            dataRowMaxHeight: 34,
-            columnSpacing: 20,
-            horizontalMargin: 16,
-            showCheckboxColumn: false,
-            columns: [
-              DataColumn(label: Text('CONNECTED', style: headStyle)),
-              DataColumn(label: Text('PEER ID', style: headStyle)),
-            ],
-            rows: [
-              for (final p in peers)
-                DataRow(
-                  selected: p.peerId == selectedPeerId,
-                  color: WidgetStateProperty.resolveWith(
-                    (states) => states.contains(WidgetState.selected)
-                        ? selectedFill
-                        : null,
-                  ),
-                  onSelectChanged: (_) => onSelectPeer(p.peerId),
-                  cells: [
-                    DataCell(
-                      Icon(
-                        p.connected ? Icons.check : Icons.remove,
-                        size: 14,
-                        color: p.connected
-                            ? kwaai.statusRunning
-                            : theme.dividerColor,
-                      ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: DataTable(
+              headingRowHeight: 32,
+              dataRowMinHeight: 30,
+              dataRowMaxHeight: 34,
+              columnSpacing: 20,
+              horizontalMargin: 16,
+              showCheckboxColumn: false,
+              columns: [
+                DataColumn(label: Text('CONNECTED', style: headStyle)),
+                DataColumn(label: Text('PEER ID', style: headStyle)),
+              ],
+              rows: [
+                for (final p in peers)
+                  DataRow(
+                    selected: p.peerId == selectedPeerId,
+                    color: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.selected)
+                          ? selectedFill
+                          : null,
                     ),
-                    DataCell(Text(p.peerId, style: monoStyle)),
-                  ],
-                ),
-            ],
+                    onSelectChanged: (_) => onSelectPeer(p.peerId),
+                    cells: [
+                      DataCell(
+                        Icon(
+                          p.connected ? Icons.check : Icons.remove,
+                          size: 14,
+                          color: p.connected
+                              ? kwaai.statusRunning
+                              : theme.dividerColor,
+                        ),
+                      ),
+                      DataCell(Text(p.peerId, style: monoStyle)),
+                    ],
+                  ),
+              ],
+            ),
           ),
         ),
       ),
