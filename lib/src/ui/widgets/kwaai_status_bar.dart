@@ -79,10 +79,7 @@ class KwaaiStatusBar extends StatelessWidget {
           Icon(icon ?? defaultIcon, size: 16, color: color),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              message,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            child: Text(message, style: Theme.of(context).textTheme.bodyMedium),
           ),
           if (action != null) ...[const SizedBox(width: 8), action!],
           if (onDismiss != null) ...[
@@ -98,10 +95,9 @@ class KwaaiStatusBar extends StatelessWidget {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 // Neutral gray — keeps the dismiss affordance from
                 // competing with the severity color of the icon + wash.
-                foregroundColor: Theme.of(context)
-                    .colorScheme
-                    .onSurfaceVariant
-                    .withValues(alpha: 0.6),
+                foregroundColor: Theme.of(
+                  context,
+                ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
               ),
             ),
           ],

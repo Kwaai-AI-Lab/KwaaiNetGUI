@@ -204,11 +204,10 @@ class DaemonController {
       // KWAAINET_NO_AUTO_UPDATE guard in kwaainet's node.rs.
       final env = Map<String, String>.from(Platform.environment)
         ..['KWAAINET_NO_AUTO_UPDATE'] = '1';
-      final p = await Process.start(
-        res.path,
-        ['start', '--daemon'],
-        environment: env,
-      );
+      final p = await Process.start(res.path, [
+        'start',
+        '--daemon',
+      ], environment: env);
       _log('spawned pid ${p.pid} (piped — stdout/stderr will appear below)');
 
       p.stdout

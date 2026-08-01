@@ -12,10 +12,10 @@ import '../chat/kwaai_rpc_client.dart';
 /// resubscribes — whenever the daemon goes away and comes back.
 final blockCoverageProvider =
     StreamProvider.autoDispose<pb.BlockCoverageUpdate>((ref) async* {
-  final client = ref.watch(kwaaiRpcClientProvider);
-  final conn = ref.watch(kwaaiRpcConnectionProvider).valueOrNull;
-  if (conn != RpcConnection.connected) {
-    return;
-  }
-  yield* client.blockCoverageStream();
-});
+      final client = ref.watch(kwaaiRpcClientProvider);
+      final conn = ref.watch(kwaaiRpcConnectionProvider).valueOrNull;
+      if (conn != RpcConnection.connected) {
+        return;
+      }
+      yield* client.blockCoverageStream();
+    });

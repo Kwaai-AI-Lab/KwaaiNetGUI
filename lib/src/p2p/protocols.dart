@@ -31,7 +31,7 @@ const protocolDescriptions = <String, String>{
   // caught by an /ipfs/id/+ pattern.
   '/p2p/id/delta/+':
       'Identify delta — sends only the protocols that changed, not a full '
-          'identify',
+      'identify',
   '/ipfs/ping/+': 'Ping — liveness and round-trip time',
   '/ipfs/kad/+': 'Kademlia DHT — serves peer and content lookups',
 

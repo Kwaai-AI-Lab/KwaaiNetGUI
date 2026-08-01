@@ -85,9 +85,7 @@ class _KwaaiDropdownState<T> extends State<KwaaiDropdown<T>> {
   /// either collapses to its content (just the selection) or expands to
   /// the parent's loose constraints.
   double _widestLabelWidth(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodyMedium?.copyWith(
-      height: 1.0,
-    );
+    final style = Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.0);
     final textScale = MediaQuery.textScalerOf(context);
     double maxW = 0;
     for (final item in widget.items) {
@@ -231,7 +229,12 @@ class _KwaaiDropdownState<T> extends State<KwaaiDropdown<T>> {
                 decoration: BoxDecoration(
                   borderRadius: radius,
                   boxShadow: _focused
-                      ? [BoxShadow(color: accent.withValues(alpha: 0.25), blurRadius: 3)]
+                      ? [
+                          BoxShadow(
+                            color: accent.withValues(alpha: 0.25),
+                            blurRadius: 3,
+                          ),
+                        ]
                       : const [],
                 ),
                 child: IgnorePointer(
@@ -242,8 +245,10 @@ class _KwaaiDropdownState<T> extends State<KwaaiDropdown<T>> {
                       hintText: widget.hintText,
                       hintStyle: Theme.of(context).textTheme.bodyMedium
                           ?.copyWith(
-                        color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
-                      ),
+                            color: scheme.onSurfaceVariant.withValues(
+                              alpha: 0.5,
+                            ),
+                          ),
                       isDense: true,
                       filled: true,
                       fillColor: fillColor,
@@ -269,8 +274,9 @@ class _KwaaiDropdownState<T> extends State<KwaaiDropdown<T>> {
                     ),
                     child: Text(
                       _selectedLabel ?? '',
-                      style: Theme.of(context).textTheme.bodyMedium
-                          ?.copyWith(height: 1.0),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(height: 1.0),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -340,10 +346,9 @@ class _MenuRowState<T> extends State<_MenuRow<T>> {
                 const SizedBox(width: 4),
                 Text(
                   widget.label,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    height: 1.0,
-                    color: hoverFg,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(height: 1.0, color: hoverFg),
                 ),
               ],
             ),

@@ -90,14 +90,10 @@ class TrayController with TrayListener {
     // Surface "Update available" in the menu. Uses updateTrayProvider, which
     // ignores the session-only "Later" (a tray affordance persists; only a
     // durable "Skip" suppresses it).
-    _updateSub = _container.listen<ReleaseInfo?>(
-      updateTrayProvider,
-      (_, next) {
-        _pendingUpdate = next;
-        _rebuildMenu();
-      },
-      fireImmediately: true,
-    );
+    _updateSub = _container.listen<ReleaseInfo?>(updateTrayProvider, (_, next) {
+      _pendingUpdate = next;
+      _rebuildMenu();
+    }, fireImmediately: true);
 
     await _rebuildMenu();
   }

@@ -19,7 +19,9 @@ import '../chat/kwaai_rpc_client.dart';
 /// Errors with `SessionOpError(code: UNIMPLEMENTED)` against a daemon running
 /// the Go p2p stack, which has no way to report most of this. The view
 /// renders that as an unavailable state rather than an error.
-final peersProvider = StreamProvider.autoDispose<pb.NetworkUpdate>((ref) async* {
+final peersProvider = StreamProvider.autoDispose<pb.NetworkUpdate>((
+  ref,
+) async* {
   final client = ref.watch(kwaaiRpcClientProvider);
   final conn = ref.watch(kwaaiRpcConnectionProvider).valueOrNull;
   if (conn != RpcConnection.connected) {

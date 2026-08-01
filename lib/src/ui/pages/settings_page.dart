@@ -604,11 +604,13 @@ class _StatusHeader extends ConsumerWidget {
     // answers — including part-way through a start, which is exactly when the
     // selected binary-location row hands the display back over. Hidden once
     // stopped, where those rows carry the versions instead.
-    final stopped = transition == DaemonTransition.none &&
+    final stopped =
+        transition == DaemonTransition.none &&
         status != null &&
         !status.running;
-    final version =
-        stopped ? null : ref.watch(daemonVersionProvider).valueOrNull;
+    final version = stopped
+        ? null
+        : ref.watch(daemonVersionProvider).valueOrNull;
 
     final Color color;
     final textColor = unknown ? cs.onSurfaceVariant : cs.onSurface;
@@ -934,10 +936,7 @@ class _DaemonSourcePickerState extends State<_DaemonSourcePicker> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _RadioRow(
-            value: DaemonMode.builtIn,
-            label: builtInDaemonLabel,
-          ),
+          _RadioRow(value: DaemonMode.builtIn, label: builtInDaemonLabel),
           // "Use system" is only selectable when kwaainet is on PATH.
           _RadioRow(
             value: DaemonMode.system,
@@ -1306,7 +1305,7 @@ class _NetworkTab extends ConsumerWidget {
             const SizedBox(height: 12),
             _FeatureCard(child: _InitialPeersSection(draft: draft)),
             const SizedBox(height: 12),
-            _FeatureCard(child: _AlwaysPrivateSection(draft: draft)),
+            _FeatureCard(child: _ReachabilitySection(draft: draft)),
             const SizedBox(height: 12),
             _FeatureCard(child: _HealthMonitoringSection(draft: draft)),
           ],
@@ -1341,6 +1340,7 @@ bool _tabDirty(int tab, ConfigSnapshot draft, ConfigSnapshot snapshot) {
           draft.publicIp != snapshot.publicIp ||
           !_peersEqual(draft.initialPeers, snapshot.initialPeers) ||
           draft.forcePrivate != snapshot.forcePrivate ||
+          draft.enableUpnp != snapshot.enableUpnp ||
           draft.healthEnabled != snapshot.healthEnabled ||
           draft.healthEndpoint != snapshot.healthEndpoint;
     default:
@@ -1348,8 +1348,8 @@ bool _tabDirty(int tab, ConfigSnapshot draft, ConfigSnapshot snapshot) {
   }
 }
 
-class _AlwaysPrivateSection extends ConsumerWidget {
-  const _AlwaysPrivateSection({required this.draft});
+class _ReachabilitySection extends ConsumerWidget {
+  const _ReachabilitySection({required this.draft});
   final ConfigSnapshot draft;
 
   @override
@@ -1358,12 +1358,21 @@ class _AlwaysPrivateSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const KwaaiHeading('Always private'),
+        const KwaaiHeading('Reachability'),
         const SizedBox(height: 4),
         _SwitchRow(
           label: 'Force private reachability (disable AutoNAT)',
           value: draft.forcePrivate,
           onChanged: notifier.setForcePrivate,
+        ),
+        _SwitchRow(
+          // Off means a genuinely NATed node: no port mapping requested, so
+          // the node falls back to relays and hole punching. That is the
+          // setting to reach for when testing those paths, or when you would
+          // rather the node did not ask the router to open a port.
+          label: 'Map port via UPnP',
+          value: draft.enableUpnp,
+          onChanged: notifier.setEnableUpnp,
         ),
       ],
     );

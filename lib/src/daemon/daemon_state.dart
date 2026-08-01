@@ -80,7 +80,7 @@ final daemonVersionProvider = FutureProvider<String?>((ref) async {
   // once the socket is actually up.
   final connected =
       ref.watch(kwaaiRpcConnectionProvider).valueOrNull ==
-          RpcConnection.connected;
+      RpcConnection.connected;
 
   if (running && connected) {
     // Whatever the daemon says — including null for a daemon older than

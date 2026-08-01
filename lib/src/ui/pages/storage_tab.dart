@@ -91,12 +91,9 @@ class _StorageTabState extends ConsumerState<StorageTab> {
   @override
   void initState() {
     super.initState();
-    _staleTicker = Timer.periodic(
-      storageStaleTick,
-      (_) {
-        if (mounted) setState(() {});
-      },
-    );
+    _staleTicker = Timer.periodic(storageStaleTick, (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -135,13 +132,15 @@ class _StorageTabState extends ConsumerState<StorageTab> {
     final peers = tier == null
         ? update.peers
         : update.peers
-            .where((p) => p.trustTier == tier.wire)
-            .toList(growable: false);
+              .where((p) => p.trustTier == tier.wire)
+              .toList(growable: false);
 
     final totals = StorageTotals.of(peers);
 
     final arrived = _lastArrived;
-    final staleFor = arrived == null ? null : DateTime.now().difference(arrived);
+    final staleFor = arrived == null
+        ? null
+        : DateTime.now().difference(arrived);
     final stale = staleFor != null && staleFor > storageStaleAfter;
 
     return Column(
@@ -191,8 +190,8 @@ class _StorageTabState extends ConsumerState<StorageTab> {
   }
 
   void _togglePeer(String peerId) => setState(() {
-        _selectedPeerId = _selectedPeerId == peerId ? null : peerId;
-      });
+    _selectedPeerId = _selectedPeerId == peerId ? null : peerId;
+  });
 }
 
 /// The daemon's trust tiers, in ascending order — mirrors `TrustTier` in
@@ -341,7 +340,8 @@ FreeBand freeBandFor(List<pb.StoragePeer> peers, String? peerId) {
   if (peerId == null) return FreeBand.none;
   var offset = 0.0;
   for (final p in peers) {
-    if (p.reachability != pb.StorageReachability.STORAGE_REACHABILITY_REACHABLE) {
+    if (p.reachability !=
+        pb.StorageReachability.STORAGE_REACHABILITY_REACHABLE) {
       continue;
     }
     if (p.peerId == peerId) {
@@ -424,10 +424,10 @@ class _StorageHeader extends StatelessWidget {
     // gap between them stays visible rather than being implied.
     final summary = probesPending
         ? '${formatCapacity(totals.advertisedGb)} advertised across '
-            '${totals.nodeCount} node(s) — checking reachability…'
+              '${totals.nodeCount} node(s) — checking reachability…'
         : '${formatCapacity(totals.freeGb)} free of '
-            '${formatCapacity(totals.advertisedGb)} advertised across '
-            '${totals.nodeCount} node(s)';
+              '${formatCapacity(totals.advertisedGb)} advertised across '
+              '${totals.nodeCount} node(s)';
 
     return Row(
       children: [
@@ -440,33 +440,28 @@ class _StorageHeader extends StatelessWidget {
             children: [
               Text(
                 summary,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
                 stale
                     ? 'No update for ${describeStorageStaleness(staleFor)} — '
-                        'the daemon has gone quiet'
+                          'the daemon has gone quiet'
                     : '${totals.tenants} tenant(s) · '
-                        '${totals.reachableCount} reachable · '
-                        '${totals.unreachableCount} unreachable',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: onSurfaceVariant),
+                          '${totals.reachableCount} reachable · '
+                          '${totals.unreachableCount} unreachable',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: onSurfaceVariant),
                 overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         ),
         const SizedBox(width: 12),
-        _TrustFilter(
-          value: tierFilter,
-          onChanged: onTierFilterChanged,
-        ),
+        _TrustFilter(value: tierFilter, onChanged: onTierFilterChanged),
       ],
     );
   }
@@ -545,10 +540,9 @@ class _CapacityCylinder extends StatelessWidget {
           totals.pendingCount > 0
               ? 'Checking reachability…'
               : 'No storage capacity discovered',
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: onSurfaceVariant),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: onSurfaceVariant),
         ),
       );
     }
@@ -587,10 +581,12 @@ class _CapacityCylinder extends StatelessWidget {
               dimmed: selectedPeerId != null,
               // The selected node's slice of this zone, and where it
               // starts — both as fractions of the zone itself.
-              highlightFraction:
-                  totals.freeGb > 0 ? band.freeGb / totals.freeGb : 0.0,
-              highlightOffset:
-                  totals.freeGb > 0 ? band.offsetGb / totals.freeGb : 0.0,
+              highlightFraction: totals.freeGb > 0
+                  ? band.freeGb / totals.freeGb
+                  : 0.0,
+              highlightOffset: totals.freeGb > 0
+                  ? band.offsetGb / totals.freeGb
+                  : 0.0,
               highlightLabel: selected?.publicName.isEmpty ?? true
                   ? selected?.peerId
                   : selected?.publicName,
@@ -666,7 +662,7 @@ class _CapacityZone extends StatelessWidget {
       child: Tooltip(
         message: hasHighlight && highlightLabel != null
             ? '$text\n${formatCapacity(amount * highlightFraction)} '
-                'on $highlightLabel'
+                  'on $highlightLabel'
             : text,
         child: Stack(
           fit: StackFit.expand,
@@ -681,10 +677,9 @@ class _CapacityZone extends StatelessWidget {
                   // Floored at a hairline so a peer with very little free
                   // space still shows where it sits, rather than
                   // vanishing into a sub-pixel band.
-                  final width =
-                      (highlightFraction.clamp(0.0, 1.0) * c.maxWidth)
-                          .clamp(2.0, math.max(c.maxWidth - start, 2.0))
-                          .toDouble();
+                  final width = (highlightFraction.clamp(0.0, 1.0) * c.maxWidth)
+                      .clamp(2.0, math.max(c.maxWidth - start, 2.0))
+                      .toDouble();
                   return Stack(
                     children: [
                       Positioned(
@@ -692,9 +687,7 @@ class _CapacityZone extends StatelessWidget {
                         top: 0,
                         bottom: 0,
                         width: width,
-                        child: ColoredBox(
-                          color: color.withValues(alpha: 0.95),
-                        ),
+                        child: ColoredBox(color: color.withValues(alpha: 0.95)),
                       ),
                     ],
                   );
@@ -711,12 +704,10 @@ class _CapacityZone extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.clip,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: dimmed ? 0.5 : 0.9),
-                            ),
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).colorScheme.onSurface
+                              .withValues(alpha: dimmed ? 0.5 : 0.9),
+                        ),
                       ),
                     ),
             ),
@@ -772,10 +763,9 @@ class _TableSection extends StatelessWidget {
                   filtered
                       ? '${peers.length} node(s) — filtered'
                       : 'All storage nodes — ${peers.length}',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(fontWeight: FontWeight.w600),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -825,10 +815,10 @@ class _ShowAllButton extends StatelessWidget {
               const SizedBox(width: 4),
               Text(
                 'Show all',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelSmall
-                    ?.copyWith(color: accent, fontWeight: FontWeight.w600),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: accent,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -863,18 +853,18 @@ class _StorageNodeTable extends StatelessWidget {
         child: Text(
           emptyMessage,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
 
     final kwaai = context.kwaai;
     final headStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-          letterSpacing: 0.6,
-        );
+      fontWeight: FontWeight.w700,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+      letterSpacing: 0.6,
+    );
     final cellStyle = Theme.of(context).textTheme.bodySmall;
     final monoStyle = cellStyle?.copyWith(
       fontFamily: 'Menlo',
@@ -902,7 +892,10 @@ class _StorageNodeTable extends StatelessWidget {
                   label: Text('CAPACITY', style: headStyle),
                   numeric: true,
                 ),
-                DataColumn(label: Text('FREE', style: headStyle), numeric: true),
+                DataColumn(
+                  label: Text('FREE', style: headStyle),
+                  numeric: true,
+                ),
                 DataColumn(
                   label: Text('TENANTS', style: headStyle),
                   numeric: true,
@@ -938,7 +931,8 @@ class _StorageNodeTable extends StatelessWidget {
                           // Free space comes from the probe, so it only
                           // means anything once the node has answered.
                           p.reachability ==
-                                  pb.StorageReachability
+                                  pb
+                                      .StorageReachability
                                       .STORAGE_REACHABILITY_REACHABLE
                               ? formatCapacity(p.capacityGbFree)
                               : '—',
@@ -985,13 +979,13 @@ class _ReachabilityCell extends StatelessWidget {
 
     final (Color color, String label) = switch (peer.reachability) {
       pb.StorageReachability.STORAGE_REACHABILITY_REACHABLE => (
-          kwaai.semanticSuccess,
-          'Reachable',
-        ),
+        kwaai.semanticSuccess,
+        'Reachable',
+      ),
       pb.StorageReachability.STORAGE_REACHABILITY_UNREACHABLE => (
-          kwaai.semanticWarning,
-          'Unreachable',
-        ),
+        kwaai.semanticWarning,
+        'Unreachable',
+      ),
       _ => (onSurfaceVariant, 'Checking…'),
     };
 
@@ -1006,10 +1000,10 @@ class _ReachabilityCell extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: color, fontWeight: FontWeight.w600),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
@@ -1043,10 +1037,10 @@ class _TrustCell extends StatelessWidget {
       message: 'score ${peer.trustScore.toStringAsFixed(2)}',
       child: Text(
         peer.trustTier,
-        style: Theme.of(context)
-            .textTheme
-            .bodySmall
-            ?.copyWith(color: color, fontWeight: FontWeight.w600),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

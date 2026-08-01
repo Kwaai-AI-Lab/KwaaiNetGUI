@@ -105,12 +105,9 @@ class _ShardingTabState extends ConsumerState<ShardingTab> {
   @override
   void initState() {
     super.initState();
-    _staleTicker = Timer.periodic(
-      staleTick,
-      (_) {
-        if (mounted) setState(() {});
-      },
-    );
+    _staleTicker = Timer.periodic(staleTick, (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -150,8 +147,8 @@ class _ShardingTabState extends ConsumerState<ShardingTab> {
     final peers = tier == null
         ? update.peers
         : update.peers
-            .where((p) => p.trustTier == tier.wire)
-            .toList(growable: false);
+              .where((p) => p.trustTier == tier.wire)
+              .toList(growable: false);
     final counts = _peerCounts(peers, update.totalBlocks);
     final covered = counts.where((c) => c > 0).length;
 
@@ -163,15 +160,17 @@ class _ShardingTabState extends ConsumerState<ShardingTab> {
     final tablePeers = block == null
         ? peers
         : peers
-            .where((p) => p.startBlock <= block && block < p.endBlock)
-            .toList(growable: false);
+              .where((p) => p.startBlock <= block && block < p.endBlock)
+              .toList(growable: false);
 
     // Silence is normal — the daemon only sends when something changed —
     // but it promises an unchanged snapshot every heartbeat. Past the
     // threshold that promise has been broken, so what is on screen is no
     // longer known to be current and the header says so.
     final arrived = _lastArrived;
-    final staleFor = arrived == null ? null : DateTime.now().difference(arrived);
+    final staleFor = arrived == null
+        ? null
+        : DateTime.now().difference(arrived);
     final stale = staleFor != null && staleFor > staleAfter;
 
     return Column(
@@ -227,13 +226,13 @@ class _ShardingTabState extends ConsumerState<ShardingTab> {
   /// filters on the same table, and leaving the peer selected would keep
   /// the grid dimmed to a range the user has just navigated away from.
   void _toggleBlock(int block) => setState(() {
-        _selectedBlock = _selectedBlock == block ? null : block;
-        _selectedPeerId = null;
-      });
+    _selectedBlock = _selectedBlock == block ? null : block;
+    _selectedPeerId = null;
+  });
 
   void _togglePeer(String peerId) => setState(() {
-        _selectedPeerId = _selectedPeerId == peerId ? null : peerId;
-      });
+    _selectedPeerId = _selectedPeerId == peerId ? null : peerId;
+  });
 }
 
 /// The daemon's trust tiers, in ascending order — mirrors `TrustTier` in
@@ -357,17 +356,17 @@ class _CoverageHeader extends StatelessWidget {
 
     final summary = full
         ? 'Full model coverage — '
-            '$coveredBlocks/${update.totalBlocks} blocks, '
-            '$peerCount peer(s)'
+              '$coveredBlocks/${update.totalBlocks} blocks, '
+              '$peerCount peer(s)'
         : '$coveredBlocks/${update.totalBlocks} blocks '
-            'covered, $peerCount peer(s)';
+              'covered, $peerCount peer(s)';
 
     return Row(
       children: [
         Tooltip(
           message: stale
               ? 'No update from the daemon in ${describeStaleness(staleFor)} — '
-                  'this may no longer be accurate'
+                    'this may no longer be accurate'
               : 'Live',
           child: Icon(icon, size: 22, color: iconColor),
         ),
@@ -378,10 +377,9 @@ class _CoverageHeader extends StatelessWidget {
             children: [
               Text(
                 update.dhtPrefix,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
@@ -389,10 +387,10 @@ class _CoverageHeader extends StatelessWidget {
                     ? '$summary · last seen ${describeStaleness(staleFor)} ago'
                     : summary,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: stale
-                          ? kwaai.semanticWarning
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  color: stale
+                      ? kwaai.semanticWarning
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ],
@@ -446,7 +444,11 @@ class _ViewToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = context.kwaai.accentPrimary;
     Widget button(
-        IconData icon, bool selected, VoidCallback onTap, String tooltip) {
+      IconData icon,
+      bool selected,
+      VoidCallback onTap,
+      String tooltip,
+    ) {
       return Tooltip(
         message: tooltip,
         child: Material(
@@ -517,10 +519,8 @@ class _CellSizeSlider extends StatelessWidget {
               // header row, not in a settings form.
               data: SliderTheme.of(context).copyWith(
                 trackHeight: 2,
-                thumbShape:
-                    const RoundSliderThumbShape(enabledThumbRadius: 6),
-                overlayShape:
-                    const RoundSliderOverlayShape(overlayRadius: 12),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
               ),
               child: Slider(
                 value: value,
@@ -580,17 +580,16 @@ class _GridAndTable extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final w = math.max(
-          constraints.maxWidth - _gridPadding.horizontal,
-          1.0,
-        );
+        final w = math.max(constraints.maxWidth - _gridPadding.horizontal, 1.0);
         final h = math.max(constraints.maxHeight, 1.0);
 
         // Pack as many whole cells per row as fit at the requested size,
         // then shrink the cell slightly to divide the width exactly — so
         // the grid is always flush left-to-right.
-        final cols =
-            ((w + _spacing) / (cellSize + _spacing)).floor().clamp(1, totalBlocks);
+        final cols = ((w + _spacing) / (cellSize + _spacing)).floor().clamp(
+          1,
+          totalBlocks,
+        );
         final rows = (totalBlocks / cols).ceil();
         final cell = (w - _spacing * (cols - 1)) / cols;
 
@@ -687,8 +686,8 @@ class _BlockCell extends StatelessWidget {
     final color = peerCount == 0
         ? kwaai.semanticError
         : peerCount == 1
-            ? kwaai.semanticWarning
-            : kwaai.semanticSuccess;
+        ? kwaai.semanticWarning
+        : kwaai.semanticSuccess;
 
     // Both selections are shown the same way: whatever is selected stays
     // at full strength and everything else drops right back, so the
@@ -706,8 +705,8 @@ class _BlockCell extends StatelessWidget {
           alpha: dimmed
               ? 0.16
               : emphasised
-                  ? 1.0
-                  : 0.85,
+              ? 1.0
+              : 0.85,
         ),
         borderRadius: BorderRadius.circular(4),
         child: InkWell(
@@ -718,13 +717,13 @@ class _BlockCell extends StatelessWidget {
                 ? Text(
                     '$block',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          // White on a near-transparent cell is
-                          // unreadable — the label recedes with it.
-                          color: dimmed
-                              ? Theme.of(context).colorScheme.onSurfaceVariant
-                              : Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      // White on a near-transparent cell is
+                      // unreadable — the label recedes with it.
+                      color: dimmed
+                          ? Theme.of(context).colorScheme.onSurfaceVariant
+                          : Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
                   )
                 : null,
           ),
@@ -788,15 +787,13 @@ class _TableSection extends StatelessWidget {
                     block == null
                         ? 'All peers — ${peers.length}'
                         : 'Block $block — ${peers.length} peer(s)',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (block != null)
-                  _ShowAllButton(onPressed: onClearBlock),
+                if (block != null) _ShowAllButton(onPressed: onClearBlock),
               ],
             ),
           ),
@@ -842,10 +839,10 @@ class _ShowAllButton extends StatelessWidget {
               const SizedBox(width: 4),
               Text(
                 'Show all',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelSmall
-                    ?.copyWith(color: accent, fontWeight: FontWeight.w600),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: accent,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -878,18 +875,18 @@ class _PeerTable extends StatelessWidget {
         child: Text(
           emptyMessage,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
 
     final kwaai = context.kwaai;
     final headStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-          letterSpacing: 0.6,
-        );
+      fontWeight: FontWeight.w700,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+      letterSpacing: 0.6,
+    );
     final cellStyle = Theme.of(context).textTheme.bodySmall;
     final monoStyle = cellStyle?.copyWith(
       fontFamily: 'Menlo',
@@ -979,10 +976,10 @@ class _TrustCell extends StatelessWidget {
       message: 'score ${peer.trustScore.toStringAsFixed(2)}',
       child: Text(
         peer.trustTier,
-        style: Theme.of(context)
-            .textTheme
-            .bodySmall
-            ?.copyWith(color: color, fontWeight: FontWeight.w600),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

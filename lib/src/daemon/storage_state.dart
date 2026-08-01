@@ -14,8 +14,9 @@ import '../chat/kwaai_rpc_client.dart';
 ///
 /// Each discovery round yields *two* updates: the DHT registry with
 /// `probesPending` set, then the same peers with reachability resolved.
-final storageDiscoveryProvider =
-    StreamProvider.autoDispose<pb.StorageUpdate>((ref) async* {
+final storageDiscoveryProvider = StreamProvider.autoDispose<pb.StorageUpdate>((
+  ref,
+) async* {
   final client = ref.watch(kwaaiRpcClientProvider);
   final conn = ref.watch(kwaaiRpcConnectionProvider).valueOrNull;
   if (conn != RpcConnection.connected) {

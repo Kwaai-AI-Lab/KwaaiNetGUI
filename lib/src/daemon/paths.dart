@@ -78,7 +78,8 @@ bool get _builtInDaemonIsBundled {
   final sep = Platform.pathSeparator;
   final exeDir = File(Platform.resolvedExecutable).absolute.parent.path;
   final resolved = builtInDebugDaemonPath;
-  return resolved == '$exeDir$sep${Platform.isWindows ? 'kwaainet.exe' : 'kwaainet'}' ||
+  return resolved ==
+          '$exeDir$sep${Platform.isWindows ? 'kwaainet.exe' : 'kwaainet'}' ||
       resolved.startsWith('$exeDir$sep..${sep}Resources$sep');
 }
 
