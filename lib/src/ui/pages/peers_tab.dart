@@ -481,33 +481,48 @@ class _AddressLineState extends State<_AddressLine> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // softWrap false + ellipsis: a multiaddr has no break
-                // opportunities, so on a narrow window it would otherwise
-                // force the row wider than the viewport. The copy button and
-                // the expander still give access to the full value.
-                Text(
-                  shown.join('\n'),
-                  style: monoStyle,
-                  softWrap: false,
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: shown.length,
-                ),
-                if (hidden > 0)
-                  // A plain tappable Text rather than a TextButton: this page
-                  // is rebuilt often and Material buttons bring an ink
-                  // controller each. No animation, no per-frame cost.
-                  GestureDetector(
-                    onTap: () => setState(() => _expanded = !_expanded),
-                    behavior: HitTestBehavior.opaque,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 1),
-                      child: Text(
-                        _expanded ? 'show less' : 'and $hidden more',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: kwaai.accentPrimary,
+                for (var i = 0; i < shown.length; i++)
+                  Row(
+                    children: [
+                      // One Text per value, each clipped to a single line.
+                      // Joining them into one Text and capping maxLines
+                      // silently dropped entries once a multiaddr wrapped —
+                      // the count said "and 4 more" while only four of five
+                      // were rendered.
+                      //
+                      // softWrap false + ellipsis: a multiaddr has no break
+                      // opportunities, so left to wrap it would force the row
+                      // wider than the viewport.
+                      Expanded(
+                        child: Text(
+                          shown[i],
+                          style: monoStyle,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
-                    ),
+                      // The toggle rides the first line's right edge rather
+                      // than sitting on a line of its own: it costs no vertical
+                      // space, and the address it shares the row with truncates
+                      // to make room.
+                      if (hidden > 0 && i == 0) ...[
+                        const SizedBox(width: 8),
+                        // A plain tappable Text rather than a TextButton: this
+                        // page rebuilds often and Material buttons bring an ink
+                        // controller each. No animation, no per-frame cost.
+                        GestureDetector(
+                          onTap: () => setState(() => _expanded = !_expanded),
+                          behavior: HitTestBehavior.opaque,
+                          child: Text(
+                            _expanded ? 'show less' : 'and $hidden more',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: kwaai.accentPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
               ],
             ),
@@ -552,6 +567,10 @@ class _TableSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final rows = mergePeerRows(connected, routing);
 
+    final selected = selectedPeerId == null
+        ? null
+        : rows.where((r) => r.peerId == selectedPeerId).firstOrNull;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -565,6 +584,24 @@ class _TableSection extends StatelessWidget {
                   onSelectPeer: onSelectPeer,
                 ),
         ),
+        // Detail for the selected peer, pinned below the table rather than
+        // spliced into it. A DataRow cannot span columns, so an inline detail
+        // had to live in one cell and overflowed it; down here it gets the full
+        // width and the table keeps its alignment. It also stays put while the
+        // table scrolls, which is what you want when comparing a peer's detail
+        // against the rows around it.
+        if (selected != null) ...[
+          Divider(height: 1, color: context.kwaai.divider),
+          // Bounded and scrollable: a peer can hold several connections and a
+          // long protocol list, and the panel must not push the table off
+          // screen or overflow the page.
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 190),
+            child: SingleChildScrollView(
+              child: _PeerConnections(row: selected),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -750,7 +787,7 @@ class _PeerTable extends StatelessWidget {
                 DataColumn(label: Text('ADDRESS', style: headStyle)),
               ],
               rows: [
-                for (final r in rows) ...[
+                for (final r in rows)
                   DataRow(
                     selected: r.peerId == selectedPeerId,
                     color: WidgetStateProperty.resolveWith(
@@ -796,10 +833,12 @@ class _PeerTable extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(_shortPeerId(r.peerId), style: monoStyle),
+                            // Only the count, and only when there is more than
+                            // one — the paths themselves are in the panel below.
                             if (r.connections.length > 1) ...[
                               const SizedBox(width: 6),
                               Text(
-                                '(${r.connections.length} paths)',
+                                '×${r.connections.length}',
                                 style: cellStyle?.copyWith(color: muted),
                               ),
                             ],
@@ -809,32 +848,6 @@ class _PeerTable extends StatelessWidget {
                       DataCell(Text(r.primary?.addr ?? '—', style: monoStyle)),
                     ],
                   ),
-                  // Expanded detail, as its own row so the table keeps its
-                  // column alignment. Only for the selected peer, so this is one
-                  // extra row at most rather than per-row widgets.
-                  if (r.peerId == selectedPeerId)
-                    DataRow(
-                      color: WidgetStateProperty.all(
-                        kwaai.accentPrimary.withValues(alpha: 0.06),
-                      ),
-                      cells: [
-                        const DataCell(SizedBox.shrink()),
-                        const DataCell(SizedBox.shrink()),
-                        DataCell(
-                          // Spans visually rather than structurally: DataTable
-                          // has no column spanning, so the detail sits in one
-                          // wide cell and the rest stay empty.
-                          _PeerDetail(row: r),
-                        ),
-                        const DataCell(SizedBox.shrink()),
-                        const DataCell(SizedBox.shrink()),
-                        const DataCell(SizedBox.shrink()),
-                        const DataCell(SizedBox.shrink()),
-                        const DataCell(SizedBox.shrink()),
-                        const DataCell(SizedBox.shrink()),
-                      ],
-                    ),
-                ],
               ],
             ),
           ),
@@ -861,16 +874,25 @@ class _StateMark extends StatelessWidget {
   }
 }
 
-/// Everything about the selected peer the collapsed row cannot show: each
-/// connection separately, and the protocol list.
-class _PeerDetail extends StatelessWidget {
-  const _PeerDetail({required this.row});
+/// The selected peer's connections, one row each.
+///
+/// The peers table shows one row per peer and says nothing about *how* it is
+/// reached; this is where that lives. Keeping it out of the table means the
+/// table stays one row per peer no matter how many paths a peer holds, and a
+/// peer mid-hole-punch — relayed path still open, direct one just built — shows
+/// both here without the row count moving.
+///
+/// Pinned below the table rather than spliced into it: a DataRow cannot span
+/// columns, so an inline detail had to live inside one cell and overflowed it.
+class _PeerConnections extends StatelessWidget {
+  const _PeerConnections({required this.row});
 
   final PeerRow row;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final kwaai = context.kwaai;
     final monoStyle = theme.textTheme.bodySmall?.copyWith(
       fontFamily: 'Menlo',
       fontFamilyFallback: const ['Consolas', 'monospace'],
@@ -880,20 +902,30 @@ class _PeerDetail extends StatelessWidget {
       color: theme.textTheme.labelSmall?.color?.withValues(alpha: 0.75),
     );
 
-    // Protocols are per peer, not per connection — identify reports them once.
+    // Protocols come from identify, which happens once per peer rather than
+    // once per connection.
     final protocols = row.primary?.protocols ?? const <String>[];
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+    return Container(
+      width: double.infinity,
+      color: kwaai.accentPrimary.withValues(alpha: 0.06),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
-              Text('PEER', style: labelStyle),
+              Text(
+                row.connections.isEmpty
+                    ? 'NO CONNECTIONS'
+                    : row.connections.length == 1
+                    ? 'CONNECTION'
+                    : '${row.connections.length} CONNECTIONS',
+                style: labelStyle,
+              ),
               const SizedBox(width: 10),
-              Flexible(
+              Expanded(
                 child: Text(
                   row.peerId,
                   style: monoStyle,
@@ -904,26 +936,48 @@ class _PeerDetail extends StatelessWidget {
               _CopyButton(text: row.peerId, label: 'Peer ID'),
             ],
           ),
-          if (row.connections.isNotEmpty) ...[
-            const SizedBox(height: 4),
+          if (row.connections.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                // A routing-table entry we hold no connection to. Normal: the
+                // table deliberately retains peers we are not talking to.
+                'Known from the DHT routing table; not currently connected.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.textTheme.bodySmall?.color?.withValues(
+                    alpha: 0.7,
+                  ),
+                ),
+              ),
+            )
+          else
             for (final c in row.connections)
               Padding(
-                padding: const EdgeInsets.only(top: 2),
+                padding: const EdgeInsets.only(top: 4),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    // Wide enough for "DCUtR" and its icon, which need more
+                    // room than the 74px label column beside them.
                     SizedBox(
-                      width: 74,
+                      width: 88,
+                      child: _PathCell(kind: c.kind, dcutr: c.dcutr),
+                    ),
+                    SizedBox(
+                      width: 72,
                       child: Text(
-                        c.kind == pbenum.PeerConnKind.PEER_CONN_KIND_RELAY
-                            ? 'relay'
-                            : c.dcutr
-                            ? 'DCUtR'
-                            : 'direct',
-                        style: labelStyle,
+                        c.direction,
+                        style: theme.textTheme.bodySmall,
                       ),
                     ),
-                    Text('${c.direction}  ', style: theme.textTheme.bodySmall),
-                    Flexible(
+                    SizedBox(
+                      width: 64,
+                      child: Text(
+                        c.rttMs == 0 ? '—' : '${c.rttMs} ms',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                    Expanded(
                       child: Text(
                         c.addr,
                         style: monoStyle,
@@ -931,16 +985,16 @@ class _PeerDetail extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    _CopyButton(text: c.addr, label: 'Address'),
                   ],
                 ),
               ),
-          ],
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(width: 74, child: Text('Protocols', style: labelStyle)),
-              Flexible(
+              Expanded(
                 child: Text(
                   protocols.isEmpty
                       // Not "speaks nothing": identify completes shortly after
@@ -950,6 +1004,8 @@ class _PeerDetail extends StatelessWidget {
                             ? 'Identify has not completed yet'
                             : 'Not connected')
                       : protocols.join(', '),
+                  // Wraps: the list is long and breaks naturally at the
+                  // separators, unlike an address.
                   style: monoStyle,
                 ),
               ),
@@ -980,10 +1036,11 @@ class _Caption extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       alignment: Alignment.centerLeft,
       child: Row(
+        // Title left, summary hard against the right edge.
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(title, style: style),
           if (detail != null) ...[
-            const Spacer(),
             // Flexible + ellipsis: the summary grows with the network ("15
             // connected · 3 in routing table"), so on a narrow window it has to
             // give way rather than push the bar wider than the viewport.

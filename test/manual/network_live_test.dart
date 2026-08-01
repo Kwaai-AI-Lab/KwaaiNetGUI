@@ -44,9 +44,14 @@ void main() {
           'routing=${u.routing.length.toString().padLeft(3)}',
         );
         for (final p in u.connected.take(8)) {
+          final path = p.kind == pbenum.PeerConnKind.PEER_CONN_KIND_RELAY
+              ? 'relay'
+              : p.dcutr
+              ? 'DCUtR'
+              : 'direct';
           // ignore: avoid_print
           print(
-            '            ${p.kind.name.replaceFirst('PEER_CONN_KIND_', '').toLowerCase().padRight(7)} '
+            '            ${path.padRight(7)} '
             '${p.direction.padRight(9)} '
             'rtt=${(p.rttMs == 0 ? '-' : '${p.rttMs}ms').padRight(7)} '
             'proto=${p.protocols.length.toString().padLeft(2)} '
@@ -55,6 +60,13 @@ void main() {
             '${p.isBootstrap ? '(bootstrap)' : p.isTrustedRelay ? '(trusted relay)' : ''}',
           );
         }
+        final bootstraps = u.routing.where((r) => r.isBootstrap).length;
+        // ignore: avoid_print
+        print(
+          '            routing: ${u.routing.length} '
+          '(${u.routing.where((r) => r.connected).length} connected, '
+          '$bootstraps bootstrap)',
+        );
       },
       onError: (Object e) {
         failure = e;

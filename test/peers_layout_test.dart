@@ -134,6 +134,64 @@ void main() {
     );
   });
 
+  testWidgets('selecting a peer opens the connections panel below the table',
+      (tester) async {
+    await tester.pumpWidget(_host(_update(connected: 3, routing: 3)));
+    await tester.pump();
+
+    // Nothing selected: no panel.
+    expect(find.textContaining('CONNECTION'), findsNothing);
+
+    // Tap a row's PATH cell. Peer ids are elided in the table, so match on
+    // something the row renders verbatim.
+    await tester.tap(find.text('direct').first);
+    await tester.pump();
+
+    // The panel names the connection count, and the table has not grown a
+    // spanning row — the inline version overflowed its cell, which is why the
+    // detail lives outside the table now.
+    expect(find.textContaining('CONNECTION'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('every value is rendered when an address line is expanded',
+      (tester) async {
+    // Regression: the values were joined into one Text with maxLines capped at
+    // the value count, so once a long multiaddr wrapped, the last entry was
+    // silently clipped — the toggle said "and 4 more" while showing four of
+    // five. One Text per value, each clipped to a single line, cannot do that.
+    final update = _update();
+    update.selfStatus.listenAddrs
+      ..clear()
+      ..addAll([
+        '/ip4/192.168.68.135/tcp/8080',
+        '/ip4/52.23.252.2/tcp/8000/p2p/Qmd3A8N5aQBATe2SYvNikaeCS9CAKN4E86jdCPacZ6RZJY/p2p-circuit/p2p/12D3KooWMVmKq1oEpt8AF8rT2eB55WDR26HdW5SrpCi97Noqy4E8',
+        '/ip4/18.219.43.67/tcp/8000/p2p/QmQhRuheeCLEsVD3RsnknM75gPDDqxAb8DhnWgro7KhaJc/p2p-circuit/p2p/12D3KooWMVmKq1oEpt8AF8rT2eB55WDR26HdW5SrpCi97Noqy4E8',
+        '/ip4/192.168.68.174/tcp/8080',
+        '/ip4/127.0.0.1/tcp/8080',
+      ]);
+
+    await tester.pumpWidget(_host(update, size: const Size(1100, 800)));
+    await tester.pump();
+
+    // Collapsed: one address plus a toggle naming the other four.
+    expect(find.text('and 4 more'), findsOneWidget);
+
+    await tester.tap(find.text('and 4 more'));
+    await tester.pump();
+
+    // Expanded: all five present, and the count matches what is rendered.
+    for (final addr in update.selfStatus.listenAddrs) {
+      expect(
+        find.text(addr),
+        findsOneWidget,
+        reason: '$addr was counted by the toggle but never rendered',
+      );
+    }
+    expect(find.text('show less'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('an idle page costs nothing per frame', (tester) async {
     // The hang was here, and it is invisible to a rebuild benchmark: with no
     // events arriving at all, the page was still burning ~14ms every frame,
