@@ -331,15 +331,21 @@ class _SelfStatusHeader extends StatelessWidget {
         if (s != null) ...[
           const SizedBox(height: 8),
           _AddressLine(label: 'Peer ID', values: [s.peerId]),
+          // Each of these collapses to its first entry, so scope order decides
+          // what the user sees without expanding: the public address if there
+          // is one, then LAN, then loopback or a wildcard bind.
           if (s.listenAddrs.isNotEmpty)
-            _AddressLine(label: 'Listening', values: s.listenAddrs),
+            _AddressLine(
+              label: 'Listening',
+              values: sortByScope(s.listenAddrs),
+            ),
           if (s.observedAddrs.isNotEmpty)
             _AddressLine(
               label: 'Observed',
-              values: summariseObservedAddrs(s.observedAddrs),
+              values: sortByScope(summariseObservedAddrs(s.observedAddrs)),
             ),
           if (s.relayAddrs.isNotEmpty)
-            _AddressLine(label: 'Relays', values: s.relayAddrs),
+            _AddressLine(label: 'Relays', values: sortByScope(s.relayAddrs)),
         ],
         if (s == null)
           Padding(
@@ -420,17 +426,33 @@ class _StaleChip extends StatelessWidget {
   }
 }
 
-/// One labelled row of addresses. Multi-valued because a node routinely
-/// listens on several and is observed at more than one.
-class _AddressLine extends StatelessWidget {
+/// One labelled row of addresses, collapsed to a single line.
+///
+/// A node routinely listens on several addresses, is observed at more, and can
+/// hold multiple relay reservations — so left unbounded these three lines
+/// dominate the header and push the tables off screen. Only the first is shown;
+/// the rest are one click away.
+///
+/// The first is the useful one by construction: listen addresses come in
+/// binding order, observed addresses are ranked most-confirmed first by the
+/// daemon, and relay addresses are all equivalent.
+class _AddressLine extends StatefulWidget {
   const _AddressLine({required this.label, required this.values});
 
   final String label;
   final List<String> values;
 
   @override
+  State<_AddressLine> createState() => _AddressLineState();
+}
+
+class _AddressLineState extends State<_AddressLine> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final kwaai = context.kwaai;
     final labelStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
     );
@@ -439,12 +461,16 @@ class _AddressLine extends StatelessWidget {
       fontFamilyFallback: const ['Consolas', 'monospace'],
     );
 
+    final values = widget.values;
+    final hidden = values.length - 1;
+    final shown = _expanded ? values : values.take(1).toList();
+
     return Padding(
       padding: const EdgeInsets.only(top: 3),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 74, child: Text(label, style: labelStyle)),
+          SizedBox(width: 74, child: Text(widget.label, style: labelStyle)),
           Expanded(
             // Plain Text, not SelectableText. This page rebuilds on every
             // update *and* every stale tick, and each SelectableText builds a
@@ -452,10 +478,34 @@ class _AddressLine extends StatelessWidget {
             // enough, repeated across the address lines, to blow the frame
             // budget and make the tab feel wedged. Copying an address is served
             // by the tap-to-copy button instead, which costs nothing to build.
-            child: Text(values.join('\n'), style: monoStyle),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(shown.join('\n'), style: monoStyle),
+                if (hidden > 0)
+                  // A plain tappable Text rather than a TextButton: this page
+                  // is rebuilt often and Material buttons bring an ink
+                  // controller each. No animation, no per-frame cost.
+                  GestureDetector(
+                    onTap: () => setState(() => _expanded = !_expanded),
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Text(
+                        _expanded ? 'show less' : 'and $hidden more',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: kwaai.accentPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
           if (values.isNotEmpty)
-            _CopyButton(text: values.join('\n'), label: label),
+            // Copies every value, not just the visible one — the collapse is a
+            // display choice and shouldn't quietly narrow what you get.
+            _CopyButton(text: values.join('\n'), label: widget.label),
         ],
       ),
     );
@@ -931,6 +981,96 @@ class _RoleCell extends StatelessWidget {
     }
     return Text('—', style: theme.textTheme.bodySmall);
   }
+}
+
+/// How widely reachable an address is. Ordering is the ranking.
+///
+/// Public for `test/peers_address_summary_test.dart`.
+enum AddrScope {
+  /// Routable from the internet — the address that determines whether anyone
+  /// outside can reach this node, so it leads.
+  public,
+
+  /// RFC1918 / CGNAT / link-local — reachable from the same network only.
+  internal,
+
+  /// Loopback, or a wildcard bind that names no interface at all.
+  local,
+}
+
+/// Classify a multiaddr by how far it reaches.
+///
+/// Deliberately coarse: the question this answers is "which of these lines do I
+/// show first", not "what exactly is this address". Anything unrecognised
+/// counts as public so a new transport ranks high rather than being buried.
+///
+/// Public for `test/peers_address_summary_test.dart`.
+AddrScope scopeOf(String addr) {
+  final parts = addr.split('/')..removeWhere((p) => p.isEmpty);
+  // A circuit address reaches as far as its relay does, which is public by
+  // definition — nobody reserves a circuit on a LAN-only relay.
+  if (parts.contains('p2p-circuit')) return AddrScope.public;
+
+  final ipIdx = parts.indexWhere((p) => p == 'ip4' || p == 'ip6');
+  if (ipIdx < 0 || ipIdx + 1 >= parts.length) return AddrScope.public;
+  final host = parts[ipIdx + 1];
+
+  if (host == '0.0.0.0' ||
+      host == '::' ||
+      host.startsWith('127.') ||
+      host == '::1') {
+    return AddrScope.local;
+  }
+
+  if (parts[ipIdx] == 'ip6') {
+    final h = host.toLowerCase();
+    // fc00::/7 unique-local, fe80::/10 link-local.
+    if (h.startsWith('fc') ||
+        h.startsWith('fd') ||
+        h.startsWith('fe8') ||
+        h.startsWith('fe9') ||
+        h.startsWith('fea') ||
+        h.startsWith('feb')) {
+      return AddrScope.internal;
+    }
+    return AddrScope.public;
+  }
+
+  final octets = host.split('.');
+  if (octets.length != 4) return AddrScope.public;
+  final a = int.tryParse(octets[0]);
+  final b = int.tryParse(octets[1]);
+  if (a == null || b == null) return AddrScope.public;
+
+  // RFC1918, plus CGNAT (100.64/10) and link-local (169.254/16): all of them
+  // mean "someone on my network can reach this, nobody else can".
+  if (a == 10) return AddrScope.internal;
+  if (a == 192 && b == 168) return AddrScope.internal;
+  if (a == 172 && b >= 16 && b <= 31) return AddrScope.internal;
+  if (a == 100 && b >= 64 && b <= 127) return AddrScope.internal;
+  if (a == 169 && b == 254) return AddrScope.internal;
+
+  return AddrScope.public;
+}
+
+/// Order addresses public → internal → local, preserving the original order
+/// within each group.
+///
+/// The collapsed address line shows only the first entry, so this decides which
+/// one that is. A node binding `0.0.0.0` and holding a LAN address would
+/// otherwise lead with a wildcard that tells the user nothing about whether
+/// they are reachable.
+///
+/// Public for `test/peers_address_summary_test.dart`.
+List<String> sortByScope(List<String> addrs) {
+  final indexed = addrs.indexed.toList();
+  indexed.sort((x, y) {
+    final byScope = scopeOf(x.$2).index.compareTo(scopeOf(y.$2).index);
+    // Stable: the daemon already ranks observed addresses by how many distinct
+    // peers confirmed them, and that ordering is worth keeping within a scope.
+    return byScope != 0 ? byScope : x.$1.compareTo(y.$1);
+  });
+  return [for (final e in indexed) e.$2];
 }
 
 /// Collapse the observed-address list to one line per host.

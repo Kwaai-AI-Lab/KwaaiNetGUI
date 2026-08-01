@@ -107,4 +107,122 @@ void main() {
       expect(summariseObservedAddrs([]), isEmpty);
     });
   });
+
+  group('scopeOf', () {
+    test('classifies public addresses', () {
+      expect(scopeOf('/ip4/98.232.246.19/tcp/8080'), AddrScope.public);
+      expect(scopeOf('/ip4/18.219.43.67/tcp/8000'), AddrScope.public);
+      expect(scopeOf('/ip6/2001:db8::1/tcp/8080'), AddrScope.public);
+    });
+
+    test('classifies every private range as internal', () {
+      // The full RFC1918 set plus the two ranges that behave the same way:
+      // CGNAT, which a carrier hands out and nobody outside can reach, and
+      // link-local, which does not leave the segment.
+      for (final host in [
+        '10.0.0.5',
+        '192.168.68.135',
+        '172.16.0.1',
+        '172.31.255.254',
+        '100.64.0.1', // CGNAT
+        '169.254.1.1', // link-local
+      ]) {
+        expect(
+          scopeOf('/ip4/$host/tcp/8080'),
+          AddrScope.internal,
+          reason: '$host should be internal',
+        );
+      }
+      // …but the neighbours of those ranges are public.
+      expect(scopeOf('/ip4/172.15.0.1/tcp/8080'), AddrScope.public);
+      expect(scopeOf('/ip4/172.32.0.1/tcp/8080'), AddrScope.public);
+      expect(scopeOf('/ip4/100.128.0.1/tcp/8080'), AddrScope.public);
+    });
+
+    test('classifies loopback and wildcard binds as local', () {
+      expect(scopeOf('/ip4/127.0.0.1/tcp/8080'), AddrScope.local);
+      // A wildcard bind names no interface, so it tells the user nothing about
+      // reachability and must not lead the collapsed line.
+      expect(scopeOf('/ip4/0.0.0.0/tcp/8080'), AddrScope.local);
+      expect(scopeOf('/ip6/::1/tcp/8080'), AddrScope.local);
+      expect(scopeOf('/ip6/::/tcp/8080'), AddrScope.local);
+    });
+
+    test('treats IPv6 unique-local and link-local as internal', () {
+      expect(scopeOf('/ip6/fd00::1/tcp/8080'), AddrScope.internal);
+      expect(scopeOf('/ip6/fe80::1/tcp/8080'), AddrScope.internal);
+    });
+
+    test('treats a circuit address as public', () {
+      // A circuit reaches as far as its relay does, and nobody reserves a
+      // circuit on a LAN-only relay.
+      expect(
+        scopeOf(
+          '/ip4/18.219.43.67/tcp/8000/p2p/QmQhRuheeCLEsVD3RsnknM75gPDDqxAb8DhnWgro7KhaJc/p2p-circuit',
+        ),
+        AddrScope.public,
+      );
+    });
+
+    test('ranks anything unrecognised as public', () {
+      // Better to lead with an address we cannot classify than to bury a new
+      // transport below loopback.
+      expect(scopeOf('/dns4/example.com/tcp/8080'), AddrScope.public);
+      expect(scopeOf('nonsense'), AddrScope.public);
+    });
+  });
+
+  group('sortByScope', () {
+    test('puts the useful address first for a real listen set', () {
+      // Verbatim from a live node: a wildcard bind and two LAN addresses. The
+      // collapsed line shows only the first, so a LAN address has to beat the
+      // wildcard.
+      final sorted = sortByScope([
+        '/ip4/127.0.0.1/tcp/8080',
+        '/ip4/192.168.68.135/tcp/8080',
+        '/ip4/192.168.68.174/tcp/8080',
+      ]);
+      expect(sorted.first, '/ip4/192.168.68.135/tcp/8080');
+      expect(sorted.last, '/ip4/127.0.0.1/tcp/8080');
+    });
+
+    test('a public address outranks everything', () {
+      final sorted = sortByScope([
+        '/ip4/127.0.0.1/tcp/8080',
+        '/ip4/192.168.68.135/tcp/8080',
+        '/ip4/98.232.246.19/tcp/8080',
+      ]);
+      expect(sorted.first, '/ip4/98.232.246.19/tcp/8080');
+    });
+
+    test('is stable within a scope', () {
+      // The daemon ranks observed addresses by how many distinct peers
+      // confirmed each; re-sorting must not discard that.
+      final sorted = sortByScope([
+        '/ip4/203.0.113.1/tcp/1',
+        '/ip4/203.0.113.2/tcp/2',
+        '/ip4/203.0.113.3/tcp/3',
+      ]);
+      expect(sorted, [
+        '/ip4/203.0.113.1/tcp/1',
+        '/ip4/203.0.113.2/tcp/2',
+        '/ip4/203.0.113.3/tcp/3',
+      ]);
+    });
+
+    test('keeps every address', () {
+      final input = [
+        '/ip4/127.0.0.1/tcp/8080',
+        '/ip4/10.0.0.1/tcp/8080',
+        '/ip4/98.232.246.19/tcp/8080',
+      ];
+      expect(sortByScope(input).toSet(), input.toSet());
+      expect(sortByScope(input), hasLength(input.length));
+    });
+
+    test('handles empty and single-element lists', () {
+      expect(sortByScope([]), isEmpty);
+      expect(sortByScope(['/ip4/127.0.0.1/tcp/1']), ['/ip4/127.0.0.1/tcp/1']);
+    });
+  });
 }

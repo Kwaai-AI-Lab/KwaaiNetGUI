@@ -1957,6 +1957,7 @@ class ConnectedPeer extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? protocols,
     $core.int? rttMs,
     $core.String? agentVersion,
+    $core.bool? dcutr,
   }) {
     final result = create();
     if (peerId != null) result.peerId = peerId;
@@ -1968,6 +1969,7 @@ class ConnectedPeer extends $pb.GeneratedMessage {
     if (protocols != null) result.protocols.addAll(protocols);
     if (rttMs != null) result.rttMs = rttMs;
     if (agentVersion != null) result.agentVersion = agentVersion;
+    if (dcutr != null) result.dcutr = dcutr;
     return result;
   }
 
@@ -1994,6 +1996,7 @@ class ConnectedPeer extends $pb.GeneratedMessage {
     ..pPS(7, _omitFieldNames ? '' : 'protocols')
     ..aI(8, _omitFieldNames ? '' : 'rttMs', fieldType: $pb.PbFieldType.OU3)
     ..aOS(9, _omitFieldNames ? '' : 'agentVersion')
+    ..aOB(10, _omitFieldNames ? '' : 'dcutr')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2101,6 +2104,24 @@ class ConnectedPeer extends $pb.GeneratedMessage {
   $core.bool hasAgentVersion() => $_has(8);
   @$pb.TagNumber(9)
   void clearAgentVersion() => $_clearField(9);
+
+  /// Whether DCUtR upgraded this connection from a relayed path to a
+  /// direct one.
+  ///
+  /// Only ever true alongside PEER_CONN_KIND_DIRECT, and it means
+  /// something stronger: the path was established *through* a NAT by
+  /// coordinated simultaneous dial, rather than there being no NAT in
+  /// the way. A node reporting "private" reachability can still hold
+  /// upgraded connections — that is DCUtR working, not a
+  /// contradiction.
+  @$pb.TagNumber(10)
+  $core.bool get dcutr => $_getBF(9);
+  @$pb.TagNumber(10)
+  set dcutr($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasDcutr() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearDcutr() => $_clearField(10);
 }
 
 /// One entry in the Kademlia routing table.
@@ -2115,10 +2136,12 @@ class RoutingPeer extends $pb.GeneratedMessage {
   factory RoutingPeer({
     $core.String? peerId,
     $core.bool? connected,
+    $core.bool? isBootstrap,
   }) {
     final result = create();
     if (peerId != null) result.peerId = peerId;
     if (connected != null) result.connected = connected;
+    if (isBootstrap != null) result.isBootstrap = isBootstrap;
     return result;
   }
 
@@ -2137,6 +2160,7 @@ class RoutingPeer extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'peerId')
     ..aOB(2, _omitFieldNames ? '' : 'connected')
+    ..aOB(3, _omitFieldNames ? '' : 'isBootstrap')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2177,6 +2201,20 @@ class RoutingPeer extends $pb.GeneratedMessage {
   $core.bool hasConnected() => $_has(1);
   @$pb.TagNumber(2)
   void clearConnected() => $_clearField(2);
+
+  /// Whether this peer is one of our configured bootstrap nodes.
+  ///
+  /// Derived from local configuration, the same way it is for a
+  /// connection: the DHT does not label bootstraps, and which nodes
+  /// hold that role is the operator's choice.
+  @$pb.TagNumber(3)
+  $core.bool get isBootstrap => $_getBF(2);
+  @$pb.TagNumber(3)
+  set isBootstrap($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasIsBootstrap() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearIsBootstrap() => $_clearField(3);
 }
 
 /// This node's own position in the network.
