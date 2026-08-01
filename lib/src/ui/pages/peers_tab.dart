@@ -338,21 +338,15 @@ class _SelfStatusHeader extends StatelessWidget {
           if (s.listenAddrs.isNotEmpty)
             _AddressLine(
               label: 'Listening',
-              itemLabel: 'Address',
               values: sortByScope(s.listenAddrs),
             ),
           if (s.observedAddrs.isNotEmpty)
             _AddressLine(
               label: 'Observed',
-              itemLabel: 'Address',
               values: sortByScope(summariseObservedAddrs(s.observedAddrs)),
             ),
           if (s.relayAddrs.isNotEmpty)
-            _AddressLine(
-              label: 'Relays',
-              itemLabel: 'Address',
-              values: sortByScope(s.relayAddrs),
-            ),
+            _AddressLine(label: 'Relays', values: sortByScope(s.relayAddrs)),
         ],
         if (s == null)
           Padding(
@@ -444,24 +438,10 @@ class _StaleChip extends StatelessWidget {
 /// binding order, observed addresses are ranked most-confirmed first by the
 /// daemon, and relay addresses are all equivalent.
 class _AddressLine extends StatefulWidget {
-  const _AddressLine({
-    required this.label,
-    required this.values,
-    this.mono = true,
-    this.itemLabel,
-  });
+  const _AddressLine({required this.label, required this.values});
 
   final String label;
   final List<String> values;
-
-  /// What one entry is called, for the per-line copy buttons. The column label
-  /// names the group ("Listening"), which reads wrong on a button that copies a
-  /// single entry from it. Falls back to [label] when unset.
-  final String? itemLabel;
-
-  /// Monospace the values. True for addresses and peer ids, where character
-  /// alignment aids comparison; false for prose, which reads badly in mono.
-  final bool mono;
 
   @override
   State<_AddressLine> createState() => _AddressLineState();
@@ -477,12 +457,10 @@ class _AddressLineState extends State<_AddressLine> {
     final labelStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
     );
-    final monoStyle = widget.mono
-        ? theme.textTheme.bodySmall?.copyWith(
-            fontFamily: 'Menlo',
-            fontFamilyFallback: const ['Consolas', 'monospace'],
-          )
-        : theme.textTheme.bodySmall;
+    final monoStyle = theme.textTheme.bodySmall?.copyWith(
+      fontFamily: 'Menlo',
+      fontFamilyFallback: const ['Consolas', 'monospace'],
+    );
 
     final values = widget.values;
     final hidden = values.length - 1;
@@ -516,7 +494,11 @@ class _AddressLineState extends State<_AddressLine> {
                       // softWrap false + ellipsis: a multiaddr has no break
                       // opportunities, so left to wrap it would force the row
                       // wider than the viewport.
-                      Expanded(
+                      //
+                      // Flexible, not Expanded: the address takes only what it
+                      // needs, so the toggle sits just after it rather than
+                      // being pushed to the far edge with a gap between.
+                      Flexible(
                         child: Text(
                           shown[i],
                           style: monoStyle,
@@ -545,18 +527,6 @@ class _AddressLineState extends State<_AddressLine> {
                           ),
                         ),
                       ],
-                      // One copy button per line, copying that line alone.
-                      // A single button copying every value was fine while only
-                      // one was shown, but once expanded it silently gave you
-                      // the whole list when you clicked next to one address.
-                      const SizedBox(width: 12),
-                      _CopyButton(
-                        text: shown[i],
-                        // "Copy address", not "Copy Listening" — the column
-                        // label names the group, which reads wrong on a button
-                        // that copies one entry from it.
-                        label: widget.itemLabel ?? widget.label,
-                      ),
                     ],
                   ),
               ],
@@ -1037,16 +1007,117 @@ class _PeerConnections extends StatelessWidget {
               ],
             )
           else
-            // One per line, described rather than listed as raw ids, and
-            // collapsed to the first — a peer advertises a dozen and the panel
-            // should not be mostly protocol list. Reuses the same collapse the
-            // address lines use, so the interaction is identical.
-            _AddressLine(
-              label: 'Protocols',
-              itemLabel: 'Protocol',
-              values: [for (final p in protocols) describeProtocol(p)],
-              mono: false,
+            _ProtocolLines(protocols: protocols),
+        ],
+      ),
+    );
+  }
+}
+
+/// The protocols a peer advertises: raw id on the left, plain-words gloss on
+/// the right, one per line.
+///
+/// Both, because they answer different questions. The id is the identifier you
+/// would grep a log or a spec for; the description is what it means. Showing
+/// only the id demands you know the ecosystem by heart, and showing only the
+/// description hides the thing you would search for.
+///
+/// Collapsed to the first entry — a peer advertises a dozen and the panel
+/// should not be mostly protocol list — with the same "and N more" toggle the
+/// address lines use.
+class _ProtocolLines extends StatefulWidget {
+  const _ProtocolLines({required this.protocols});
+
+  final List<String> protocols;
+
+  @override
+  State<_ProtocolLines> createState() => _ProtocolLinesState();
+}
+
+class _ProtocolLinesState extends State<_ProtocolLines> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final kwaai = context.kwaai;
+    final labelStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+    );
+    final monoStyle = theme.textTheme.bodySmall?.copyWith(
+      fontFamily: 'Menlo',
+      fontFamilyFallback: const ['Consolas', 'monospace'],
+    );
+    final descStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.8),
+    );
+
+    final protocols = widget.protocols;
+    final hidden = protocols.length - 1;
+    final shown = _expanded ? protocols : protocols.take(1).toList();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 74, child: Text('Protocols', style: labelStyle)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < shown.length; i++)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Fixed width so the descriptions line up into a column
+                      // of their own rather than starting wherever each id
+                      // happens to end.
+                      SizedBox(
+                        width: 244,
+                        child: Text(
+                          shown[i],
+                          style: monoStyle,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Flexible, not Expanded: the description takes only the
+                      // width it needs, so the toggle sits just after it rather
+                      // than being shoved to the far edge of the panel.
+                      Flexible(
+                        child: Text(
+                          // An unknown id describes itself, which would render
+                          // the same text twice; leave the gloss empty instead.
+                          describeProtocol(shown[i]) == shown[i]
+                              ? ''
+                              : describeProtocol(shown[i]),
+                          style: descStyle,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                      if (hidden > 0 && i == 0) ...[
+                        const SizedBox(width: 12),
+                        GestureDetector(
+                          onTap: () => setState(() => _expanded = !_expanded),
+                          behavior: HitTestBehavior.opaque,
+                          child: Text(
+                            _expanded ? 'show less' : 'and $hidden more',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: kwaai.accentPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+              ],
             ),
+          ),
         ],
       ),
     );
