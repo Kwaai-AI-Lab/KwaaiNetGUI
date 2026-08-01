@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -10,13 +11,6 @@ import '../theme/kwaai_theme.dart';
 import '../widgets/kwaai_dropdown.dart';
 import '../widgets/service_status_view.dart';
 
-/// Settings tab visualising live model block coverage: a viewport-filling
-/// grid of blocks coloured by how many peers serve each one, over a peer
-/// table (the same view `kwaainet shard chain` prints in the terminal).
-///
-/// Data arrives through [blockCoverageProvider], a gRPC subscription the
-/// daemon refreshes every few seconds — the view is live for as long as
-/// the tab is on screen.
 /// Grid cell sizing. The minimum is the smallest cell that still reads as
 /// a distinct box at a glance; the maximum is well past "bigger than an
 /// icon", which is where the user asked the grid to stop growing on its
@@ -30,11 +24,35 @@ const _defaultCellSize = (_minCellSize + _maxCellSize) / 2;
 /// out of existence by the slider.
 const _minTableHeight = 180.0;
 
+/// How long without an update before the view is marked stale.
+///
+/// The daemon suppresses updates that would say nothing new but still
+/// sends an unchanged snapshot every 60 s, so silence up to that point is
+/// normal and healthy. This threshold clears that heartbeat with enough
+/// margin to absorb a slow tick or a busy DHT round without crying wolf —
+/// past it, the daemon has missed a beat it promised to send.
+///
+/// Keep this comfortably above the daemon's HEARTBEAT (grpc_server.rs).
+/// If that interval changes, this has to move with it — the relationship
+/// between the two is asserted in `test/coverage_staleness_test.dart`,
+/// which is why this is public.
+const staleAfter = Duration(seconds: 100);
+
+/// How often to re-evaluate staleness while no updates arrive.
+const staleTick = Duration(seconds: 5);
+
 /// Height of the table's caption bar. Fixed rather than intrinsic so the
 /// bar is identical with and without the "Show all" button — the button
 /// fits the bar, not the other way round.
 const _captionBarHeight = 28.0;
 
+/// Settings tab visualising live model block coverage: a viewport-filling
+/// grid of blocks coloured by how many peers serve each one, over a peer
+/// table (the same view `kwaainet shard chain` prints in the terminal).
+///
+/// Data arrives through [blockCoverageProvider], a gRPC subscription the
+/// daemon pushes to whenever coverage changes — plus a heartbeat while it
+/// doesn't, which is what [staleAfter] measures against.
 class BlocksTab extends ConsumerStatefulWidget {
   const BlocksTab({super.key});
 
@@ -68,11 +86,46 @@ class _BlocksTabState extends ConsumerState<BlocksTab> {
   /// stable (rather than flashing back to a spinner) through the gap.
   pb.BlockCoverageUpdate? _last;
 
+  /// When [_last] arrived, for the staleness check.
+  ///
+  /// Local arrival time rather than the update's own `server_time`: the
+  /// question is "how long since this daemon last told us anything",
+  /// which a clock skew between the two machines shouldn't distort.
+  DateTime? _lastArrived;
+
+  /// Drives a rebuild while no updates are arriving.
+  ///
+  /// The daemon suppresses updates that would say nothing new, so a
+  /// healthy stable network is legitimately silent. Nothing else would
+  /// rebuild this view during that silence, so without a tick the
+  /// staleness cue could never appear.
+  Timer? _staleTicker;
+
+  @override
+  void initState() {
+    super.initState();
+    _staleTicker = Timer.periodic(
+      staleTick,
+      (_) {
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _staleTicker?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final coverage = ref.watch(blockCoverageProvider);
     final fresh = coverage.valueOrNull;
-    if (fresh != null) _last = fresh;
+    if (fresh != null) {
+      _last = fresh;
+      _lastArrived = DateTime.now();
+    }
     final update = _last;
 
     if (update == null) {
@@ -112,6 +165,14 @@ class _BlocksTabState extends ConsumerState<BlocksTab> {
             .where((p) => p.startBlock <= block && block < p.endBlock)
             .toList(growable: false);
 
+    // Silence is normal — the daemon only sends when something changed —
+    // but it promises an unchanged snapshot every heartbeat. Past the
+    // threshold that promise has been broken, so what is on screen is no
+    // longer known to be current and the header says so.
+    final arrived = _lastArrived;
+    final staleFor = arrived == null ? null : DateTime.now().difference(arrived);
+    final stale = staleFor != null && staleFor > staleAfter;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -121,6 +182,8 @@ class _BlocksTabState extends ConsumerState<BlocksTab> {
             update: update,
             coveredBlocks: covered,
             peerCount: peers.length,
+            stale: stale,
+            staleFor: staleFor,
             tableOnly: _tableOnly,
             tierFilter: _tierFilter,
             cellSize: _cellSize,
@@ -197,6 +260,18 @@ _TrustTier? _tierOf(String wire) {
   return null;
 }
 
+/// Coarse "how long ago" for the staleness label. Rounded deliberately:
+/// the exact second is noise, and a value that ticks every second would
+/// pull the eye back to a number that isn't changing meaningfully.
+String describeStaleness(Duration? d) {
+  if (d == null) return 'a while';
+  final mins = d.inMinutes;
+  if (mins < 2) return '${d.inSeconds}s';
+  if (mins < 60) return '${mins}m';
+  final hours = d.inHours;
+  return hours < 24 ? '${hours}h' : '${d.inDays}d';
+}
+
 /// Block indices served by [peerId], for grid highlighting. A peer can
 /// appear more than once in the DHT (separate announced ranges), so this
 /// unions every matching entry rather than taking the first.
@@ -219,6 +294,8 @@ class _CoverageHeader extends StatelessWidget {
     required this.update,
     required this.coveredBlocks,
     required this.peerCount,
+    required this.stale,
+    required this.staleFor,
     required this.tableOnly,
     required this.tierFilter,
     required this.cellSize,
@@ -231,6 +308,13 @@ class _CoverageHeader extends StatelessWidget {
   final pb.BlockCoverageUpdate update;
   final int coveredBlocks;
   final int peerCount;
+
+  /// The daemon has missed the heartbeat it promised, so what is shown is
+  /// no longer known to be current.
+  final bool stale;
+
+  /// How long since the last update arrived. Null before the first one.
+  final Duration? staleFor;
   final bool tableOnly;
   final _TrustTier? tierFilter;
   final double cellSize;
@@ -246,12 +330,40 @@ class _CoverageHeader extends StatelessWidget {
     // with the trust filter on, `update.fullCoverage` would describe a
     // set of peers the user isn't looking at.
     final full = update.totalBlocks > 0 && coveredBlocks == update.totalBlocks;
+
+    // Staleness outranks coverage in the icon. A green check on data the
+    // daemon has stopped confirming is the one genuinely misleading state
+    // here — it reads as "verified good right now" when the truth is
+    // "unknown". The counts stay on screen, but the badge stops vouching
+    // for them.
+    final IconData icon;
+    final Color iconColor;
+    if (stale) {
+      icon = Icons.cloud_off;
+      iconColor = Theme.of(context).colorScheme.onSurfaceVariant;
+    } else if (full) {
+      icon = Icons.check_circle;
+      iconColor = kwaai.semanticSuccess;
+    } else {
+      icon = Icons.error_outline;
+      iconColor = kwaai.semanticWarning;
+    }
+
+    final summary = full
+        ? 'Full model coverage — '
+            '$coveredBlocks/${update.totalBlocks} blocks, '
+            '$peerCount peer(s)'
+        : '$coveredBlocks/${update.totalBlocks} blocks '
+            'covered, $peerCount peer(s)';
+
     return Row(
       children: [
-        Icon(
-          full ? Icons.check_circle : Icons.error_outline,
-          size: 22,
-          color: full ? kwaai.semanticSuccess : kwaai.semanticWarning,
+        Tooltip(
+          message: stale
+              ? 'No update from the daemon in ${describeStaleness(staleFor)} — '
+                  'this may no longer be accurate'
+              : 'Live',
+          child: Icon(icon, size: 22, color: iconColor),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -267,15 +379,15 @@ class _CoverageHeader extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
-                full
-                    ? 'Full model coverage — '
-                        '$coveredBlocks/${update.totalBlocks} blocks, '
-                        '$peerCount peer(s)'
-                    : '$coveredBlocks/${update.totalBlocks} blocks '
-                        'covered, $peerCount peer(s)',
+                stale
+                    ? '$summary · last seen ${describeStaleness(staleFor)} ago'
+                    : summary,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: stale
+                          ? kwaai.semanticWarning
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
