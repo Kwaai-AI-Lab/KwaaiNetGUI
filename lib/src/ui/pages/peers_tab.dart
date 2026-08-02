@@ -649,14 +649,13 @@ class _TableSectionState extends State<_TableSection> {
       children: [
         _Caption(
           title: 'PEERS',
-          detail: _summary(rows),
+          detail: _summary(rows, hiddenClients),
           // On the caption row rather than its own band: the toggle changes
           // what the summary counts, so keeping them together stops it
           // stealing a row of table height.
           trailing: (hiddenClients > 0 || _showDhtClients)
               ? _DhtClientToggle(
                   value: _showDhtClients,
-                  hiddenCount: hiddenClients,
                   onChanged: (v) => setState(() => _showDhtClients = v),
                 )
               : null,
@@ -698,11 +697,14 @@ class _TableSectionState extends State<_TableSection> {
     );
   }
 
-  String? _summary(List<PeerRow> rows) {
-    if (rows.isEmpty) return null;
+  String? _summary(List<PeerRow> rows, int hiddenClients) {
+    if (rows.isEmpty && hiddenClients == 0) return null;
     final live = rows.where((r) => r.isConnected).length;
     final dht = rows.where((r) => r.inRoutingTable).length;
-    return '$live connected · $dht in routing table';
+    final summary = '$live connected · $dht in routing table';
+    // Counts what the table is not showing. The table may legitimately be
+    // empty while peers exist, so this has to be reported even then.
+    return hiddenClients > 0 ? '$summary · $hiddenClients hidden' : summary;
   }
 }
 
@@ -1390,26 +1392,27 @@ class _ProtocolLinesState extends State<_ProtocolLines> {
 
 /// Toggle for listing client-mode peers, with the count it is suppressing.
 ///
-/// The count is the point. A bare checkbox leaves "are there peers I'm not
-/// seeing?" unanswerable without toggling it; naming the number means the
-/// default view omits the rows without ever misrepresenting the network.
+/// The label is deliberately fixed. It once carried the hidden count, which
+/// changed its width between states and made the control move as you clicked
+/// it. The count belongs in the caption summary, where the answer to "are
+/// there peers I'm not seeing?" is visible without touching anything.
 class _DhtClientToggle extends StatelessWidget {
   const _DhtClientToggle({
     required this.value,
-    required this.hiddenCount,
     required this.onChanged,
   });
 
   final bool value;
-  final int hiddenCount;
   final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = value
-        ? 'Show DHT clients'
-        : 'Show DHT clients ($hiddenCount hidden)';
+    // Fixed label. The hidden count used to be appended here, which changed
+    // the text width between states and shifted the checkbox as you toggled
+    // it. The count lives in the caption summary instead, where it does not
+    // move anything.
+    const label = 'Show DHT clients';
 
     return Tooltip(
       message: 'Peers that query the DHT without serving it. They are never '
@@ -1472,17 +1475,19 @@ class _Caption extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       alignment: Alignment.centerLeft,
       child: Row(
-        // Title left, summary hard against the right edge.
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        // Title (and any control) left, summary hard against the right edge —
+        // enforced by the Spacer below, not by spaceBetween, which would
+        // distribute the slack and push the control away from the title.
         children: [
           Text(title, style: style),
-          // Sits between the title and the summary, pushed clear of the title
-          // so it reads as a control on this bar rather than part of the label.
+          // Sits immediately after the title, with the Spacer pushing the
+          // summary to the right edge. The gap is fixed rather than flexible
+          // so the control keeps its position as the summary text changes.
           if (trailing != null) ...[
-            const SizedBox(width: 24),
+            const SizedBox(width: 12),
             trailing!,
-            const Spacer(),
           ],
+          const Spacer(),
           if (detail != null) ...[
             // Flexible + ellipsis: the summary grows with the network ("15
             // connected · 3 in routing table"), so on a narrow window it has to
