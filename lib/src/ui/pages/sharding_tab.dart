@@ -127,16 +127,17 @@ class _ShardingTabState extends ConsumerState<ShardingTab> {
     final update = _last;
 
     if (update == null) {
-      final running =
-          ref.watch(daemonStatusProvider).valueOrNull?.running ?? false;
+      // Reachability, not the local PID: with KWAAINET_GRPC_PORT set the
+      // daemon runs elsewhere and has no PID on this machine.
+      final running = ref.watch(daemonAvailableProvider);
       return ServiceStatusView(
         headline: running
             ? 'Querying the network for block coverage…'
-            : 'Daemon is not running',
+            : unavailableHeadline(),
         spinner: running,
         subtitle: running
             ? null
-            : const Text('Start it from the Status tab to see coverage.'),
+            : Text(unavailableHint('see coverage')),
       );
     }
 

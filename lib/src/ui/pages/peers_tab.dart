@@ -145,16 +145,17 @@ class _PeersTabState extends ConsumerState<PeersTab> {
         );
       }
 
-      final running =
-          ref.watch(daemonStatusProvider).valueOrNull?.running ?? false;
+      // Reachability, not the local PID: with KWAAINET_GRPC_PORT set the
+      // daemon runs elsewhere and has no PID on this machine.
+      final running = ref.watch(daemonAvailableProvider);
       return ServiceStatusView(
         headline: running
             ? 'Reading the local p2p state…'
-            : 'Daemon is not running',
+            : unavailableHeadline(),
         spinner: running,
         subtitle: running
             ? null
-            : const Text('Start it from the Status tab to see the network.'),
+            : Text(unavailableHint('see the network')),
       );
     }
 

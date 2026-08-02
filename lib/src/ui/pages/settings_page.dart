@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../chat/kwaai_rpc_client.dart';
 import '../../daemon/config_file.dart';
 import '../../daemon/daemon_controller.dart';
 import '../../daemon/daemon_state.dart';
@@ -640,7 +641,27 @@ class _StatusHeader extends ConsumerWidget {
           void sep() => bitWidgets.add(bitText('  •  '));
 
           bitWidgets.add(bitText(status.running ? 'Running' : 'Stopped'));
-          if (status.running && status.pid != null) {
+          // An explicit port means the daemon is somewhere else, so the local
+          // pid describes a different process — or nothing at all. Name the
+          // port instead: that is what this app is actually talking to.
+          if (grpcPortOverridden) {
+            sep();
+            bitWidgets.add(bitText('port $grpcPort'));
+            bitWidgets.add(const SizedBox(width: 4));
+            bitWidgets.add(
+              Tooltip(
+                message:
+                    '$kGrpcPortEnvVar=$grpcPort — this app is talking to a '
+                    'daemon on that port, not the one it manages locally. '
+                    'Start/Stop below still act on the local daemon.',
+                child: Icon(
+                  Icons.lan_outlined,
+                  size: 16,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            );
+          } else if (status.running && status.pid != null) {
             sep();
             bitWidgets.add(bitText('pid ${status.pid}'));
             // Info icon sits immediately after the pid bit, before
