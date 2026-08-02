@@ -647,13 +647,20 @@ class _TableSectionState extends State<_TableSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Caption(title: 'PEERS', detail: _summary(rows)),
-        if (hiddenClients > 0 || _showDhtClients)
-          _DhtClientToggle(
-            value: _showDhtClients,
-            hiddenCount: hiddenClients,
-            onChanged: (v) => setState(() => _showDhtClients = v),
-          ),
+        _Caption(
+          title: 'PEERS',
+          detail: _summary(rows),
+          // On the caption row rather than its own band: the toggle changes
+          // what the summary counts, so keeping them together stops it
+          // stealing a row of table height.
+          trailing: (hiddenClients > 0 || _showDhtClients)
+              ? _DhtClientToggle(
+                  value: _showDhtClients,
+                  hiddenCount: hiddenClients,
+                  onChanged: (v) => setState(() => _showDhtClients = v),
+                )
+              : null,
+        ),
         Expanded(
           child: rows.isEmpty
               ? const _EmptyRow(text: 'No peers known.')
@@ -1404,41 +1411,53 @@ class _DhtClientToggle extends StatelessWidget {
         ? 'Show DHT clients'
         : 'Show DHT clients ($hiddenCount hidden)';
 
-    return Padding(
-      padding: const EdgeInsets.only(left: 12, right: 16, bottom: 4),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Dense hit target: this sits above a table, not in a form, and the
-          // default Material checkbox padding would push the rows down.
-          SizedBox(
-            width: 24,
-            height: 24,
-            child: Checkbox(
-              value: value,
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              onChanged: (v) => onChanged(v ?? false),
-            ),
+    return Tooltip(
+      message: 'Peers that query the DHT without serving it. They are never '
+          'routing hops — typically hivemind/Python processes, or nodes '
+          'reachable only via a relay.',
+      // Whole control is the hit target, so the label toggles too — a bare
+      // checkbox this small is a fussy thing to hit.
+      child: InkWell(
+        onTap: () => onChanged(!value),
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Scaled down to sit on the caption bar without setting its
+              // height: an unscaled checkbox is taller than the bar's text.
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: Transform.scale(
+                  scale: 0.75,
+                  child: Checkbox(
+                    value: value,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onChanged: (v) => onChanged(v ?? false),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(label, style: theme.textTheme.labelSmall),
+            ],
           ),
-          const SizedBox(width: 8),
-          Tooltip(
-            message: 'Peers that query the DHT without serving it. They are '
-                'never routing hops — typically hivemind/Python processes, or '
-                'nodes reachable only via a relay.',
-            child: Text(label, style: theme.textTheme.bodySmall),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
 class _Caption extends StatelessWidget {
-  const _Caption({required this.title, this.detail});
+  const _Caption({required this.title, this.detail, this.trailing});
 
   final String title;
   final String? detail;
+
+  /// Optional control shown on the caption bar, after the title.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -1457,6 +1476,13 @@ class _Caption extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(title, style: style),
+          // Sits between the title and the summary, pushed clear of the title
+          // so it reads as a control on this bar rather than part of the label.
+          if (trailing != null) ...[
+            const SizedBox(width: 24),
+            trailing!,
+            const Spacer(),
+          ],
           if (detail != null) ...[
             // Flexible + ellipsis: the summary grows with the network ("15
             // connected · 3 in routing table"), so on a narrow window it has to
