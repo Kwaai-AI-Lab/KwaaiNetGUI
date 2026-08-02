@@ -1999,6 +1999,7 @@ class ConnectedPeer extends $pb.GeneratedMessage {
     $core.String? agentVersion,
     $core.bool? dcutr,
     $core.String? via,
+    DhtRole? dhtRole,
   }) {
     final result = create();
     if (peerId != null) result.peerId = peerId;
@@ -2012,6 +2013,7 @@ class ConnectedPeer extends $pb.GeneratedMessage {
     if (agentVersion != null) result.agentVersion = agentVersion;
     if (dcutr != null) result.dcutr = dcutr;
     if (via != null) result.via = via;
+    if (dhtRole != null) result.dhtRole = dhtRole;
     return result;
   }
 
@@ -2040,6 +2042,8 @@ class ConnectedPeer extends $pb.GeneratedMessage {
     ..aOS(9, _omitFieldNames ? '' : 'agentVersion')
     ..aOB(10, _omitFieldNames ? '' : 'dcutr')
     ..aOS(11, _omitFieldNames ? '' : 'via')
+    ..aE<DhtRole>(12, _omitFieldNames ? '' : 'dhtRole',
+        enumValues: DhtRole.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2182,6 +2186,23 @@ class ConnectedPeer extends $pb.GeneratedMessage {
   $core.bool hasVia() => $_has(10);
   @$pb.TagNumber(11)
   void clearVia() => $_clearField(11);
+
+  /// Whether this peer serves the DHT, from its advertised protocols.
+  ///
+  /// Separate from is_bootstrap/is_trusted_relay rather than a variant
+  /// of them: those are operator configuration, this is observed peer
+  /// behaviour, and they are independent. A client-mode peer still
+  /// advertises circuit relay hop, and a relayed node of ours runs kad
+  /// in client mode while remaining a full peer — so "client" is a
+  /// marker on a row, not a role that replaces the others.
+  @$pb.TagNumber(12)
+  DhtRole get dhtRole => $_getN(11);
+  @$pb.TagNumber(12)
+  set dhtRole(DhtRole value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasDhtRole() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearDhtRole() => $_clearField(12);
 }
 
 /// One entry in the Kademlia routing table.

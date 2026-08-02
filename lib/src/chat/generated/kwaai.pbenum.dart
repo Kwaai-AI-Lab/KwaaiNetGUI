@@ -114,6 +114,43 @@ class PeerConnKind extends $pb.ProtobufEnum {
   const PeerConnKind._(super.value, super.name);
 }
 
+/// A peer's DHT participation, as reported by identify.
+///
+/// Three states, not a bool: identify completes shortly *after* the
+/// connection establishes, so a freshly-connected peer has no protocol
+/// list yet. UNKNOWN keeps that gap honest — a client filtering on this
+/// would otherwise blink rows in and out as connections settle.
+class DhtRole extends $pb.ProtobufEnum {
+  /// Identify has not reported this peer's protocols yet.
+  static const DhtRole DHT_ROLE_UNKNOWN =
+      DhtRole._(0, _omitEnumNames ? '' : 'DHT_ROLE_UNKNOWN');
+
+  /// Advertises kad: a routing hop that can store records and be
+  /// returned as a lookup result.
+  static const DhtRole DHT_ROLE_SERVER =
+      DhtRole._(1, _omitEnumNames ? '' : 'DHT_ROLE_SERVER');
+
+  /// Identify completed and kad was absent. Queries the DHT without
+  /// serving it. Common and permanent — every hivemind/Python process
+  /// proxies through such a peer, and rust-libp2p nodes sit in this
+  /// mode until reachability resolves.
+  static const DhtRole DHT_ROLE_CLIENT =
+      DhtRole._(2, _omitEnumNames ? '' : 'DHT_ROLE_CLIENT');
+
+  static const $core.List<DhtRole> values = <DhtRole>[
+    DHT_ROLE_UNKNOWN,
+    DHT_ROLE_SERVER,
+    DHT_ROLE_CLIENT,
+  ];
+
+  static final $core.List<DhtRole?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static DhtRole? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const DhtRole._(super.value, super.name);
+}
+
 class Error_Code extends $pb.ProtobufEnum {
   static const Error_Code UNKNOWN =
       Error_Code._(0, _omitEnumNames ? '' : 'UNKNOWN');

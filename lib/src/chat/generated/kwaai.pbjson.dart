@@ -62,6 +62,21 @@ final $typed_data.Uint8List peerConnKindDescriptor = $convert.base64Decode(
     'CgxQZWVyQ29ubktpbmQSGQoVUEVFUl9DT05OX0tJTkRfRElSRUNUEAASGAoUUEVFUl9DT05OX0'
     'tJTkRfUkVMQVkQAQ==');
 
+@$core.Deprecated('Use dhtRoleDescriptor instead')
+const DhtRole$json = {
+  '1': 'DhtRole',
+  '2': [
+    {'1': 'DHT_ROLE_UNKNOWN', '2': 0},
+    {'1': 'DHT_ROLE_SERVER', '2': 1},
+    {'1': 'DHT_ROLE_CLIENT', '2': 2},
+  ],
+};
+
+/// Descriptor for `DhtRole`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List dhtRoleDescriptor = $convert.base64Decode(
+    'CgdEaHRSb2xlEhQKEERIVF9ST0xFX1VOS05PV04QABITCg9ESFRfUk9MRV9TRVJWRVIQARITCg'
+    '9ESFRfUk9MRV9DTElFTlQQAg==');
+
 @$core.Deprecated('Use clientFrameDescriptor instead')
 const ClientFrame$json = {
   '1': 'ClientFrame',
@@ -640,6 +655,14 @@ const ConnectedPeer$json = {
     {'1': 'agent_version', '3': 9, '4': 1, '5': 9, '10': 'agentVersion'},
     {'1': 'via', '3': 11, '4': 1, '5': 9, '10': 'via'},
     {'1': 'dcutr', '3': 10, '4': 1, '5': 8, '10': 'dcutr'},
+    {
+      '1': 'dht_role',
+      '3': 12,
+      '4': 1,
+      '5': 14,
+      '6': '.kwaai.v1.DhtRole',
+      '10': 'dhtRole'
+    },
   ],
 };
 
@@ -651,7 +674,7 @@ final $typed_data.Uint8List connectedPeerDescriptor = $convert.base64Decode(
     'JhcBIoChBpc190cnVzdGVkX3JlbGF5GAYgASgIUg5pc1RydXN0ZWRSZWxheRIcCglwcm90b2Nv'
     'bHMYByADKAlSCXByb3RvY29scxIVCgZydHRfbXMYCCABKA1SBXJ0dE1zEiMKDWFnZW50X3Zlcn'
     'Npb24YCSABKAlSDGFnZW50VmVyc2lvbhIQCgN2aWEYCyABKAlSA3ZpYRIUCgVkY3V0chgKIAEo'
-    'CFIFZGN1dHI=');
+    'CFIFZGN1dHISLAoIZGh0X3JvbGUYDCABKA4yES5rd2FhaS52MS5EaHRSb2xlUgdkaHRSb2xl');
 
 @$core.Deprecated('Use routingPeerDescriptor instead')
 const RoutingPeer$json = {

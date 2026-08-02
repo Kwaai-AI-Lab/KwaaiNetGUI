@@ -598,7 +598,7 @@ class _AddressLineState extends State<_AddressLine> {
 /// unbounded height, which costs ~25ms per frame at twenty rows versus ~0.1ms
 /// when bounded. Putting these tables in a ListView is what made this page
 /// feel like it hung. `test/peers_layout_test.dart` measures it.
-class _TableSection extends StatelessWidget {
+class _TableSection extends StatefulWidget {
   const _TableSection({
     required this.connected,
     required this.routing,
@@ -614,25 +614,54 @@ class _TableSection extends StatelessWidget {
   final Future<void> Function(String peerId) onConnect;
 
   @override
-  Widget build(BuildContext context) {
-    final rows = mergePeerRows(connected, routing);
+  State<_TableSection> createState() => _TableSectionState();
+}
 
-    final selected = selectedPeerId == null
+class _TableSectionState extends State<_TableSection> {
+  /// Whether client-mode peers are listed.
+  ///
+  /// Off by default: these are query-only participants that can never be a
+  /// routing hop, and at scale there is one per connected inference client, so
+  /// they would crowd out the nodes an operator is actually looking for.
+  ///
+  /// The hidden count is always shown next to the toggle. Hiding rows is
+  /// defensible; hiding the fact that rows are hidden is not — and a silently
+  /// filtered table would also conceal client peers accumulating in the
+  /// routing table, which is exactly the symptom worth noticing.
+  bool _showDhtClients = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final allRows = mergePeerRows(widget.connected, widget.routing);
+    final hiddenClients = allRows.where((r) => r.isDhtClient).length;
+    final rows = _showDhtClients
+        ? allRows
+        : allRows.where((r) => !r.isDhtClient).toList();
+
+    // A selection can survive the filter hiding its row — keep the detail
+    // panel honest by resolving against what is actually on screen.
+    final selected = widget.selectedPeerId == null
         ? null
-        : rows.where((r) => r.peerId == selectedPeerId).firstOrNull;
+        : rows.where((r) => r.peerId == widget.selectedPeerId).firstOrNull;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Caption(title: 'PEERS', detail: _summary(rows)),
+        if (hiddenClients > 0 || _showDhtClients)
+          _DhtClientToggle(
+            value: _showDhtClients,
+            hiddenCount: hiddenClients,
+            onChanged: (v) => setState(() => _showDhtClients = v),
+          ),
         Expanded(
           child: rows.isEmpty
               ? const _EmptyRow(text: 'No peers known.')
               : _PeerTable(
                   rows: rows,
-                  selectedPeerId: selectedPeerId,
-                  onSelectPeer: onSelectPeer,
-                  onConnect: onConnect,
+                  selectedPeerId: widget.selectedPeerId,
+                  onSelectPeer: widget.onSelectPeer,
+                  onConnect: widget.onConnect,
                 ),
         ),
         // Detail for the selected peer, pinned below the table rather than
@@ -653,7 +682,7 @@ class _TableSection extends StatelessWidget {
                 row: selected,
                 // Same toggle the row uses, so closing here and re-clicking
                 // the row cannot disagree about what is selected.
-                onClose: () => onSelectPeer(selected.peerId),
+                onClose: () => widget.onSelectPeer(selected.peerId),
               ),
             ),
           ),
@@ -735,6 +764,21 @@ class PeerRow {
 
   /// Whether any connection to this peer was upgraded by DCUtR.
   bool get anyDcutr => connections.any((c) => c.dcutr);
+
+  /// Whether this peer queries the DHT without serving it.
+  ///
+  /// Deliberately false while the role is unknown: identify lands shortly
+  /// *after* a connection establishes, so treating "not yet reported" as
+  /// "client" would blink every new peer through the filtered-out state.
+  /// A routing-only peer has no connection to read a role from and is never
+  /// a client — it is in the routing table, which is the opposite claim.
+  ///
+  /// Independent of [isBootstrap] and [isTrustedRelay] rather than exclusive
+  /// with them: those are operator configuration, this is observed behaviour.
+  /// A client-mode peer still advertises circuit relay hop, and one of our own
+  /// nodes runs kad in client mode whenever it is only reachable via a relay.
+  bool get isDhtClient =>
+      primary?.dhtRole == pbenum.DhtRole.DHT_ROLE_CLIENT;
 }
 
 /// Merge the two peer sets into one row per peer, in display order.
@@ -1337,6 +1381,59 @@ class _ProtocolLinesState extends State<_ProtocolLines> {
   }
 }
 
+/// Toggle for listing client-mode peers, with the count it is suppressing.
+///
+/// The count is the point. A bare checkbox leaves "are there peers I'm not
+/// seeing?" unanswerable without toggling it; naming the number means the
+/// default view omits the rows without ever misrepresenting the network.
+class _DhtClientToggle extends StatelessWidget {
+  const _DhtClientToggle({
+    required this.value,
+    required this.hiddenCount,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final int hiddenCount;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final label = value
+        ? 'Show DHT clients'
+        : 'Show DHT clients ($hiddenCount hidden)';
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, right: 16, bottom: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Dense hit target: this sits above a table, not in a form, and the
+          // default Material checkbox padding would push the rows down.
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: Checkbox(
+              value: value,
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              onChanged: (v) => onChanged(v ?? false),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Tooltip(
+            message: 'Peers that query the DHT without serving it. They are '
+                'never routing hops — typically hivemind/Python processes, or '
+                'nodes reachable only via a relay.',
+            child: Text(label, style: theme.textTheme.bodySmall),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Caption extends StatelessWidget {
   const _Caption({required this.title, this.detail});
 
@@ -1469,19 +1566,44 @@ class _RoleCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final kwaai = context.kwaai;
     final theme = Theme.of(context);
-    if (row.isBootstrap) {
-      return Text(
-        'bootstrap',
-        style: theme.textTheme.bodySmall?.copyWith(color: kwaai.accentPrimary),
-      );
+
+    // Configured role first, then the observed DHT one. They are independent
+    // axes, so a configured peer that is also client-mode reads "bootstrap ·
+    // client" rather than having one fact hide the other.
+    final configured = row.isBootstrap
+        ? ('bootstrap', kwaai.accentPrimary)
+        : row.isTrustedRelay
+            ? ('trusted relay', kwaai.semanticInfo)
+            : null;
+
+    if (configured == null && !row.isDhtClient) {
+      return Text('—', style: theme.textTheme.bodySmall);
     }
-    if (row.isTrustedRelay) {
-      return Text(
-        'trusted relay',
-        style: theme.textTheme.bodySmall?.copyWith(color: kwaai.semanticInfo),
-      );
-    }
-    return Text('—', style: theme.textTheme.bodySmall);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (configured != null)
+          Text(
+            configured.$1,
+            style: theme.textTheme.bodySmall?.copyWith(color: configured.$2),
+          ),
+        if (configured != null && row.isDhtClient)
+          Text(' · ', style: theme.textTheme.bodySmall),
+        if (row.isDhtClient)
+          Tooltip(
+            message: 'Queries the DHT but does not serve it — never a routing '
+                'hop. Common for hivemind/Python peers and for nodes that are '
+                'only reachable via a relay.',
+            child: Text(
+              'client',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }
 
