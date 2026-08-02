@@ -14,6 +14,44 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
+/// Whether a discovered node answered a storage RPC.
+///
+/// Reachability is a property of *this* node's route to the peer, not of
+/// the peer itself: a node behind a NAT that we cannot traverse is
+/// unreachable from here and fine from elsewhere.
+class StorageReachability extends $pb.ProtobufEnum {
+  /// Not probed yet. Every peer holds this in the first update of a
+  /// round, and keeps it for the whole round when `skip_probes` is set.
+  static const StorageReachability STORAGE_REACHABILITY_UNKNOWN =
+      StorageReachability._(
+          0, _omitEnumNames ? '' : 'STORAGE_REACHABILITY_UNKNOWN');
+
+  /// Answered a /kwaai/storage/1.0.0 health RPC. `capacity_gb_free`
+  /// and `tenant_count` on this peer are live values from that reply.
+  static const StorageReachability STORAGE_REACHABILITY_REACHABLE =
+      StorageReachability._(
+          1, _omitEnumNames ? '' : 'STORAGE_REACHABILITY_REACHABLE');
+
+  /// Advertised in the DHT but did not answer — offline, or running a
+  /// build without the storage protocol.
+  static const StorageReachability STORAGE_REACHABILITY_UNREACHABLE =
+      StorageReachability._(
+          2, _omitEnumNames ? '' : 'STORAGE_REACHABILITY_UNREACHABLE');
+
+  static const $core.List<StorageReachability> values = <StorageReachability>[
+    STORAGE_REACHABILITY_UNKNOWN,
+    STORAGE_REACHABILITY_REACHABLE,
+    STORAGE_REACHABILITY_UNREACHABLE,
+  ];
+
+  static final $core.List<StorageReachability?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static StorageReachability? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const StorageReachability._(super.value, super.name);
+}
+
 /// Why a NetworkUpdate was sent.
 ///
 /// Without this a client cannot tell a routine sample from a genuine
@@ -113,42 +151,143 @@ class DhtRole extends $pb.ProtobufEnum {
   const DhtRole._(super.value, super.name);
 }
 
-/// Whether a discovered node answered a storage RPC.
+/// What stage of a distributed run an InferenceEvent describes.
 ///
-/// Reachability is a property of *this* node's route to the peer, not of
-/// the peer itself: a node behind a NAT that we cannot traverse is
-/// unreachable from here and fine from elsewhere.
-class StorageReachability extends $pb.ProtobufEnum {
-  /// Not probed yet. Every peer holds this in the first update of a
-  /// round, and keeps it for the whole round when `skip_probes` is set.
-  static const StorageReachability STORAGE_REACHABILITY_UNKNOWN =
-      StorageReachability._(
-          0, _omitEnumNames ? '' : 'STORAGE_REACHABILITY_UNKNOWN');
+/// Open enum: a client that does not recognise a value must render the
+/// event's `message` generically rather than dropping it, so a newer
+/// daemon's added phases stay legible on an older client.
+class InferencePhase extends $pb.ProtobufEnum {
+  static const InferencePhase INFERENCE_PHASE_UNSPECIFIED =
+      InferencePhase._(0, _omitEnumNames ? '' : 'INFERENCE_PHASE_UNSPECIFIED');
 
-  /// Answered a /kwaai/storage/1.0.0 health RPC. `capacity_gb_free`
-  /// and `tenant_count` on this peer are live values from that reply.
-  static const StorageReachability STORAGE_REACHABILITY_REACHABLE =
-      StorageReachability._(
-          1, _omitEnumNames ? '' : 'STORAGE_REACHABILITY_REACHABLE');
+  /// Run accepted; model / dht_prefix / total_blocks resolved.
+  /// Sets: model, dht_prefix, total_blocks.
+  static const InferencePhase INFERENCE_PHASE_RESOLVED =
+      InferencePhase._(1, _omitEnumNames ? '' : 'INFERENCE_PHASE_RESOLVED');
 
-  /// Advertised in the DHT but did not answer — offline, or running a
-  /// build without the storage protocol.
-  static const StorageReachability STORAGE_REACHABILITY_UNREACHABLE =
-      StorageReachability._(
-          2, _omitEnumNames ? '' : 'STORAGE_REACHABILITY_UNREACHABLE');
+  /// A DHT discovery round is starting. Sets: attempt, dht_prefix.
+  static const InferencePhase INFERENCE_PHASE_DISCOVERY_START =
+      InferencePhase._(
+          2, _omitEnumNames ? '' : 'INFERENCE_PHASE_DISCOVERY_START');
 
-  static const $core.List<StorageReachability> values = <StorageReachability>[
-    STORAGE_REACHABILITY_UNKNOWN,
-    STORAGE_REACHABILITY_REACHABLE,
-    STORAGE_REACHABILITY_UNREACHABLE,
+  /// A discovery round returned. Sets: attempt, peer_count,
+  /// covered_blocks, total_blocks. peer_count == 0 means the round
+  /// found nothing and another attempt follows, up to the 30s cap.
+  static const InferencePhase INFERENCE_PHASE_DISCOVERY_RESULT =
+      InferencePhase._(
+          3, _omitEnumNames ? '' : 'INFERENCE_PHASE_DISCOVERY_RESULT');
+
+  /// The chain came from a saved circuit rather than the DHT.
+  /// Sets: circuit_id, peer_count.
+  static const InferencePhase INFERENCE_PHASE_CIRCUIT_LOADED = InferencePhase._(
+      4, _omitEnumNames ? '' : 'INFERENCE_PHASE_CIRCUIT_LOADED');
+
+  /// The route for this run was pinned. Sets: hops (ordered, gapless,
+  /// covering [0, total_blocks)) and total_blocks. Re-emitted after a
+  /// rebuild with `attempt` incremented.
+  static const InferencePhase INFERENCE_PHASE_CHAIN_PINNED =
+      InferencePhase._(5, _omitEnumNames ? '' : 'INFERENCE_PHASE_CHAIN_PINNED');
+
+  /// Best-effort dial of a chain member before generation starts.
+  /// Sets: peer_id, peer_name, ok.
+  static const InferencePhase INFERENCE_PHASE_PEER_DIAL =
+      InferencePhase._(6, _omitEnumNames ? '' : 'INFERENCE_PHASE_PEER_DIAL');
+
+  /// A hop is being dispatched. Sets: peer_id, peer_name, block_start,
+  /// block_end, is_self, token_index, is_prefill, candidate_index.
+  static const InferencePhase INFERENCE_PHASE_HOP_START =
+      InferencePhase._(7, _omitEnumNames ? '' : 'INFERENCE_PHASE_HOP_START');
+
+  /// A hop returned activations or logits. Sets everything HOP_START
+  /// does, plus duration_ms.
+  static const InferencePhase INFERENCE_PHASE_HOP_OK =
+      InferencePhase._(8, _omitEnumNames ? '' : 'INFERENCE_PHASE_HOP_OK');
+
+  /// A hop failed. Sets everything HOP_START does, plus duration_ms,
+  /// message (the error) and failure. Followed by either a HOP_START
+  /// for the next candidate at the same block_start, or a
+  /// PATH_REBUILD when no candidate is left.
+  static const InferencePhase INFERENCE_PHASE_HOP_FAILED =
+      InferencePhase._(9, _omitEnumNames ? '' : 'INFERENCE_PHASE_HOP_FAILED');
+
+  /// Every candidate for a block position failed; the path is being
+  /// rebuilt and the token retried. The KV cache is lost at this
+  /// point, so output may degrade. Sets: block_start, message, attempt.
+  static const InferencePhase INFERENCE_PHASE_PATH_REBUILD = InferencePhase._(
+      10, _omitEnumNames ? '' : 'INFERENCE_PHASE_PATH_REBUILD');
+
+  /// A token was sampled. Sets: token_index, is_prefill, duration_ms
+  /// (wall time for this token's whole forward pass).
+  static const InferencePhase INFERENCE_PHASE_TOKEN_SAMPLED = InferencePhase._(
+      11, _omitEnumNames ? '' : 'INFERENCE_PHASE_TOKEN_SAMPLED');
+
+  /// Generation finished. Sets: token_index (total generated),
+  /// duration_ms (whole run) and message (the stop reason).
+  static const InferencePhase INFERENCE_PHASE_COMPLETE =
+      InferencePhase._(12, _omitEnumNames ? '' : 'INFERENCE_PHASE_COMPLETE');
+
+  static const $core.List<InferencePhase> values = <InferencePhase>[
+    INFERENCE_PHASE_UNSPECIFIED,
+    INFERENCE_PHASE_RESOLVED,
+    INFERENCE_PHASE_DISCOVERY_START,
+    INFERENCE_PHASE_DISCOVERY_RESULT,
+    INFERENCE_PHASE_CIRCUIT_LOADED,
+    INFERENCE_PHASE_CHAIN_PINNED,
+    INFERENCE_PHASE_PEER_DIAL,
+    INFERENCE_PHASE_HOP_START,
+    INFERENCE_PHASE_HOP_OK,
+    INFERENCE_PHASE_HOP_FAILED,
+    INFERENCE_PHASE_PATH_REBUILD,
+    INFERENCE_PHASE_TOKEN_SAMPLED,
+    INFERENCE_PHASE_COMPLETE,
   ];
 
-  static final $core.List<StorageReachability?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
-  static StorageReachability? valueOf($core.int value) =>
+  static final $core.List<InferencePhase?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 12);
+  static InferencePhase? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
-  const StorageReachability._(super.value, super.name);
+  const InferencePhase._(super.value, super.name);
+}
+
+/// Why a hop failed, which decides whether the peer stays eligible for
+/// the rest of the run.
+class HopFailure extends $pb.ProtobufEnum {
+  static const HopFailure HOP_FAILURE_UNSPECIFIED =
+      HopFailure._(0, _omitEnumNames ? '' : 'HOP_FAILURE_UNSPECIFIED');
+
+  /// The peer answered but has no inference handler registered
+  /// ("protocols not supported"). Blacklisted for this run.
+  static const HopFailure HOP_FAILURE_NO_HANDLER =
+      HopFailure._(1, _omitEnumNames ? '' : 'HOP_FAILURE_NO_HANDLER');
+
+  /// Stream reset, early eof, or connection closed. NOT blacklisted:
+  /// the peer may recover and is retried on the next token.
+  static const HopFailure HOP_FAILURE_TRANSIENT =
+      HopFailure._(2, _omitEnumNames ? '' : 'HOP_FAILURE_TRANSIENT');
+
+  /// Exceeded the per-hop deadline. Blacklisted for this run.
+  static const HopFailure HOP_FAILURE_TIMEOUT =
+      HopFailure._(3, _omitEnumNames ? '' : 'HOP_FAILURE_TIMEOUT');
+
+  /// Anything else. Blacklisted for this run.
+  static const HopFailure HOP_FAILURE_OTHER =
+      HopFailure._(4, _omitEnumNames ? '' : 'HOP_FAILURE_OTHER');
+
+  static const $core.List<HopFailure> values = <HopFailure>[
+    HOP_FAILURE_UNSPECIFIED,
+    HOP_FAILURE_NO_HANDLER,
+    HOP_FAILURE_TRANSIENT,
+    HOP_FAILURE_TIMEOUT,
+    HOP_FAILURE_OTHER,
+  ];
+
+  static final $core.List<HopFailure?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static HopFailure? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const HopFailure._(super.value, super.name);
 }
 
 class Error_Code extends $pb.ProtobufEnum {

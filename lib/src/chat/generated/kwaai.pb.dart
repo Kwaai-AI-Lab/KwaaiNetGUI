@@ -307,6 +307,7 @@ enum ServerFrame_Body {
   storage,
   network,
   connect,
+  inferenceEvent,
   notSet
 }
 
@@ -325,6 +326,7 @@ class ServerFrame extends $pb.GeneratedMessage {
     StorageUpdate? storage,
     NetworkUpdate? network,
     ConnectReply? connect,
+    InferenceEvent? inferenceEvent,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -337,6 +339,7 @@ class ServerFrame extends $pb.GeneratedMessage {
     if (storage != null) result.storage = storage;
     if (network != null) result.network = network;
     if (connect != null) result.connect = connect;
+    if (inferenceEvent != null) result.inferenceEvent = inferenceEvent;
     return result;
   }
 
@@ -359,13 +362,14 @@ class ServerFrame extends $pb.GeneratedMessage {
     16: ServerFrame_Body.storage,
     17: ServerFrame_Body.network,
     18: ServerFrame_Body.connect,
+    19: ServerFrame_Body.inferenceEvent,
     0: ServerFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ServerFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingReply>(10, _omitFieldNames ? '' : 'pong',
@@ -384,6 +388,8 @@ class ServerFrame extends $pb.GeneratedMessage {
         subBuilder: NetworkUpdate.create)
     ..aOM<ConnectReply>(18, _omitFieldNames ? '' : 'connect',
         subBuilder: ConnectReply.create)
+    ..aOM<InferenceEvent>(19, _omitFieldNames ? '' : 'inferenceEvent',
+        subBuilder: InferenceEvent.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -414,6 +420,7 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
+  @$pb.TagNumber(19)
   ServerFrame_Body whichBody() => _ServerFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
@@ -424,6 +431,7 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
+  @$pb.TagNumber(19)
   void clearBody() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -550,6 +558,21 @@ class ServerFrame extends $pb.GeneratedMessage {
   void clearConnect() => $_clearField(18);
   @$pb.TagNumber(18)
   ConnectReply ensureConnect() => $_ensure(9);
+
+  /// Structured progress event for a shard_run operation, emitted
+  /// only when ShardRunRequest.events was set. Interleaved with
+  /// `token` bodies on the same id, and never terminal — the
+  /// operation still ends with Done or Error.
+  @$pb.TagNumber(19)
+  InferenceEvent get inferenceEvent => $_getN(10);
+  @$pb.TagNumber(19)
+  set inferenceEvent(InferenceEvent value) => $_setField(19, value);
+  @$pb.TagNumber(19)
+  $core.bool hasInferenceEvent() => $_has(10);
+  @$pb.TagNumber(19)
+  void clearInferenceEvent() => $_clearField(19);
+  @$pb.TagNumber(19)
+  InferenceEvent ensureInferenceEvent() => $_ensure(10);
 }
 
 /// Sent from client → server to abort an in-flight operation by id.
@@ -900,12 +923,14 @@ class ShardRunRequest extends $pb.GeneratedMessage {
     $core.String? content,
     $core.String? model,
     $core.String? conversationId,
+    $core.bool? events,
   }) {
     final result = create();
     if (role != null) result.role = role;
     if (content != null) result.content = content;
     if (model != null) result.model = model;
     if (conversationId != null) result.conversationId = conversationId;
+    if (events != null) result.events = events;
     return result;
   }
 
@@ -926,6 +951,7 @@ class ShardRunRequest extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'content')
     ..aOS(3, _omitFieldNames ? '' : 'model')
     ..aOS(4, _omitFieldNames ? '' : 'conversationId')
+    ..aOB(5, _omitFieldNames ? '' : 'events')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -984,6 +1010,26 @@ class ShardRunRequest extends $pb.GeneratedMessage {
   $core.bool hasConversationId() => $_has(3);
   @$pb.TagNumber(4)
   void clearConversationId() => $_clearField(4);
+
+  /// Emit InferenceEvent frames on this operation id, interleaved with
+  /// tokens, describing peer/block routing as it happens.
+  ///
+  /// Off by default, and deliberately opt-in: a chain of N hops over T
+  /// tokens produces O(N*T) events, which is real formatting work for a
+  /// client that isn't showing them — and they share this operation's
+  /// channel with the tokens, so producing them unasked adds
+  /// backpressure to the path the user is actually waiting on.
+  ///
+  /// A daemon predating this field ignores it and emits no events. See
+  /// InferenceEvent for how a client tells that apart from a quiet run.
+  @$pb.TagNumber(5)
+  $core.bool get events => $_getBF(4);
+  @$pb.TagNumber(5)
+  set events($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasEvents() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearEvents() => $_clearField(5);
 }
 
 /// `kwaainet status` — daemon-side state snapshot.
@@ -2800,6 +2846,486 @@ class ConnectReply extends $pb.GeneratedMessage {
   $core.bool hasError() => $_has(1);
   @$pb.TagNumber(2)
   void clearError() => $_clearField(2);
+}
+
+/// One hop of a pinned route: which peer serves which block range.
+class InferenceHop extends $pb.GeneratedMessage {
+  factory InferenceHop({
+    $core.String? peerId,
+    $core.String? peerName,
+    $core.int? blockStart,
+    $core.int? blockEnd,
+    $core.bool? isSelf,
+    $core.double? trustScore,
+    $core.double? throughput,
+  }) {
+    final result = create();
+    if (peerId != null) result.peerId = peerId;
+    if (peerName != null) result.peerName = peerName;
+    if (blockStart != null) result.blockStart = blockStart;
+    if (blockEnd != null) result.blockEnd = blockEnd;
+    if (isSelf != null) result.isSelf = isSelf;
+    if (trustScore != null) result.trustScore = trustScore;
+    if (throughput != null) result.throughput = throughput;
+    return result;
+  }
+
+  InferenceHop._();
+
+  factory InferenceHop.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory InferenceHop.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'InferenceHop',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'peerId')
+    ..aOS(2, _omitFieldNames ? '' : 'peerName')
+    ..aI(3, _omitFieldNames ? '' : 'blockStart', fieldType: $pb.PbFieldType.OU3)
+    ..aI(4, _omitFieldNames ? '' : 'blockEnd', fieldType: $pb.PbFieldType.OU3)
+    ..aOB(5, _omitFieldNames ? '' : 'isSelf')
+    ..aD(6, _omitFieldNames ? '' : 'trustScore')
+    ..aD(7, _omitFieldNames ? '' : 'throughput')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  InferenceHop clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  InferenceHop copyWith(void Function(InferenceHop) updates) =>
+      super.copyWith((message) => updates(message as InferenceHop))
+          as InferenceHop;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static InferenceHop create() => InferenceHop._();
+  @$core.override
+  InferenceHop createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static InferenceHop getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<InferenceHop>(create);
+  static InferenceHop? _defaultInstance;
+
+  /// libp2p peer id, base58.
+  @$pb.TagNumber(1)
+  $core.String get peerId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set peerId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPeerId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPeerId() => $_clearField(1);
+
+  /// The name the peer announced in the DHT. May be empty.
+  @$pb.TagNumber(2)
+  $core.String get peerName => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set peerName($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPeerName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPeerName() => $_clearField(2);
+
+  /// Served block range: [block_start, block_end).
+  @$pb.TagNumber(3)
+  $core.int get blockStart => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set blockStart($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasBlockStart() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearBlockStart() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get blockEnd => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set blockEnd($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasBlockEnd() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearBlockEnd() => $_clearField(4);
+
+  /// Whether this hop dispatches to the local bypass server rather
+  /// than out over libp2p — i.e. this machine serves these blocks.
+  @$pb.TagNumber(5)
+  $core.bool get isSelf => $_getBF(4);
+  @$pb.TagNumber(5)
+  set isSelf($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasIsSelf() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearIsSelf() => $_clearField(5);
+
+  /// Local reputation score in [0, 1]. Absent when the reputation
+  /// system is disabled.
+  @$pb.TagNumber(6)
+  $core.double get trustScore => $_getN(5);
+  @$pb.TagNumber(6)
+  set trustScore($core.double value) => $_setDouble(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasTrustScore() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTrustScore() => $_clearField(6);
+
+  /// Tokens/sec the peer claimed in its DHT announcement. 0 = unknown.
+  @$pb.TagNumber(7)
+  $core.double get throughput => $_getN(6);
+  @$pb.TagNumber(7)
+  set throughput($core.double value) => $_setDouble(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasThroughput() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearThroughput() => $_clearField(7);
+}
+
+/// A single point-in-time event during a distributed run.
+///
+/// Deliberately one flat message with a phase enum rather than a oneof
+/// of per-phase types: clients render these as a homogeneous log, and a
+/// flat shape means a future phase costs one enum value instead of a new
+/// message plus a new oneof arm — which matters under the append-only
+/// rule at the top of this file. It also degrades better across version
+/// skew, since an unknown enum value still carries a readable `message`
+/// where an unknown oneof arm is simply invisible.
+///
+/// Which fields carry meaning depends on `phase`; see InferencePhase.
+/// Numerics that are not always applicable use explicit presence, so
+/// "0 ms" is distinguishable from "not applicable to this phase".
+class InferenceEvent extends $pb.GeneratedMessage {
+  factory InferenceEvent({
+    $fixnum.Int64? elapsedMs,
+    InferencePhase? phase,
+    $core.String? message,
+    $core.String? peerId,
+    $core.String? peerName,
+    $core.bool? isSelf,
+    $core.int? blockStart,
+    $core.int? blockEnd,
+    $core.int? totalBlocks,
+    $core.int? coveredBlocks,
+    $core.double? durationMs,
+    $core.int? tokenIndex,
+    $core.bool? isPrefill,
+    $core.int? candidateIndex,
+    $core.int? attempt,
+    $core.bool? ok,
+    HopFailure? failure,
+    $core.String? model,
+    $core.String? dhtPrefix,
+    $core.int? peerCount,
+    $core.String? circuitId,
+    $core.Iterable<InferenceHop>? hops,
+  }) {
+    final result = create();
+    if (elapsedMs != null) result.elapsedMs = elapsedMs;
+    if (phase != null) result.phase = phase;
+    if (message != null) result.message = message;
+    if (peerId != null) result.peerId = peerId;
+    if (peerName != null) result.peerName = peerName;
+    if (isSelf != null) result.isSelf = isSelf;
+    if (blockStart != null) result.blockStart = blockStart;
+    if (blockEnd != null) result.blockEnd = blockEnd;
+    if (totalBlocks != null) result.totalBlocks = totalBlocks;
+    if (coveredBlocks != null) result.coveredBlocks = coveredBlocks;
+    if (durationMs != null) result.durationMs = durationMs;
+    if (tokenIndex != null) result.tokenIndex = tokenIndex;
+    if (isPrefill != null) result.isPrefill = isPrefill;
+    if (candidateIndex != null) result.candidateIndex = candidateIndex;
+    if (attempt != null) result.attempt = attempt;
+    if (ok != null) result.ok = ok;
+    if (failure != null) result.failure = failure;
+    if (model != null) result.model = model;
+    if (dhtPrefix != null) result.dhtPrefix = dhtPrefix;
+    if (peerCount != null) result.peerCount = peerCount;
+    if (circuitId != null) result.circuitId = circuitId;
+    if (hops != null) result.hops.addAll(hops);
+    return result;
+  }
+
+  InferenceEvent._();
+
+  factory InferenceEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory InferenceEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'InferenceEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..a<$fixnum.Int64>(
+        1, _omitFieldNames ? '' : 'elapsedMs', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aE<InferencePhase>(2, _omitFieldNames ? '' : 'phase',
+        enumValues: InferencePhase.values)
+    ..aOS(3, _omitFieldNames ? '' : 'message')
+    ..aOS(10, _omitFieldNames ? '' : 'peerId')
+    ..aOS(11, _omitFieldNames ? '' : 'peerName')
+    ..aOB(12, _omitFieldNames ? '' : 'isSelf')
+    ..aI(20, _omitFieldNames ? '' : 'blockStart',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(21, _omitFieldNames ? '' : 'blockEnd', fieldType: $pb.PbFieldType.OU3)
+    ..aI(22, _omitFieldNames ? '' : 'totalBlocks',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(23, _omitFieldNames ? '' : 'coveredBlocks',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aD(30, _omitFieldNames ? '' : 'durationMs')
+    ..aI(40, _omitFieldNames ? '' : 'tokenIndex',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOB(41, _omitFieldNames ? '' : 'isPrefill')
+    ..aI(42, _omitFieldNames ? '' : 'candidateIndex',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(43, _omitFieldNames ? '' : 'attempt', fieldType: $pb.PbFieldType.OU3)
+    ..aOB(44, _omitFieldNames ? '' : 'ok')
+    ..aE<HopFailure>(50, _omitFieldNames ? '' : 'failure',
+        enumValues: HopFailure.values)
+    ..aOS(60, _omitFieldNames ? '' : 'model')
+    ..aOS(61, _omitFieldNames ? '' : 'dhtPrefix')
+    ..aI(62, _omitFieldNames ? '' : 'peerCount', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(63, _omitFieldNames ? '' : 'circuitId')
+    ..pPM<InferenceHop>(70, _omitFieldNames ? '' : 'hops',
+        subBuilder: InferenceHop.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  InferenceEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  InferenceEvent copyWith(void Function(InferenceEvent) updates) =>
+      super.copyWith((message) => updates(message as InferenceEvent))
+          as InferenceEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static InferenceEvent create() => InferenceEvent._();
+  @$core.override
+  InferenceEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static InferenceEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<InferenceEvent>(create);
+  static InferenceEvent? _defaultInstance;
+
+  /// Milliseconds since the run started. Relative rather than absolute
+  /// so a client can render a timeline without trusting clock skew
+  /// between the daemon and itself.
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get elapsedMs => $_getI64(0);
+  @$pb.TagNumber(1)
+  set elapsedMs($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasElapsedMs() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearElapsedMs() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  InferencePhase get phase => $_getN(1);
+  @$pb.TagNumber(2)
+  set phase(InferencePhase value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPhase() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPhase() => $_clearField(2);
+
+  /// Human-readable detail. Always safe to display; for a phase the
+  /// client does not recognise it is the only thing to display.
+  @$pb.TagNumber(3)
+  $core.String get message => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set message($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMessage() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMessage() => $_clearField(3);
+
+  /// ── Peer identity (HOP_*, PEER_DIAL) ──
+  @$pb.TagNumber(10)
+  $core.String get peerId => $_getSZ(3);
+  @$pb.TagNumber(10)
+  set peerId($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(10)
+  $core.bool hasPeerId() => $_has(3);
+  @$pb.TagNumber(10)
+  void clearPeerId() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.String get peerName => $_getSZ(4);
+  @$pb.TagNumber(11)
+  set peerName($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(11)
+  $core.bool hasPeerName() => $_has(4);
+  @$pb.TagNumber(11)
+  void clearPeerName() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.bool get isSelf => $_getBF(5);
+  @$pb.TagNumber(12)
+  set isSelf($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(12)
+  $core.bool hasIsSelf() => $_has(5);
+  @$pb.TagNumber(12)
+  void clearIsSelf() => $_clearField(12);
+
+  /// ── Block range (HOP_*, PATH_REBUILD, discovery) ──
+  @$pb.TagNumber(20)
+  $core.int get blockStart => $_getIZ(6);
+  @$pb.TagNumber(20)
+  set blockStart($core.int value) => $_setUnsignedInt32(6, value);
+  @$pb.TagNumber(20)
+  $core.bool hasBlockStart() => $_has(6);
+  @$pb.TagNumber(20)
+  void clearBlockStart() => $_clearField(20);
+
+  @$pb.TagNumber(21)
+  $core.int get blockEnd => $_getIZ(7);
+  @$pb.TagNumber(21)
+  set blockEnd($core.int value) => $_setUnsignedInt32(7, value);
+  @$pb.TagNumber(21)
+  $core.bool hasBlockEnd() => $_has(7);
+  @$pb.TagNumber(21)
+  void clearBlockEnd() => $_clearField(21);
+
+  @$pb.TagNumber(22)
+  $core.int get totalBlocks => $_getIZ(8);
+  @$pb.TagNumber(22)
+  set totalBlocks($core.int value) => $_setUnsignedInt32(8, value);
+  @$pb.TagNumber(22)
+  $core.bool hasTotalBlocks() => $_has(8);
+  @$pb.TagNumber(22)
+  void clearTotalBlocks() => $_clearField(22);
+
+  @$pb.TagNumber(23)
+  $core.int get coveredBlocks => $_getIZ(9);
+  @$pb.TagNumber(23)
+  set coveredBlocks($core.int value) => $_setUnsignedInt32(9, value);
+  @$pb.TagNumber(23)
+  $core.bool hasCoveredBlocks() => $_has(9);
+  @$pb.TagNumber(23)
+  void clearCoveredBlocks() => $_clearField(23);
+
+  /// ── Timing ──
+  @$pb.TagNumber(30)
+  $core.double get durationMs => $_getN(10);
+  @$pb.TagNumber(30)
+  set durationMs($core.double value) => $_setDouble(10, value);
+  @$pb.TagNumber(30)
+  $core.bool hasDurationMs() => $_has(10);
+  @$pb.TagNumber(30)
+  void clearDurationMs() => $_clearField(30);
+
+  /// ── Sequencing ──
+  /// 0-based index of the token being produced. Token 0 is the prefill
+  /// pass over the whole prompt; every later token is a single-token
+  /// decode step. `is_prefill` says which, so a client does not have to
+  /// infer it from the index.
+  @$pb.TagNumber(40)
+  $core.int get tokenIndex => $_getIZ(11);
+  @$pb.TagNumber(40)
+  set tokenIndex($core.int value) => $_setUnsignedInt32(11, value);
+  @$pb.TagNumber(40)
+  $core.bool hasTokenIndex() => $_has(11);
+  @$pb.TagNumber(40)
+  void clearTokenIndex() => $_clearField(40);
+
+  @$pb.TagNumber(41)
+  $core.bool get isPrefill => $_getBF(12);
+  @$pb.TagNumber(41)
+  set isPrefill($core.bool value) => $_setBool(12, value);
+  @$pb.TagNumber(41)
+  $core.bool hasIsPrefill() => $_has(12);
+  @$pb.TagNumber(41)
+  void clearIsPrefill() => $_clearField(41);
+
+  /// Which candidate at this block position, 0 = first choice. Greater
+  /// than 0 means earlier candidates for the same blocks already failed.
+  @$pb.TagNumber(42)
+  $core.int get candidateIndex => $_getIZ(13);
+  @$pb.TagNumber(42)
+  set candidateIndex($core.int value) => $_setUnsignedInt32(13, value);
+  @$pb.TagNumber(42)
+  $core.bool hasCandidateIndex() => $_has(13);
+  @$pb.TagNumber(42)
+  void clearCandidateIndex() => $_clearField(42);
+
+  /// Discovery round or path-rebuild generation, 1-based.
+  @$pb.TagNumber(43)
+  $core.int get attempt => $_getIZ(14);
+  @$pb.TagNumber(43)
+  set attempt($core.int value) => $_setUnsignedInt32(14, value);
+  @$pb.TagNumber(43)
+  $core.bool hasAttempt() => $_has(14);
+  @$pb.TagNumber(43)
+  void clearAttempt() => $_clearField(43);
+
+  /// Whether the action this event reports succeeded. Only meaningful
+  /// for PEER_DIAL, where a failed dial is routine rather than fatal —
+  /// the peer may still be reachable when the hop is actually made.
+  @$pb.TagNumber(44)
+  $core.bool get ok => $_getBF(15);
+  @$pb.TagNumber(44)
+  set ok($core.bool value) => $_setBool(15, value);
+  @$pb.TagNumber(44)
+  $core.bool hasOk() => $_has(15);
+  @$pb.TagNumber(44)
+  void clearOk() => $_clearField(44);
+
+  /// ── Failure detail (HOP_FAILED) ──
+  @$pb.TagNumber(50)
+  HopFailure get failure => $_getN(16);
+  @$pb.TagNumber(50)
+  set failure(HopFailure value) => $_setField(50, value);
+  @$pb.TagNumber(50)
+  $core.bool hasFailure() => $_has(16);
+  @$pb.TagNumber(50)
+  void clearFailure() => $_clearField(50);
+
+  /// ── Discovery / resolution detail ──
+  @$pb.TagNumber(60)
+  $core.String get model => $_getSZ(17);
+  @$pb.TagNumber(60)
+  set model($core.String value) => $_setString(17, value);
+  @$pb.TagNumber(60)
+  $core.bool hasModel() => $_has(17);
+  @$pb.TagNumber(60)
+  void clearModel() => $_clearField(60);
+
+  @$pb.TagNumber(61)
+  $core.String get dhtPrefix => $_getSZ(18);
+  @$pb.TagNumber(61)
+  set dhtPrefix($core.String value) => $_setString(18, value);
+  @$pb.TagNumber(61)
+  $core.bool hasDhtPrefix() => $_has(18);
+  @$pb.TagNumber(61)
+  void clearDhtPrefix() => $_clearField(61);
+
+  @$pb.TagNumber(62)
+  $core.int get peerCount => $_getIZ(19);
+  @$pb.TagNumber(62)
+  set peerCount($core.int value) => $_setUnsignedInt32(19, value);
+  @$pb.TagNumber(62)
+  $core.bool hasPeerCount() => $_has(19);
+  @$pb.TagNumber(62)
+  void clearPeerCount() => $_clearField(62);
+
+  @$pb.TagNumber(63)
+  $core.String get circuitId => $_getSZ(20);
+  @$pb.TagNumber(63)
+  set circuitId($core.String value) => $_setString(20, value);
+  @$pb.TagNumber(63)
+  $core.bool hasCircuitId() => $_has(20);
+  @$pb.TagNumber(63)
+  void clearCircuitId() => $_clearField(63);
+
+  /// ── Route (CHAIN_PINNED only) ──
+  @$pb.TagNumber(70)
+  $pb.PbList<InferenceHop> get hops => $_getList(21);
 }
 
 class ChatMessage extends $pb.GeneratedMessage {
