@@ -3,7 +3,9 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../settings.dart';
 import 'chat_message.dart';
+import 'inference_events_state.dart';
 import 'kwaai_rpc_client.dart';
 import 'session_client.dart';
 
@@ -79,10 +81,21 @@ class ChatTranscriptNotifier
     final client = ref.read(kwaaiRpcClientProvider);
     _operationId = null;
     void captureId(int? id) => _operationId = id;
+
+    // Only the distributed path has a route to narrate, and only ask the
+    // daemon for the detail when the panel is actually open — producing it
+    // is real work on its side.
+    final wantEvents =
+        _path == ChatPath.shardRun &&
+        ref.read(inferencePanelEnabledProvider);
+    final eventsNotifier = ref.read(inferenceEventsProvider.notifier);
+    if (wantEvents) eventsNotifier.startRun();
+
     final stream = switch (_path) {
       ChatPath.shardRun => client.chatStreamCancellable(
         prompt,
         onOperationId: captureId,
+        onEvents: wantEvents ? eventsNotifier.ingest : null,
       ),
       ChatPath.generateLocal => client.generateLocalCancellable(
         prompt,
@@ -164,6 +177,11 @@ class ChatTranscriptNotifier
     // Unconditional: a pending bump must be cleared even when the last
     // message wasn't mid-stream, so it can't fire after teardown.
     _flushBump();
+    // Dropping the token subscription does not close the event stream, so
+    // end the run explicitly or the panel keeps claiming it is live.
+    if (_path == ChatPath.shardRun) {
+      ref.read(inferenceEventsProvider.notifier).endRun();
+    }
   }
 
   /// Drop the transcript and abort any in-flight stream. Backs the
@@ -185,6 +203,11 @@ class ChatTranscriptNotifier
     _bumpTimer?.cancel();
     _bumpTimer = null;
     state = [];
+    // The panel describes the transcript we just discarded, so clear it
+    // too rather than leaving a finished run's route on screen.
+    if (_path == ChatPath.shardRun) {
+      ref.read(inferenceEventsProvider.notifier).reset();
+    }
   }
 
   /// Trigger a rebuild without changing the list reference — copying

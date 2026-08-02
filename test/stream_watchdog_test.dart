@@ -100,5 +100,54 @@ void main() {
       await Future<void>.delayed(_first * 2);
       expect(errored, isFalse);
     });
+
+    // `counts` exists for progress events: they prove the daemon is alive
+    // during a long prefill, but they are not the answer starting. Without
+    // the distinction, a run with the inference panel open would drop onto
+    // the short stall deadline before its first token and be killed —
+    // while the same run with the panel closed survived.
+    group('counts', () {
+      Stream<String> wrapCounting(Stream<String> source) =>
+          watchdogged<String, String>(
+            source,
+            extract: (s) => s.startsWith('tok') ? s : null,
+            counts: (s) => s.startsWith('tok'),
+            firstTimeout: _first,
+            stallTimeout: _stall,
+          );
+
+      test('non-counting elements hold the longer first-frame deadline',
+          () async {
+        final ctrl = StreamController<String>();
+        addTearDown(ctrl.close);
+        var errored = false;
+        wrapCounting(
+          ctrl.stream,
+        ).listen((_) {}, onError: (Object _) => errored = true);
+
+        // Heartbeat at a cadence that would breach the stall deadline but
+        // not the first-frame one. If these counted as "started", the
+        // deadline would have shortened and this would fail.
+        for (var i = 0; i < 4; i++) {
+          await Future<void>.delayed(_stall + (_stall ~/ 2));
+          ctrl.add('event$i');
+        }
+        expect(errored, isFalse);
+      });
+
+      test('a counting element shortens the deadline', () async {
+        final ctrl = StreamController<String>();
+        addTearDown(ctrl.close);
+        final errors = <Object>[];
+        wrapCounting(ctrl.stream).listen((_) {}, onError: errors.add);
+
+        ctrl.add('tok0');
+        // Past the stall deadline but inside the first-frame one: only a
+        // shortened deadline fires here.
+        await Future<void>.delayed(_stall * 2);
+        expect(errors, hasLength(1));
+        expect((errors.single as SessionOpError).message, contains('mid-answer'));
+      });
+    });
   });
 }

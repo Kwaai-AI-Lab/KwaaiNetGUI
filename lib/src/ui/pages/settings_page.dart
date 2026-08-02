@@ -2001,6 +2001,7 @@ class _DeveloperTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final enabled = ref.watch(localChatEnabledProvider);
+    final panelEnabled = ref.watch(inferencePanelEnabledProvider);
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
@@ -2027,6 +2028,37 @@ class _DeveloperTab extends ConsumerWidget {
                   'in-process model, bypassing the shard mesh. Useful '
                   'for verifying the local InferenceEngine without '
                   'depending on peer availability.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _FeatureCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const KwaaiHeading('Inference events'),
+                const SizedBox(height: 4),
+                _SwitchRow(
+                  label: 'Show inference panel during chat',
+                  value: panelEnabled,
+                  onChanged: (v) async {
+                    await settings.setInferencePanelEnabled(v);
+                    ref.read(inferencePanelEnabledProvider.notifier).state = v;
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Opens a panel beside the chat showing how a distributed '
+                  'answer is being produced: which peers were discovered, '
+                  'the route through the model\'s blocks, and each hop as '
+                  'its activations pass through — including retries when a '
+                  'peer fails. Only affects the distributed Chat tab, and '
+                  'asks the daemon for the extra detail only while the '
+                  'panel is open.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),

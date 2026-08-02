@@ -159,12 +159,25 @@ class SessionClient {
   /// As [shardRun], but also exposes the operation id so the caller can
   /// [cancel] it. Stopping generation needs the id, and `_open` would
   /// otherwise allocate and discard it.
-  SessionOperation shardRunOp(String prompt, {String role = 'user'}) =>
-      _openOp((id) => pb.ClientFrame()
-        ..id = Int64(id)
-        ..shardRun = (pb.ShardRunRequest()
-          ..role = role
-          ..content = prompt));
+  ///
+  /// Set [events] to also receive [SessionOperation.events] — the daemon's
+  /// account of which peers served which blocks. It is off by default
+  /// because the daemon does real work to produce it, so it is only worth
+  /// asking for when something is going to display it.
+  SessionOperation shardRunOp(
+    String prompt, {
+    String role = 'user',
+    bool events = false,
+  }) =>
+      _openOp(
+        (id) => pb.ClientFrame()
+          ..id = Int64(id)
+          ..shardRun = (pb.ShardRunRequest()
+            ..role = role
+            ..content = prompt
+            ..events = events),
+        withEvents: events,
+      );
 
   /// `kwaainet generate <PROMPT>` — single-node local inference. Used
   /// by the Developer tab to drive the local InferenceEngine directly.
@@ -291,6 +304,10 @@ class SessionClient {
         final t = f.token;
         return t.text.isEmpty ? null : t.text;
       },
+      // Progress events keep the watchdog fed — they prove the daemon is
+      // working — but only a token means the answer has actually begun, and
+      // so only a token moves us onto the shorter stall deadline.
+      counts: (f) => f.whichBody() == pb.ServerFrame_Body.token,
     );
   }
 
@@ -298,7 +315,13 @@ class SessionClient {
   /// return the per-id stream.
   /// As [_open], but keeps the allocated operation id so the caller can
   /// cancel the operation server-side.
-  SessionOperation _openOp(pb.ClientFrame Function(int id) build) {
+  ///
+  /// With [withEvents], the operation's frames feed two streams instead of
+  /// one — see the tee below.
+  SessionOperation _openOp(
+    pb.ClientFrame Function(int id) build, {
+    bool withEvents = false,
+  }) {
     ensureOpen();
     if (_closed || _outbound == null) {
       // No frame was sent, so there is no server-side operation to
@@ -312,15 +335,66 @@ class SessionClient {
             reason: 'session not open',
           ),
         ),
+        events: const Stream<pb.InferenceEvent>.empty(),
       );
     }
     final id = _nextId++;
     final controller = StreamController<pb.ServerFrame>();
     _routers[id] = controller;
     _outbound!.add(build(id));
+
+    if (!withEvents) {
+      return SessionOperation(
+        id: id,
+        tokens: _tokensFromFrames(controller.stream),
+        events: const Stream<pb.InferenceEvent>.empty(),
+      );
+    }
+
+    // One router, two consumers. The router is single-subscription (see
+    // [_handleFrame]), so it cannot simply be listened to twice; instead
+    // subscribe once here and fan each frame out.
+    //
+    // Both sinks are plain controllers rather than broadcast ones, and
+    // that matters: a plain controller buffers while it has no listener,
+    // so nothing is lost in the window between this method returning and
+    // the caller subscribing. A broadcast controller would drop those
+    // first frames, which on a fast local daemon is exactly the chain
+    // discovery a caller most wants to see.
+    final frames = StreamController<pb.ServerFrame>();
+    final events = StreamController<pb.InferenceEvent>();
+    controller.stream.listen(
+      (f) {
+        if (f.whichBody() == pb.ServerFrame_Body.inferenceEvent) {
+          if (!events.isClosed) events.add(f.inferenceEvent);
+        }
+        // Forward every frame, not just tokens: the token pipeline's
+        // watchdog treats any frame as proof the daemon is alive.
+        if (!frames.isClosed) frames.add(f);
+      },
+      // Errors go to *both* sinks. Sending them only downstream of the
+      // tokens would leave anything watching events waiting forever on a
+      // run that has already failed.
+      onError: (Object e, StackTrace st) {
+        if (!events.isClosed) {
+          events.addError(e, st);
+          events.close();
+        }
+        if (!frames.isClosed) {
+          frames.addError(e, st);
+          frames.close();
+        }
+      },
+      onDone: () {
+        if (!events.isClosed) events.close();
+        if (!frames.isClosed) frames.close();
+      },
+    );
+
     return SessionOperation(
       id: id,
-      tokens: _tokensFromFrames(controller.stream),
+      tokens: _tokensFromFrames(frames.stream),
+      events: events.stream,
     );
   }
 
@@ -369,9 +443,21 @@ const kStallTimeout = Duration(seconds: 45);
 /// The deadline is [kFirstFrameTimeout] until the first element arrives and
 /// [kStallTimeout] thereafter — "never started" and "stopped mid-answer"
 /// warrant different patience.
+///
+/// [counts] decides which elements mean the stream has genuinely *started*,
+/// and so switch the deadline to the shorter one. Every element still resets
+/// the timer; this only controls which deadline is armed. Default: all of
+/// them.
+///
+/// That distinction exists because progress events are proof the daemon is
+/// alive but not proof it is producing output. Prefill on a slow mesh emits
+/// events for a long time before the first token, and treating those as "we
+/// have started" would drop the run onto the 45s stall deadline mid-prefill
+/// and kill a perfectly healthy generation.
 Stream<Out> watchdogged<In, Out>(
   Stream<In> source, {
   required Out? Function(In) extract,
+  bool Function(In)? counts,
   Duration firstTimeout = kFirstFrameTimeout,
   Duration stallTimeout = kStallTimeout,
 }) {
@@ -406,7 +492,8 @@ Stream<Out> watchdogged<In, Out>(
     arm();
     sub = source.listen(
       (e) {
-        sawElement = true;
+        // Every element resets the timer; only a counting one shortens it.
+        sawElement = sawElement || (counts?.call(e) ?? true);
         arm();
         final mapped = extract(e);
         if (mapped != null) out.add(mapped);
@@ -436,7 +523,11 @@ Stream<Out> watchdogged<In, Out>(
 /// can only drop its own subscription while the daemon keeps generating
 /// into a channel nobody reads.
 class SessionOperation {
-  SessionOperation({required this.id, required this.tokens});
+  SessionOperation({
+    required this.id,
+    required this.tokens,
+    this.events = const Stream<pb.InferenceEvent>.empty(),
+  });
 
   /// Server-side operation id, or null when the session was already
   /// closed and no frame was ever sent. Null means "nothing to cancel";
@@ -445,6 +536,16 @@ class SessionOperation {
   final int? id;
 
   final Stream<String> tokens;
+
+  /// The daemon's running account of how this operation is being served —
+  /// chain discovery, the pinned route, per-block peer dispatch.
+  ///
+  /// Empty unless the operation asked for events, and empty against a
+  /// daemon too old to send them: proto3 drops the unknown request field
+  /// silently, so "no events" and "not supported" look identical here and
+  /// have to be told apart further up. Interleaved with [tokens] and
+  /// closed by the same terminator.
+  final Stream<pb.InferenceEvent> events;
 }
 
 /// An in-flight block-coverage subscription: its update stream plus the

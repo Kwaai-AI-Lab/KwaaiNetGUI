@@ -262,10 +262,14 @@ class KwaaiRpcClient {
   Stream<String> chatStreamCancellable(
     String prompt, {
     required void Function(int? operationId) onOperationId,
+    void Function(Stream<pb.InferenceEvent>)? onEvents,
   }) async* {
     final session = await _sessionOrInit();
-    final op = session.shardRunOp(prompt);
+    // A non-null [onEvents] is also what asks the daemon to produce events
+    // in the first place — no listener, no work.
+    final op = session.shardRunOp(prompt, events: onEvents != null);
     onOperationId(op.id);
+    onEvents?.call(op.events);
     try {
       yield* op.tokens;
     } catch (e) {

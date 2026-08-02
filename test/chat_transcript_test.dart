@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kwaainet_gui/src/chat/chat_state.dart';
+import 'package:kwaainet_gui/src/chat/generated/kwaai.pb.dart' as pb;
 import 'package:kwaainet_gui/src/chat/kwaai_rpc_client.dart';
 import 'package:kwaainet_gui/src/chat/session_client.dart';
 
@@ -47,6 +48,7 @@ abstract class _FakeClient extends KwaaiRpcClient {
   Stream<String> chatStreamCancellable(
     String prompt, {
     required void Function(int? operationId) onOperationId,
+    void Function(Stream<pb.InferenceEvent>)? onEvents,
   }) {
     onOperationId(operationId);
     return tokenStream(prompt);

@@ -25,6 +25,7 @@ class Settings {
   static const _keepInTrayKey = 'window.keepInTrayOnClose';
   static const _startOnStartupKey = 'daemon.startOnStartup';
   static const _localChatKey = 'dev.localChatEnabled';
+  static const _inferencePanelKey = 'dev.inferencePanelEnabled';
   static const _skippedVersionKey = 'app.skippedVersion';
 
   final SharedPreferences _prefs;
@@ -50,6 +51,14 @@ class Settings {
   /// local inference). Off by default; meant for development /
   /// fallback when you want to bypass the shard mesh.
   bool get localChatEnabled => _prefs.getBool(_localChatKey) ?? false;
+
+  /// Developer preference — when true, the main chat window shows a panel
+  /// on the right streaming what the daemon is doing during a distributed
+  /// run: chain discovery, the pinned route, and each block's peer as its
+  /// activations pass through. Off by default; asking for it makes the
+  /// daemon do extra work, so it is only requested while the panel is open.
+  bool get inferencePanelEnabled =>
+      _prefs.getBool(_inferencePanelKey) ?? false;
 
   /// The app release version the user chose to "Skip" from the update
   /// banner (e.g. "0.1.3", normalized without a leading "v"). The banner
@@ -81,6 +90,10 @@ class Settings {
     await _prefs.setBool(_localChatKey, v);
   }
 
+  Future<void> setInferencePanelEnabled(bool v) async {
+    await _prefs.setBool(_inferencePanelKey, v);
+  }
+
   Future<void> setSkippedVersion(String? v) async {
     if (v == null || v.isEmpty) {
       await _prefs.remove(_skippedVersionKey);
@@ -108,6 +121,14 @@ final settingsProvider = Provider<Settings>((ref) {
 /// writes through to Settings.setLocalChatEnabled() and updates this
 /// provider so subscribers see the change immediately.
 final localChatEnabledProvider = StateProvider<bool>((_) => false);
+
+/// Riverpod-visible mirror of [Settings.inferencePanelEnabled]. The chat
+/// tab watches this to decide whether to show the inference panel — and
+/// [ChatTranscriptNotifier] reads it to decide whether to ask the daemon
+/// for events at all. Seeded by main.dart at startup; the Settings UI
+/// writes through to [Settings.setInferencePanelEnabled] and updates this
+/// so the panel appears on the same frame.
+final inferencePanelEnabledProvider = StateProvider<bool>((_) => false);
 
 /// Riverpod-visible mirror of [Settings.skippedVersion]. The update
 /// banner / tray watch this so a "Skip" takes effect immediately without

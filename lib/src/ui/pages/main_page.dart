@@ -13,6 +13,7 @@ import '../../window/window_focus.dart';
 import '../theme/kwaai_theme.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/branded_title.dart';
+import '../widgets/inference_panel.dart';
 import '../widgets/kwaai_chat_composer.dart';
 import '../widgets/kwaai_markdown_body.dart';
 import '../widgets/kwaai_status_bar.dart';
@@ -121,21 +122,38 @@ class _TabSpec {
 }
 
 /// The contents of one tab — body + input — driven by a [ChatPath].
-class _ChatTab extends StatelessWidget {
+class _ChatTab extends ConsumerWidget {
   const _ChatTab({required this.path, required this.onOpenSettings});
 
   final ChatPath path;
   final VoidCallback onOpenSettings;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Only on the distributed tab: local inference runs entirely in the
+    // daemon's own process, so there is no route to show.
+    final showPanel =
+        path == ChatPath.shardRun &&
+        ref.watch(inferencePanelEnabledProvider);
+
+    final chat = Column(
       children: [
         Expanded(
           child: _ChatBody(path: path, onOpenSettings: onOpenSettings),
         ),
         _ChatErrorBar(path: path),
         _ChatInputBar(path: path),
+      ],
+    );
+
+    if (!showPanel) return chat;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(child: chat),
+        const VerticalDivider(width: 1),
+        const InferencePanel(),
       ],
     );
   }
