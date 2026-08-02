@@ -195,9 +195,13 @@ class _PeersTabState extends ConsumerState<PeersTab> {
   ///
   /// The next snapshot reports the result, so there is nothing to update here
   /// beyond surfacing a failure — a successful connection simply appears.
-  Future<void> _connectPeer(String peerId) async {
+  ///
+  /// Returns whether the dial succeeded. A refused dial comes back as a reply
+  /// with `connected == false`, not as a thrown error, so a caller that infers
+  /// the outcome from whether this threw would call every failure a success.
+  Future<bool> _connectPeer(String peerId) async {
     final reply = await ref.read(kwaaiRpcClientProvider).connectPeer(peerId);
-    if (!mounted) return;
+    if (!mounted) return reply?.connected ?? false;
     final failed = reply == null || !reply.connected;
     if (failed) {
       final detail = reply?.error ?? 'the daemon could not be reached';
@@ -208,6 +212,7 @@ class _PeersTabState extends ConsumerState<PeersTab> {
         ),
       );
     }
+    return !failed;
   }
 
   void _togglePeer(String peerId) => setState(() {
@@ -628,7 +633,7 @@ class _TableSection extends StatefulWidget {
   final List<pb.RoutingPeer> routing;
   final String? selectedPeerId;
   final void Function(String peerId) onSelectPeer;
-  final Future<void> Function(String peerId) onConnect;
+  final Future<bool> Function(String peerId) onConnect;
 
   @override
   State<_TableSection> createState() => _TableSectionState();
@@ -886,7 +891,7 @@ class _PeerTable extends StatelessWidget {
   final List<PeerRow> rows;
   final String? selectedPeerId;
   final void Function(String peerId) onSelectPeer;
-  final Future<void> Function(String peerId) onConnect;
+  final Future<bool> Function(String peerId) onConnect;
 
   @override
   Widget build(BuildContext context) {
@@ -1037,7 +1042,7 @@ class _ConnectCell extends StatefulWidget {
   });
 
   final String peerId;
-  final Future<void> Function(String peerId) onConnect;
+  final Future<bool> Function(String peerId) onConnect;
 
   /// Whether the routing table holds an address to dial.
   ///
@@ -1078,8 +1083,10 @@ class _ConnectCellState extends State<_ConnectCell> {
     });
     var ok = false;
     try {
-      await widget.onConnect(widget.peerId);
-      ok = true;
+      // The returned flag, not the absence of a throw: a refused dial comes
+      // back as a normal reply carrying `connected: false`, so treating "did
+      // not throw" as success marks every failure with a tick.
+      ok = await widget.onConnect(widget.peerId);
     } catch (_) {
       // Swallowed deliberately: the caller surfaces the error, and this cell
       // only needs to know which mark to show.
@@ -1113,13 +1120,22 @@ class _ConnectCellState extends State<_ConnectCell> {
       );
     }
 
+    // A failure mark replaces the button rather than sitting beside it: the
+    // dial used the address the routing table holds, so an immediate retry
+    // repeats it exactly. The mark clears on its own, which is when retrying
+    // becomes worth offering again — by then a fresh snapshot may have
+    // replaced the address that failed.
     if (_lastOk != null) {
       return Tooltip(
-        message: _lastOk! ? 'Connect requested' : 'Connect failed',
+        message: _lastOk!
+            ? 'Connect requested'
+            : 'Connect failed — see the message below the table',
         child: Icon(
           _lastOk! ? Icons.check : Icons.close,
           size: 14,
-          color: _lastOk! ? kwaai.semanticInfo : Theme.of(context).colorScheme.error,
+          color: _lastOk!
+              ? kwaai.semanticInfo
+              : Theme.of(context).colorScheme.error,
         ),
       );
     }
