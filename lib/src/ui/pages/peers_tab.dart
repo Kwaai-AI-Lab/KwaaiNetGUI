@@ -694,6 +694,7 @@ class PeerRow {
     required this.inRoutingTable,
     required this.isBootstrap,
     required this.isTrustedRelay,
+    this.routingAddrs = const [],
   });
 
   final String peerId;
@@ -709,6 +710,13 @@ class PeerRow {
   final bool inRoutingTable;
   final bool isBootstrap;
   final bool isTrustedRelay;
+
+  /// What the DHT routing table holds for this peer.
+  ///
+  /// Present even with no connection — that is the point. A routing entry with
+  /// no address is a peer we know of but cannot dial, which looks identical to
+  /// a merely-unconnected one unless the addresses are shown.
+  final List<String> routingAddrs;
 
   bool get isConnected => connections.isNotEmpty;
 
@@ -759,6 +767,7 @@ List<PeerRow> mergePeerRows(
         // configuration there, and a routing entry carries the same flag.
         isBootstrap: conns.any((c) => c.isBootstrap),
         isTrustedRelay: conns.any((c) => c.isTrustedRelay),
+        routingAddrs: routingById[entry.key]?.addrs ?? const [],
       ),
     );
   }
@@ -771,6 +780,7 @@ List<PeerRow> mergePeerRows(
         inRoutingTable: true,
         isBootstrap: r.isBootstrap,
         isTrustedRelay: false,
+        routingAddrs: r.addrs,
       ),
     );
   }
@@ -863,6 +873,7 @@ class _PeerTable extends StatelessWidget {
                             : _ConnectCell(
                                 peerId: r.peerId,
                                 onConnect: onConnect,
+                                dialable: r.routingAddrs.isNotEmpty,
                               ),
                       ),
                       DataCell(_StateMark(on: r.inRoutingTable)),
@@ -945,10 +956,21 @@ class _PeerTable extends StatelessWidget {
 /// libp2p has the inbound side initiate hole punching. It is for reaching a
 /// peer the routing table knows about but we are not talking to.
 class _ConnectCell extends StatefulWidget {
-  const _ConnectCell({required this.peerId, required this.onConnect});
+  const _ConnectCell({
+    required this.peerId,
+    required this.onConnect,
+    required this.dialable,
+  });
 
   final String peerId;
   final Future<void> Function(String peerId) onConnect;
+
+  /// Whether the routing table holds an address to dial.
+  ///
+  /// Offering the button without one invites a connect that cannot succeed —
+  /// and fails confusingly, since a peer with no usable address may still be
+  /// reached at a stale one and report a peer-id mismatch.
+  final bool dialable;
 
   @override
   State<_ConnectCell> createState() => _ConnectCellState();
@@ -980,16 +1002,22 @@ class _ConnectCellState extends State<_ConnectCell> {
               padding: EdgeInsets.zero,
               visualDensity: VisualDensity.compact,
               constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
-              color: kwaai.accentPrimary,
-              tooltip: 'Connect to this peer',
-              onPressed: () async {
-                setState(() => _busy = true);
-                try {
-                  await widget.onConnect(widget.peerId);
-                } finally {
-                  if (mounted) setState(() => _busy = false);
-                }
-              },
+              color: widget.dialable
+                  ? kwaai.accentPrimary
+                  : Theme.of(context).disabledColor,
+              tooltip: widget.dialable
+                  ? 'Connect to this peer'
+                  : 'No dialable address known for this peer',
+              onPressed: !widget.dialable
+                  ? null
+                  : () async {
+                      setState(() => _busy = true);
+                      try {
+                        await widget.onConnect(widget.peerId);
+                      } finally {
+                        if (mounted) setState(() => _busy = false);
+                      }
+                    },
             )
           : const _StateMark(on: false),
     );
@@ -1087,20 +1115,39 @@ class _PeerConnections extends StatelessWidget {
               ),
             ],
           ),
-          if (row.connections.isEmpty)
+          if (row.connections.isEmpty) ...[
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
                 // A routing-table entry we hold no connection to. Normal: the
                 // table deliberately retains peers we are not talking to.
-                'Known from the DHT routing table; not currently connected.',
+                //
+                // Whether it is *dialable* is the part worth saying out loud:
+                // an entry with no address cannot be connected to at all, and
+                // reads identically to one that simply is not connected yet.
+                row.routingAddrs.isEmpty
+                    ? 'Known from the DHT routing table, but with no dialable '
+                          'address — connecting is not possible until one is '
+                          'learned.'
+                    : 'Known from the DHT routing table; not currently '
+                          'connected.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.textTheme.bodySmall?.color?.withValues(
                     alpha: 0.7,
                   ),
                 ),
               ),
-            )
+            ),
+            if (row.routingAddrs.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: _AddressLine(
+                  label: 'Known at',
+                  itemLabel: 'address',
+                  values: row.routingAddrs,
+                ),
+              ),
+          ]
           else
             for (final c in row.connections)
               Padding(

@@ -179,4 +179,51 @@ void main() {
   test('an empty network produces no rows', () {
     expect(mergePeerRows([], []), isEmpty);
   });
+
+  group('routing addresses', () {
+    test('a routing-only peer carries its addresses', () {
+      // The state this exists to make visible: kad knows the peer and holds a
+      // way to reach it, but there is no connection. Without the addresses
+      // that is indistinguishable from an entry we cannot dial at all.
+      final rows = mergePeerRows(
+        const [],
+        [
+          pb.RoutingPeer(
+            peerId: 'A',
+            addrs: ['/ip4/198.18.0.32/tcp/8080'],
+          ),
+        ],
+      );
+      expect(rows.single.routingAddrs, ['/ip4/198.18.0.32/tcp/8080']);
+      expect(rows.single.isConnected, isFalse);
+    });
+
+    test('an entry with no address is distinguishable from one with', () {
+      // This pair is the whole point: both are "in the routing table, not
+      // connected", and only routingAddrs tells them apart. The empty one
+      // cannot be connected to, so the UI must not offer it.
+      final rows = mergePeerRows(
+        const [],
+        [
+          pb.RoutingPeer(peerId: 'A', addrs: ['/ip4/198.18.0.32/tcp/8080']),
+          pb.RoutingPeer(peerId: 'B'),
+        ],
+      );
+      final byId = {for (final r in rows) r.peerId: r};
+      expect(byId['A']!.routingAddrs, isNotEmpty);
+      expect(byId['B']!.routingAddrs, isEmpty);
+    });
+
+    test('a connected peer still picks up its routing addresses', () {
+      // Merging must not drop them just because a connection exists — the
+      // routing entry and the live connection are different facts, and the
+      // connection can be relayed while the routing address is direct.
+      final rows = mergePeerRows(
+        [pb.ConnectedPeer(peerId: 'A', addr: '/ip4/1.2.3.4/tcp/1')],
+        [pb.RoutingPeer(peerId: 'A', addrs: ['/ip4/198.18.0.32/tcp/8080'])],
+      );
+      expect(rows.single.routingAddrs, ['/ip4/198.18.0.32/tcp/8080']);
+      expect(rows.single.isConnected, isTrue);
+    });
+  });
 }

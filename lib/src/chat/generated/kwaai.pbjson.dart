@@ -660,13 +660,15 @@ const RoutingPeer$json = {
     {'1': 'peer_id', '3': 1, '4': 1, '5': 9, '10': 'peerId'},
     {'1': 'connected', '3': 2, '4': 1, '5': 8, '10': 'connected'},
     {'1': 'is_bootstrap', '3': 3, '4': 1, '5': 8, '10': 'isBootstrap'},
+    {'1': 'addrs', '3': 4, '4': 3, '5': 9, '10': 'addrs'},
   ],
 };
 
 /// Descriptor for `RoutingPeer`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List routingPeerDescriptor = $convert.base64Decode(
     'CgtSb3V0aW5nUGVlchIXCgdwZWVyX2lkGAEgASgJUgZwZWVySWQSHAoJY29ubmVjdGVkGAIgAS'
-    'gIUgljb25uZWN0ZWQSIQoMaXNfYm9vdHN0cmFwGAMgASgIUgtpc0Jvb3RzdHJhcA==');
+    'gIUgljb25uZWN0ZWQSIQoMaXNfYm9vdHN0cmFwGAMgASgIUgtpc0Jvb3RzdHJhcBIUCgVhZGRy'
+    'cxgEIAMoCVIFYWRkcnM=');
 
 @$core.Deprecated('Use selfStatusDescriptor instead')
 const SelfStatus$json = {

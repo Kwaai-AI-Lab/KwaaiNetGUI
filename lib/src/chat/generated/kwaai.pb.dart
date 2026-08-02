@@ -2197,11 +2197,13 @@ class RoutingPeer extends $pb.GeneratedMessage {
     $core.String? peerId,
     $core.bool? connected,
     $core.bool? isBootstrap,
+    $core.Iterable<$core.String>? addrs,
   }) {
     final result = create();
     if (peerId != null) result.peerId = peerId;
     if (connected != null) result.connected = connected;
     if (isBootstrap != null) result.isBootstrap = isBootstrap;
+    if (addrs != null) result.addrs.addAll(addrs);
     return result;
   }
 
@@ -2221,6 +2223,7 @@ class RoutingPeer extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'peerId')
     ..aOB(2, _omitFieldNames ? '' : 'connected')
     ..aOB(3, _omitFieldNames ? '' : 'isBootstrap')
+    ..pPS(4, _omitFieldNames ? '' : 'addrs')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2275,6 +2278,17 @@ class RoutingPeer extends $pb.GeneratedMessage {
   $core.bool hasIsBootstrap() => $_has(2);
   @$pb.TagNumber(3)
   void clearIsBootstrap() => $_clearField(3);
+
+  /// The addresses the routing table holds for this peer, as multiaddr
+  /// strings.
+  ///
+  /// Empty means kad knows the peer but has no address a third party
+  /// could dial — a materially different state from "known and not
+  /// currently connected", and one a peer id alone cannot express. It is
+  /// also what makes a poisoned entry legible: a peer whose only address
+  /// is its own loopback reads as healthy until the address is visible.
+  @$pb.TagNumber(4)
+  $pb.PbList<$core.String> get addrs => $_getList(3);
 }
 
 /// This node's own position in the network.
