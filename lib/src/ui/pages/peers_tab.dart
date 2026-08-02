@@ -327,21 +327,38 @@ class _SelfStatusHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Wrap, not Row: the badge text grows with the reachability source and
-        // the counts grow with the network, so on a narrow window this line
-        // genuinely cannot fit. Wrapping re-flows it instead of overflowing.
-        Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 12,
-          runSpacing: 6,
+        // Wrap, not Row, for the title group: the badge text grows with the
+        // reachability source, so on a narrow window it genuinely cannot fit
+        // and needs to re-flow rather than overflow.
+        //
+        // The counts sit outside that group, in a Row that spans the full
+        // width, so they can be pushed to the right edge. Inside the Wrap they
+        // were just another wrapped child, landing mid-line or on a line of
+        // their own aligned left under the title.
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text('This node', style: theme.textTheme.titleSmall),
-            if (s != null) _ReachabilityBadge(self: s),
+            // Expanded, not Flexible: it must claim the leftover width so the
+            // counts are pushed to the right edge. Flexible lets the Row
+            // shrink to its content, leaving the counts mid-bar.
+            Expanded(
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 6,
+                children: [
+                  Text('This node', style: theme.textTheme.titleSmall),
+                  if (s != null) _ReachabilityBadge(self: s),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
             if (stale && staleFor != null)
               _StaleChip(staleFor: staleFor!)
             else
               Text(
                 '$connectedCount connected · $routingCount in routing table',
+                textAlign: TextAlign.right,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.textTheme.bodySmall?.color?.withValues(
                     alpha: 0.75,
@@ -633,7 +650,9 @@ class _TableSectionState extends State<_TableSection> {
   @override
   Widget build(BuildContext context) {
     final allRows = mergePeerRows(widget.connected, widget.routing);
-    final hiddenClients = allRows.where((r) => r.isDhtClient).length;
+    final clientRows = allRows.where((r) => r.isDhtClient).length;
+    // What the table is actually withholding — zero once they are shown.
+    final hiddenClients = _showDhtClients ? 0 : clientRows;
     final rows = _showDhtClients
         ? allRows
         : allRows.where((r) => !r.isDhtClient).toList();
@@ -653,7 +672,9 @@ class _TableSectionState extends State<_TableSection> {
           // On the caption row rather than its own band: the toggle changes
           // what the summary counts, so keeping them together stops it
           // stealing a row of table height.
-          trailing: (hiddenClients > 0 || _showDhtClients)
+          // Keyed off client rows existing at all, not off how many are
+          // hidden — otherwise checking the box would make the box vanish.
+          trailing: (clientRows > 0 || _showDhtClients)
               ? _DhtClientToggle(
                   value: _showDhtClients,
                   onChanged: (v) => setState(() => _showDhtClients = v),
@@ -1033,15 +1054,73 @@ class _ConnectCellState extends State<_ConnectCell> {
   bool _hovered = false;
   bool _busy = false;
 
+  /// Outcome of the last attempt, held briefly after it finishes.
+  ///
+  /// Without this the cell reverts to its idle mark the instant the future
+  /// completes, so a fast failure is indistinguishable from never having
+  /// clicked. A connect can also succeed without the row changing — the peer
+  /// may already have been in the routing table — so "did that do anything?"
+  /// needs answering here rather than being left to the table.
+  bool? _lastOk;
+  Timer? _clearOutcome;
+
+  @override
+  void dispose() {
+    _clearOutcome?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _connect() async {
+    _clearOutcome?.cancel();
+    setState(() {
+      _busy = true;
+      _lastOk = null;
+    });
+    var ok = false;
+    try {
+      await widget.onConnect(widget.peerId);
+      ok = true;
+    } catch (_) {
+      // Swallowed deliberately: the caller surfaces the error, and this cell
+      // only needs to know which mark to show.
+      ok = false;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _lastOk = ok;
+        });
+        // Long enough to read after the pointer has moved on, short enough
+        // that a stale verdict does not linger over a changing table.
+        _clearOutcome = Timer(const Duration(seconds: 4), () {
+          if (mounted) setState(() => _lastOk = null);
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final kwaai = context.kwaai;
 
+    // Both of these render regardless of hover — the pointer has usually left
+    // the row by the time either matters.
     if (_busy) {
       return const SizedBox(
         width: 14,
         height: 14,
         child: CircularProgressIndicator(strokeWidth: 1.6),
+      );
+    }
+
+    if (_lastOk != null) {
+      return Tooltip(
+        message: _lastOk! ? 'Connect requested' : 'Connect failed',
+        child: Icon(
+          _lastOk! ? Icons.check : Icons.close,
+          size: 14,
+          color: _lastOk! ? kwaai.semanticInfo : Theme.of(context).colorScheme.error,
+        ),
       );
     }
 
@@ -1061,16 +1140,7 @@ class _ConnectCellState extends State<_ConnectCell> {
               tooltip: widget.dialable
                   ? 'Connect to this peer'
                   : 'No dialable address known for this peer',
-              onPressed: !widget.dialable
-                  ? null
-                  : () async {
-                      setState(() => _busy = true);
-                      try {
-                        await widget.onConnect(widget.peerId);
-                      } finally {
-                        if (mounted) setState(() => _busy = false);
-                      }
-                    },
+              onPressed: widget.dialable ? _connect : null,
             )
           : const _StateMark(on: false),
     );
@@ -1489,9 +1559,9 @@ class _Caption extends StatelessWidget {
           ],
           const Spacer(),
           if (detail != null) ...[
-            // Flexible + ellipsis: the summary grows with the network ("15
-            // connected · 3 in routing table"), so on a narrow window it has to
-            // give way rather than push the bar wider than the viewport.
+            // Flexible, not Expanded: the text takes only the width it needs
+            // so the Spacer above keeps it against the right edge, and it
+            // still shrinks with an ellipsis when the bar is too narrow.
             Flexible(
               child: Text(
                 detail!,
