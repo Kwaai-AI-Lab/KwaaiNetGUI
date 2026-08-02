@@ -939,6 +939,12 @@ class _PeerTable extends StatelessWidget {
               rows: [
                 for (final r in rows)
                   DataRow(
+                    // Keyed by peer so per-row state survives the 5s refresh.
+                    // Without it Flutter matches rows by position, and a peer
+                    // appearing or dropping shifts everything below it —
+                    // handing one row's connect outcome to a different peer,
+                    // or resetting it so a failure mark never clears.
+                    key: ValueKey(r.peerId),
                     selected: r.peerId == selectedPeerId,
                     color: WidgetStateProperty.resolveWith(
                       (states) => states.contains(WidgetState.selected)
@@ -951,6 +957,11 @@ class _PeerTable extends StatelessWidget {
                         r.isConnected
                             ? const _StateMark(on: true)
                             : _ConnectCell(
+                                // Keyed by peer for the same reason as the
+                                // row: this cell holds the in-flight and
+                                // outcome state, and it must follow the peer
+                                // rather than the position.
+                                key: ValueKey('connect-${r.peerId}'),
                                 peerId: r.peerId,
                                 onConnect: onConnect,
                                 dialable: r.routingAddrs.isNotEmpty,
@@ -1037,6 +1048,7 @@ class _PeerTable extends StatelessWidget {
 /// peer the routing table knows about but we are not talking to.
 class _ConnectCell extends StatefulWidget {
   const _ConnectCell({
+    super.key,
     required this.peerId,
     required this.onConnect,
     required this.dialable,
