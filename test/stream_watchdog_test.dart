@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kwaainet_gui/src/chat/session_client.dart';
 
 /// Short deadlines so the tests exercise the real timer logic without the
-/// production 90s/45s waits. fakeAsync-free: we drive real timers but at a
+/// production 10-minute waits. fakeAsync-free: we drive real timers but at a
 /// scale where the whole suite still runs in well under a second.
 const _first = Duration(milliseconds: 120);
 const _stall = Duration(milliseconds: 60);
@@ -99,6 +99,139 @@ void main() {
       // and push an error into a stream nobody is listening to.
       await Future<void>.delayed(_first * 2);
       expect(errored, isFalse);
+    });
+
+    // The watchdog measures silence, not slowness. Anything the daemon
+    // sends — a token or a mere progress event — proves it is alive, so a
+    // run that keeps reporting is never killed however long it takes. A
+    // 90s cap here used to kill healthy distributed runs seconds before
+    // their first token.
+    group('liveness', () {
+      Stream<String> wrapCounting(
+        Stream<String> source, {
+        void Function(SessionSlowNotice)? onSlow,
+        Duration? slowAfter,
+      }) => watchdogged<String, String>(
+        source,
+        extract: (s) => s.startsWith('tok') ? s : null,
+        counts: (s) => s.startsWith('tok'),
+        onSlow: onSlow,
+        firstTimeout: _first,
+        stallTimeout: _stall,
+        slowAfter: slowAfter ?? _first,
+        slowTick: _stall,
+      );
+
+      test('progress alone keeps a run alive indefinitely', () async {
+        final ctrl = StreamController<String>();
+        addTearDown(ctrl.close);
+        var errored = false;
+        wrapCounting(
+          ctrl.stream,
+        ).listen((_) {}, onError: (Object _) => errored = true);
+
+        // Frames at a cadence inside the deadline, for far longer in
+        // aggregate than either deadline would allow on its own.
+        for (var i = 0; i < 6; i++) {
+          await Future<void>.delayed(_stall ~/ 2);
+          ctrl.add('event$i');
+        }
+        expect(
+          errored,
+          isFalse,
+          reason: 'events prove liveness, so the run must not be failed',
+        );
+      });
+
+      test('a token does not shorten the deadline into a failure', () async {
+        final ctrl = StreamController<String>();
+        addTearDown(ctrl.close);
+        var errored = false;
+        wrapCounting(
+          ctrl.stream,
+        ).listen((_) {}, onError: (Object _) => errored = true);
+
+        ctrl.add('tok0');
+        // Total elapsed far exceeds the stall deadline, but events keep
+        // arriving — the run is slow, not stalled.
+        for (var i = 0; i < 6; i++) {
+          await Future<void>.delayed(_stall ~/ 2);
+          ctrl.add('event$i');
+        }
+        expect(errored, isFalse);
+      });
+
+      test('genuine silence still fails', () async {
+        final ctrl = StreamController<String>();
+        addTearDown(ctrl.close);
+        final errors = <Object>[];
+        wrapCounting(ctrl.stream).listen((_) {}, onError: errors.add);
+
+        // Nothing at all — the wedged case the deadline exists for.
+        await Future<void>.delayed(_first * 2);
+        expect(errors, hasLength(1));
+        expect(errors.single, isA<SessionOpError>());
+      });
+    });
+
+    group('slow notices', () {
+      test('reports elapsed time until output arrives, then stops', () async {
+        final ctrl = StreamController<String>();
+        addTearDown(ctrl.close);
+        final notices = <SessionSlowNotice>[];
+        watchdogged<String, String>(
+          ctrl.stream,
+          extract: (s) => s.startsWith('tok') ? s : null,
+          counts: (s) => s.startsWith('tok'),
+          onSlow: notices.add,
+          firstTimeout: _first * 10,
+          stallTimeout: _stall * 10,
+          slowAfter: _stall,
+          slowTick: _stall,
+        ).listen((_) {});
+
+        // Progress but no output: the user should be told it is working.
+        // Keep frames coming so the notice reports an active run.
+        for (var i = 0; i < 6; i++) {
+          await Future<void>.delayed(_stall ~/ 2);
+          ctrl.add('event$i');
+        }
+        expect(notices, isNotEmpty);
+        expect(
+          notices.first.active,
+          isTrue,
+          reason: 'a recent frame means the daemon is demonstrably working',
+        );
+
+        // First token ends the notices for good.
+        final before = notices.length;
+        ctrl.add('tok0');
+        await Future<void>.delayed(_stall * 3);
+        expect(notices.length, before);
+      });
+
+      test('marks a run inactive when nothing has arrived', () async {
+        final ctrl = StreamController<String>();
+        addTearDown(ctrl.close);
+        final notices = <SessionSlowNotice>[];
+        watchdogged<String, String>(
+          ctrl.stream,
+          extract: (s) => s,
+          onSlow: notices.add,
+          firstTimeout: _first * 10,
+          stallTimeout: _stall * 10,
+          slowAfter: _stall,
+          slowTick: _stall,
+        ).listen((_) {});
+
+        await Future<void>.delayed(_stall * 3);
+        expect(notices, isNotEmpty);
+        expect(
+          notices.last.active,
+          isFalse,
+          reason: 'no frames means no evidence of progress',
+        );
+      });
     });
   });
 }
