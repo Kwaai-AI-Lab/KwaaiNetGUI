@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kwaainet_gui/src/chat/chat_state.dart';
 import 'package:kwaainet_gui/src/chat/generated/kwaai.pb.dart' as pb;
 import 'package:kwaainet_gui/src/chat/kwaai_rpc_client.dart';
+import 'package:kwaainet_gui/src/chat/session_client.dart';
 
 /// Token throttling exists to bound markdown re-parses, and its failure
 /// mode is a *lost tail*: buffered tokens that never reach a frame, so
@@ -32,6 +33,7 @@ class _ControlledClient extends KwaaiRpcClient {
     String prompt, {
     required void Function(int? operationId) onOperationId,
     void Function(Stream<pb.InferenceEvent>)? onEvents,
+    void Function(Stream<SessionSlowNotice>)? onSlow,
   }) {
     onOperationId(1);
     return source;

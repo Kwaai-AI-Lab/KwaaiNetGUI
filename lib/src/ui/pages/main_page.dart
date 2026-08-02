@@ -141,6 +141,7 @@ class _ChatTab extends ConsumerWidget {
         Expanded(
           child: _ChatBody(path: path, onOpenSettings: onOpenSettings),
         ),
+        _ChatSlowBar(path: path),
         _ChatErrorBar(path: path),
         _ChatInputBar(path: path),
       ],
@@ -787,6 +788,69 @@ class _ChatTranscriptState extends ConsumerState<_ChatTranscript> {
 ///
 /// Shows the most recent error in the transcript and nothing when there
 /// is none, so a failure clears as soon as the next turn starts.
+/// Tells the user a run is taking a while, without calling it a failure.
+///
+/// Distributed prefill on a large model genuinely runs into minutes, and
+/// the run is usually healthy — so this informs and leaves the decision
+/// alone. Stopping is already one click away on the composer.
+class _ChatSlowBar extends ConsumerWidget {
+  const _ChatSlowBar({required this.path});
+
+  final ChatPath path;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notice = ref.watch(chatSlowNoticeProvider(path));
+    if (notice == null) return const SizedBox.shrink();
+
+    final warn = context.kwaai.statusTransitioning;
+    // "Still working" only when the daemon has actually said so recently.
+    // Without telemetry there is no evidence either way, and claiming
+    // progress we cannot see would be worse than admitting the silence.
+    final headline = notice.active
+        ? 'Still working — ${_humanElapsed(notice.elapsed)} so far. '
+              'Peers can take a while on the first token.'
+        : 'Waiting on the daemon — ${_humanElapsed(notice.elapsed)} so far.';
+
+    return Padding(
+      // Matches _ChatErrorBadge so the two bars line up with the composer.
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: warn.withValues(alpha: 0.10),
+          border: Border.all(color: warn.withValues(alpha: 0.35)),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.hourglass_top, size: 16, color: warn),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                headline,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: warn),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "45s", "1m 30s" — short enough to sit inline in a one-line bar.
+String _humanElapsed(Duration d) {
+  if (d.inMinutes < 1) return '${d.inSeconds}s';
+  final mins = d.inMinutes;
+  final secs = d.inSeconds % 60;
+  return secs == 0 ? '${mins}m' : '${mins}m ${secs}s';
+}
+
 class _ChatErrorBar extends ConsumerStatefulWidget {
   const _ChatErrorBar({required this.path});
 

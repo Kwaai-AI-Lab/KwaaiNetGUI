@@ -263,6 +263,7 @@ class KwaaiRpcClient {
     String prompt, {
     required void Function(int? operationId) onOperationId,
     void Function(Stream<pb.InferenceEvent>)? onEvents,
+    void Function(Stream<SessionSlowNotice>)? onSlow,
   }) async* {
     final session = await _sessionOrInit();
     // A non-null [onEvents] is also what asks the daemon to produce events
@@ -270,6 +271,7 @@ class KwaaiRpcClient {
     final op = session.shardRunOp(prompt, events: onEvents != null);
     onOperationId(op.id);
     onEvents?.call(op.events);
+    onSlow?.call(op.slow);
     try {
       yield* op.tokens;
     } catch (e) {
@@ -282,10 +284,12 @@ class KwaaiRpcClient {
   Stream<String> generateLocalCancellable(
     String prompt, {
     required void Function(int? operationId) onOperationId,
+    void Function(Stream<SessionSlowNotice>)? onSlow,
   }) async* {
     final session = await _sessionOrInit();
     final op = session.generateOp(prompt);
     onOperationId(op.id);
+    onSlow?.call(op.slow);
     try {
       yield* op.tokens;
     } catch (e) {

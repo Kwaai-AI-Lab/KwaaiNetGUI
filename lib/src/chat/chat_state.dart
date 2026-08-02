@@ -42,6 +42,7 @@ enum ChatPath {
 class ChatTranscriptNotifier
     extends FamilyNotifier<List<ChatMessage>, ChatPath> {
   StreamSubscription<String>? _sub;
+  StreamSubscription<SessionSlowNotice>? _slowSub;
   Timer? _bumpTimer;
 
   /// Daemon-side id of the in-flight operation, used to tell the daemon
@@ -64,9 +65,18 @@ class ChatTranscriptNotifier
   List<ChatMessage> build(ChatPath arg) {
     ref.onDispose(() {
       _sub?.cancel();
+      _slowSub?.cancel();
       _bumpTimer?.cancel();
     });
     return [];
+  }
+
+  /// Tear down the slow-run notice. Called on every path that ends a run,
+  /// so a "still working" bar can never outlive the work it describes.
+  void _clearSlow() {
+    _slowSub?.cancel();
+    _slowSub = null;
+    ref.read(chatSlowNoticeProvider(_path).notifier).state = null;
   }
 
   /// Send [prompt] and stream the response into a new assistant message.
@@ -91,15 +101,28 @@ class ChatTranscriptNotifier
     final eventsNotifier = ref.read(inferenceEventsProvider.notifier);
     if (wantEvents) eventsNotifier.startRun();
 
+    // Slow-run notices. The subscription is kept so it can be torn down
+    // with the run — the notice stream is broadcast and closes itself, but
+    // a cancel drops us out before that.
+    ref.read(chatSlowNoticeProvider(_path).notifier).state = null;
+    void watchSlow(Stream<SessionSlowNotice> notices) {
+      _slowSub?.cancel();
+      _slowSub = notices.listen((n) {
+        ref.read(chatSlowNoticeProvider(_path).notifier).state = n;
+      });
+    }
+
     final stream = switch (_path) {
       ChatPath.shardRun => client.chatStreamCancellable(
         prompt,
         onOperationId: captureId,
         onEvents: wantEvents ? eventsNotifier.ingest : null,
+        onSlow: watchSlow,
       ),
       ChatPath.generateLocal => client.generateLocalCancellable(
         prompt,
         onOperationId: captureId,
+        onSlow: watchSlow,
       ),
     };
     final completer = Completer<void>();
@@ -132,6 +155,7 @@ class ChatTranscriptNotifier
             : ChatError(code: 0, message: e.toString());
         assistant.streaming = false;
         _flushBump();
+        _clearSlow();
         _sub = null;
         _operationId = null;
         if (!completer.isCompleted) completer.complete();
@@ -140,6 +164,7 @@ class ChatTranscriptNotifier
         _log('[${_path.name}] < ${assistant.text}');
         assistant.streaming = false;
         _flushBump();
+        _clearSlow();
         _sub = null;
         // Stream finished on its own: there is nothing left to cancel,
         // so drop the id to keep a later stop from targeting a
@@ -177,6 +202,7 @@ class ChatTranscriptNotifier
     // Unconditional: a pending bump must be cleared even when the last
     // message wasn't mid-stream, so it can't fire after teardown.
     _flushBump();
+    _clearSlow();
     // Dropping the token subscription does not close the event stream, so
     // end the run explicitly or the panel keeps claiming it is live.
     if (_path == ChatPath.shardRun) {
@@ -202,6 +228,7 @@ class ChatTranscriptNotifier
     // against the emptied transcript a frame later.
     _bumpTimer?.cancel();
     _bumpTimer = null;
+    _clearSlow();
     state = [];
     // The panel describes the transcript we just discarded, so clear it
     // too rather than leaving a finished run's route on screen.
@@ -253,3 +280,12 @@ final chatStreamingProvider = Provider.family<bool, ChatPath>((ref, path) {
   final msgs = ref.watch(chatTranscriptProvider(path));
   return msgs.isNotEmpty && msgs.last.streaming;
 });
+
+/// Set while the in-flight run is slow to produce its first token, null
+/// otherwise.
+///
+/// Deliberately separate from [ChatMessage.error]: this is not a failure and
+/// must not render as one. Distributed prefill takes as long as it takes,
+/// and the only decision to be made — keep waiting or stop — is the user's.
+final chatSlowNoticeProvider =
+    StateProvider.family<SessionSlowNotice?, ChatPath>((_, _) => null);

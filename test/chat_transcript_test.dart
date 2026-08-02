@@ -49,6 +49,7 @@ abstract class _FakeClient extends KwaaiRpcClient {
     String prompt, {
     required void Function(int? operationId) onOperationId,
     void Function(Stream<pb.InferenceEvent>)? onEvents,
+    void Function(Stream<SessionSlowNotice>)? onSlow,
   }) {
     onOperationId(operationId);
     return tokenStream(prompt);
@@ -58,6 +59,7 @@ abstract class _FakeClient extends KwaaiRpcClient {
   Stream<String> generateLocalCancellable(
     String prompt, {
     required void Function(int? operationId) onOperationId,
+    void Function(Stream<SessionSlowNotice>)? onSlow,
   }) {
     onOperationId(operationId);
     return tokenStream(prompt);
@@ -123,6 +125,32 @@ class _ThrowingClient extends _FakeClient {
   Stream<String> tokenStream(String prompt) async* {
     yield 'first ';
     throw StateError('boom');
+  }
+}
+
+/// Emits slow notices but no tokens — the long-prefill case that used to
+/// surface as "Lost connection to the service".
+class _SlowClient extends _FakeClient {
+  final slow = StreamController<SessionSlowNotice>.broadcast();
+  final _tokens = StreamController<String>();
+
+  @override
+  Stream<String> tokenStream(String prompt) => _tokens.stream;
+
+  @override
+  Stream<String> chatStreamCancellable(
+    String prompt, {
+    required void Function(int? operationId) onOperationId,
+    void Function(Stream<pb.InferenceEvent>)? onEvents,
+    void Function(Stream<SessionSlowNotice>)? onSlow,
+  }) {
+    onOperationId(operationId);
+    onSlow?.call(slow.stream);
+    return _tokens.stream;
+  }
+
+  void finish() {
+    _tokens.close();
   }
 }
 
@@ -448,6 +476,83 @@ void main() {
     // resurrect the cleared transcript.
     await Future<void>.delayed(const Duration(milliseconds: 120));
     expect(container.read(chatTranscriptProvider(ChatPath.shardRun)), isEmpty);
+  });
+
+  test('a slow run raises a notice, not an error', () async {
+    final client = _SlowClient();
+    final container = ProviderContainer(
+      overrides: [kwaaiRpcClientProvider.overrideWithValue(client)],
+    );
+    addTearDown(container.dispose);
+
+    final notifier =
+        container.read(chatTranscriptProvider(ChatPath.shardRun).notifier);
+    unawaited(notifier.send('hi'));
+    await Future<void>.delayed(Duration.zero);
+
+    client.slow.add(
+      const SessionSlowNotice(elapsed: Duration(seconds: 45), active: true),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    final notice = container.read(chatSlowNoticeProvider(ChatPath.shardRun));
+    expect(notice, isNotNull);
+    expect(notice!.elapsed.inSeconds, 45);
+    expect(notice.active, isTrue);
+    // The whole point: a slow run is not a failed one.
+    expect(
+      container.read(chatTranscriptProvider(ChatPath.shardRun)).last.error,
+      isNull,
+    );
+
+    client.finish();
+  });
+
+  test('the notice clears when the run ends', () async {
+    final client = _SlowClient();
+    final container = ProviderContainer(
+      overrides: [kwaaiRpcClientProvider.overrideWithValue(client)],
+    );
+    addTearDown(container.dispose);
+
+    final notifier =
+        container.read(chatTranscriptProvider(ChatPath.shardRun).notifier);
+    final send = notifier.send('hi');
+    await Future<void>.delayed(Duration.zero);
+    client.slow.add(
+      const SessionSlowNotice(elapsed: Duration(seconds: 45), active: true),
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(container.read(chatSlowNoticeProvider(ChatPath.shardRun)), isNotNull);
+
+    client.finish();
+    await send;
+    expect(
+      container.read(chatSlowNoticeProvider(ChatPath.shardRun)),
+      isNull,
+      reason: 'a "still working" bar must not outlive the work',
+    );
+  });
+
+  test('cancelling clears the notice', () async {
+    final client = _SlowClient();
+    final container = ProviderContainer(
+      overrides: [kwaaiRpcClientProvider.overrideWithValue(client)],
+    );
+    addTearDown(container.dispose);
+
+    final notifier =
+        container.read(chatTranscriptProvider(ChatPath.shardRun).notifier);
+    unawaited(notifier.send('hi'));
+    await Future<void>.delayed(Duration.zero);
+    client.slow.add(
+      const SessionSlowNotice(elapsed: Duration(seconds: 45), active: true),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    notifier.cancel();
+    expect(container.read(chatSlowNoticeProvider(ChatPath.shardRun)), isNull);
+    client.finish();
   });
 }
 
