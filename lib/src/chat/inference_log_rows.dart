@@ -18,6 +18,7 @@ class LogRow {
     required this.label,
     required this.outcome,
     this.detail = '',
+    this.prefix = '',
     this.trailing = '',
     this.phase = pb.InferencePhase.INFERENCE_PHASE_UNSPECIFIED,
     this.failure = pb.HopFailure.HOP_FAILURE_UNSPECIFIED,
@@ -37,6 +38,11 @@ class LogRow {
 
   /// The middle column: what the row is about.
   String detail;
+
+  /// Set when a token folded into this row, e.g. `#2`. Kept separate from
+  /// [detail] so it can be dimmed independently — the index is a
+  /// position-keeper, not the thing you read the row for.
+  String prefix;
 
   /// The right column, e.g. a duration. Filled in when the answer lands.
   String trailing;
@@ -96,12 +102,23 @@ String _failureLabel(pb.HopFailure f) => switch (f) {
 ///  - **Hops** become one row that starts as `→` and becomes `✓` when the
 ///    answer arrives, carrying its duration. Two lines per hop per token
 ///    is the bulk of a long run's log.
+///  - **Tokens** fold into the hop that produced them. `TOKEN_SAMPLED`
+///    measures the whole round trip plus local sampling, so on a
+///    single-hop chain it restates the hop's own duration one line later
+///    (724ms of hop inside 731ms of token). The token index is worth
+///    keeping; the second line is not.
 ///  - **Failures** stay as their own `✗` row, and the retry lands on the
 ///    next row, so a fallback reads as two lines rather than being merged
 ///    into one and disappearing.
 List<LogRow> collapseEvents(List<pb.InferenceEvent> events) {
   final rows = <LogRow>[];
   final byKey = <String, LogRow>{};
+
+  // The last successfully-completed hop row, per token. A token's result
+  // is folded into this rather than getting a line of its own; a *failed*
+  // hop is never a fold target, because the diagnostic value of a failure
+  // is exactly the thing that must not be overwritten.
+  final lastOkHopForToken = <int, LogRow>{};
 
   // The dial tally currently being accumulated. Cleared by any non-dial
   // event so a later burst (after a path rebuild) starts a fresh row
@@ -194,6 +211,32 @@ List<LogRow> collapseEvents(List<pb.InferenceEvent> events) {
           ..trailing = ok
               ? (e.hasDurationMs() ? '${e.durationMs.round()}ms' : '')
               : _failureLabel(e.failure);
+        // The last hop to succeed for a token is where that token's
+        // result will be folded. On a multi-hop chain that is the final
+        // hop, which is also when the token actually became available.
+        if (ok && e.hasTokenIndex()) lastOkHopForToken[e.tokenIndex] = row;
+
+      case pb.InferencePhase.INFERENCE_PHASE_TOKEN_SAMPLED:
+        final idx = e.hasTokenIndex() ? e.tokenIndex : 0;
+        final target = lastOkHopForToken[idx];
+        if (target != null) {
+          // Fold: the hop line already carries the peer, the blocks and
+          // the time. All the token adds is which token it was.
+          target.prefix = e.isPrefill ? 'prefill' : '#$idx';
+        } else {
+          // No hop to fold into — a local run, or the hop was trimmed.
+          // The token still needs to be visible.
+          rows.add(
+            LogRow(
+              key: 'tok:$idx',
+              elapsedMs: ms,
+              label: e.isPrefill ? 'prefill' : 'token',
+              detail: _detail(e),
+              outcome: RowOutcome.ok,
+              phase: e.phase,
+            ),
+          );
+        }
 
       default:
         rows.add(
