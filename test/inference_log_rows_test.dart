@@ -232,6 +232,172 @@ void main() {
     });
   });
 
+  group('token folding', () {
+    pb.InferenceEvent token(int idx, {double ms = 731, bool prefill = false}) =>
+        pb.InferenceEvent()
+          ..phase = pb.InferencePhase.INFERENCE_PHASE_TOKEN_SAMPLED
+          ..elapsedMs = Int64(6800)
+          ..tokenIndex = idx
+          ..isPrefill = prefill
+          ..durationMs = ms;
+
+    /// TOKEN_SAMPLED times the whole round trip, so on a single-hop chain
+    /// it restates the hop's own duration a line later. One line per
+    /// token is the point of the exercise.
+    test('a token folds into the hop that produced it', () {
+      final rows = collapseEvents([
+        _hop(pb.InferencePhase.INFERENCE_PHASE_HOP_START, start: 0, end: 32),
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_OK,
+          start: 0,
+          end: 32,
+          durationMs: 724,
+        ),
+        token(0),
+      ]);
+
+      expect(rows, hasLength(1), reason: 'one line per token');
+      expect(rows.single.prefix, '#0');
+      expect(rows.single.trailing, '724ms');
+      expect(rows.single.detail, contains('node-f'));
+    });
+
+    test('prefill is labelled rather than numbered', () {
+      final rows = collapseEvents([
+        _hop(pb.InferencePhase.INFERENCE_PHASE_HOP_START, start: 0, end: 32),
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_OK,
+          start: 0,
+          end: 32,
+          durationMs: 29681,
+        ),
+        token(0, prefill: true),
+      ]);
+
+      expect(rows, hasLength(1));
+      expect(rows.single.prefix, 'prefill');
+    });
+
+    test('several tokens are one row each', () {
+      final events = <pb.InferenceEvent>[];
+      for (var i = 0; i < 5; i++) {
+        events
+          ..add(
+            _hop(
+              pb.InferencePhase.INFERENCE_PHASE_HOP_START,
+              start: 0,
+              end: 32,
+              token: i,
+            ),
+          )
+          ..add(
+            _hop(
+              pb.InferencePhase.INFERENCE_PHASE_HOP_OK,
+              start: 0,
+              end: 32,
+              token: i,
+              durationMs: 700 + i.toDouble(),
+            ),
+          )
+          ..add(token(i));
+      }
+
+      final rows = collapseEvents(events);
+      expect(rows, hasLength(5));
+      expect(rows.map((r) => r.prefix), ['#0', '#1', '#2', '#3', '#4']);
+    });
+
+    /// On a multi-hop chain the hops are the interesting part, so the
+    /// token folds into the *last* one rather than collapsing them all.
+    test('a multi-hop token keeps its hops and folds into the last', () {
+      final rows = collapseEvents([
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_START,
+          start: 0,
+          end: 16,
+          peer: 'node-a',
+        ),
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_OK,
+          start: 0,
+          end: 16,
+          peer: 'node-a',
+          durationMs: 120,
+        ),
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_START,
+          start: 16,
+          end: 32,
+          peer: 'node-f',
+        ),
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_OK,
+          start: 16,
+          end: 32,
+          peer: 'node-f',
+          durationMs: 180,
+        ),
+        token(0),
+      ]);
+
+      expect(rows, hasLength(2));
+      expect(rows.first.prefix, isEmpty);
+      expect(rows.last.prefix, '#0');
+      expect(rows.last.detail, contains('node-f'));
+    });
+
+    /// A failed hop is the diagnostic content of the log; folding a token
+    /// onto it would overwrite the reason it is there.
+    test('a token never folds into a failed hop', () {
+      final rows = collapseEvents([
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_START,
+          start: 0,
+          end: 32,
+          peer: 'node-b',
+        ),
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_FAILED,
+          start: 0,
+          end: 32,
+          peer: 'node-b',
+          failure: pb.HopFailure.HOP_FAILURE_TRANSIENT,
+        ),
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_START,
+          start: 0,
+          end: 32,
+          peer: 'node-f',
+          candidate: 1,
+        ),
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_OK,
+          start: 0,
+          end: 32,
+          peer: 'node-f',
+          candidate: 1,
+          durationMs: 184,
+        ),
+        token(0),
+      ]);
+
+      expect(rows, hasLength(2));
+      expect(rows.first.outcome, RowOutcome.failed);
+      expect(rows.first.prefix, isEmpty, reason: 'failure keeps its own line');
+      expect(rows.last.prefix, '#0');
+    });
+
+    /// A local run has no hops at all, and the ring buffer can drop the
+    /// hop out from under a token. Either way the token must still show.
+    test('a token with no hop to fold into keeps its own row', () {
+      final rows = collapseEvents([token(3, ms: 45)]);
+
+      expect(rows, hasLength(1));
+      expect(rows.single.label, 'token');
+      expect(rows.single.detail, contains('#3'));
+    });
+  });
+
   group('other phases', () {
     test('non-hop phases render one row each, in order', () {
       final rows = collapseEvents([

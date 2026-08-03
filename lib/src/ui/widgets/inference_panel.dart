@@ -339,6 +339,16 @@ class _LogRowView extends StatelessWidget {
               style: mono,
             ),
           ),
+          if (row.prefix.isNotEmpty) ...[
+            SizedBox(
+              width: 46,
+              child: Text(
+                row.prefix,
+                style: mono?.copyWith(color: dim),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
           Expanded(
             child: Text(
               row.detail,
