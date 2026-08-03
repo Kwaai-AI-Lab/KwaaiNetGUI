@@ -68,6 +68,7 @@ class InferenceRunLog {
     this.running = false,
     this.sawAnyEvent = false,
     this.model = '',
+    this.sessionId = '',
     this.totalBlocks = 0,
     this.droppedFromFront = 0,
     this.startedAt,
@@ -96,6 +97,14 @@ class InferenceRunLog {
   final bool sawAnyEvent;
 
   final String model;
+
+  /// The daemon's id for this run, shown once in the header.
+  ///
+  /// Constant for a whole run and identical to the id the serving peers
+  /// log, so it is the handle for finding this run in another node's
+  /// logs. Per-row it would be the same 20 characters on every line.
+  final String sessionId;
+
   final int totalBlocks;
 
   /// How many events were dropped off the front to stay under the cap, so
@@ -112,6 +121,7 @@ class InferenceRunLog {
     bool? running,
     bool? sawAnyEvent,
     String? model,
+    String? sessionId,
     int? totalBlocks,
     int? droppedFromFront,
     DateTime? startedAt,
@@ -123,6 +133,7 @@ class InferenceRunLog {
     running: running ?? this.running,
     sawAnyEvent: sawAnyEvent ?? this.sawAnyEvent,
     model: model ?? this.model,
+    sessionId: sessionId ?? this.sessionId,
     totalBlocks: totalBlocks ?? this.totalBlocks,
     droppedFromFront: droppedFromFront ?? this.droppedFromFront,
     startedAt: startedAt ?? this.startedAt,
@@ -149,6 +160,7 @@ class InferenceEventsNotifier extends Notifier<InferenceRunLog> {
   Map<int, double> _hopMs = {};
   bool _sawAny = false;
   String _model = '';
+  String _sessionId = '';
   int _totalBlocks = 0;
   int _dropped = 0;
 
@@ -173,6 +185,7 @@ class InferenceEventsNotifier extends Notifier<InferenceRunLog> {
     _hopMs = {};
     _sawAny = false;
     _model = '';
+    _sessionId = '';
     _totalBlocks = 0;
     _dropped = 0;
     state = InferenceRunLog(running: true, startedAt: DateTime.now());
@@ -195,6 +208,11 @@ class InferenceEventsNotifier extends Notifier<InferenceRunLog> {
   void _onEvent(pb.InferenceEvent e) {
     _sawAny = true;
     _events.add(e);
+
+    // Latched from whichever event carries it first. Only hop-level events
+    // set it — the run-level ones (resolve, discovery) happen before a
+    // session exists — so this cannot be read from a fixed phase.
+    if (_sessionId.isEmpty && e.sessionId.isNotEmpty) _sessionId = e.sessionId;
     if (_events.length > kMaxInferenceEvents) {
       _events.removeRange(0, _trimBatch);
       _dropped += _trimBatch;
@@ -262,6 +280,7 @@ class InferenceEventsNotifier extends Notifier<InferenceRunLog> {
       running: running ?? state.running,
       sawAnyEvent: _sawAny,
       model: _model,
+      sessionId: _sessionId,
       totalBlocks: _totalBlocks,
       droppedFromFront: _dropped,
       startedAt: state.startedAt,
