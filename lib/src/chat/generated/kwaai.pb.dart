@@ -2917,6 +2917,8 @@ class InferenceEvent extends $pb.GeneratedMessage {
     $core.int? candidateIndex,
     $core.int? attempt,
     $core.bool? ok,
+    $core.String? sessionId,
+    $core.int? seqPos,
     HopFailure? failure,
     $core.String? model,
     $core.String? dhtPrefix,
@@ -2941,6 +2943,8 @@ class InferenceEvent extends $pb.GeneratedMessage {
     if (candidateIndex != null) result.candidateIndex = candidateIndex;
     if (attempt != null) result.attempt = attempt;
     if (ok != null) result.ok = ok;
+    if (sessionId != null) result.sessionId = sessionId;
+    if (seqPos != null) result.seqPos = seqPos;
     if (failure != null) result.failure = failure;
     if (model != null) result.model = model;
     if (dhtPrefix != null) result.dhtPrefix = dhtPrefix;
@@ -2987,6 +2991,8 @@ class InferenceEvent extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OU3)
     ..aI(43, _omitFieldNames ? '' : 'attempt', fieldType: $pb.PbFieldType.OU3)
     ..aOB(44, _omitFieldNames ? '' : 'ok')
+    ..aOS(45, _omitFieldNames ? '' : 'sessionId')
+    ..aI(46, _omitFieldNames ? '' : 'seqPos', fieldType: $pb.PbFieldType.OU3)
     ..aE<HopFailure>(50, _omitFieldNames ? '' : 'failure',
         enumValues: HopFailure.values)
     ..aOS(60, _omitFieldNames ? '' : 'model')
@@ -3179,56 +3185,89 @@ class InferenceEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(44)
   void clearOk() => $_clearField(44);
 
+  /// ── Cross-node correlation ──
+  /// The two identifiers that also travel in every InferenceRequest, so
+  /// both ends of a hop name the same work the same way. A client can
+  /// take a hop from this stream and find it in the serving peer's log,
+  /// which is otherwise impossible — peer id and block range identify
+  /// *who* and *what*, but not *which request*.
+  ///
+  /// `session_id` is constant for a run and is the remote's KV-cache
+  /// key. Sent as a string because it is a u64 whose full range does not
+  /// survive JSON-based clients, and it is only ever compared or
+  /// displayed, never arithmetic.
+  @$pb.TagNumber(45)
+  $core.String get sessionId => $_getSZ(16);
+  @$pb.TagNumber(45)
+  set sessionId($core.String value) => $_setString(16, value);
+  @$pb.TagNumber(45)
+  $core.bool hasSessionId() => $_has(16);
+  @$pb.TagNumber(45)
+  void clearSessionId() => $_clearField(45);
+
+  /// Global sequence position of the first token in this call. NOT the
+  /// same as `token_index`: prefill covers the whole prompt, so this
+  /// advances by the prompt length and then by one per token. It is what
+  /// the serving peer logs, which is what makes it the field to grep on.
+  @$pb.TagNumber(46)
+  $core.int get seqPos => $_getIZ(17);
+  @$pb.TagNumber(46)
+  set seqPos($core.int value) => $_setUnsignedInt32(17, value);
+  @$pb.TagNumber(46)
+  $core.bool hasSeqPos() => $_has(17);
+  @$pb.TagNumber(46)
+  void clearSeqPos() => $_clearField(46);
+
   /// ── Failure detail (HOP_FAILED) ──
   @$pb.TagNumber(50)
-  HopFailure get failure => $_getN(16);
+  HopFailure get failure => $_getN(18);
   @$pb.TagNumber(50)
   set failure(HopFailure value) => $_setField(50, value);
   @$pb.TagNumber(50)
-  $core.bool hasFailure() => $_has(16);
+  $core.bool hasFailure() => $_has(18);
   @$pb.TagNumber(50)
   void clearFailure() => $_clearField(50);
 
   /// ── Discovery / resolution detail ──
   @$pb.TagNumber(60)
-  $core.String get model => $_getSZ(17);
+  $core.String get model => $_getSZ(19);
   @$pb.TagNumber(60)
-  set model($core.String value) => $_setString(17, value);
+  set model($core.String value) => $_setString(19, value);
   @$pb.TagNumber(60)
-  $core.bool hasModel() => $_has(17);
+  $core.bool hasModel() => $_has(19);
   @$pb.TagNumber(60)
   void clearModel() => $_clearField(60);
 
   @$pb.TagNumber(61)
-  $core.String get dhtPrefix => $_getSZ(18);
+  $core.String get dhtPrefix => $_getSZ(20);
   @$pb.TagNumber(61)
-  set dhtPrefix($core.String value) => $_setString(18, value);
+  set dhtPrefix($core.String value) => $_setString(20, value);
   @$pb.TagNumber(61)
-  $core.bool hasDhtPrefix() => $_has(18);
+  $core.bool hasDhtPrefix() => $_has(20);
   @$pb.TagNumber(61)
   void clearDhtPrefix() => $_clearField(61);
 
   @$pb.TagNumber(62)
-  $core.int get peerCount => $_getIZ(19);
+  $core.int get peerCount => $_getIZ(21);
   @$pb.TagNumber(62)
-  set peerCount($core.int value) => $_setUnsignedInt32(19, value);
+  set peerCount($core.int value) => $_setUnsignedInt32(21, value);
   @$pb.TagNumber(62)
-  $core.bool hasPeerCount() => $_has(19);
+  $core.bool hasPeerCount() => $_has(21);
   @$pb.TagNumber(62)
   void clearPeerCount() => $_clearField(62);
 
   @$pb.TagNumber(63)
-  $core.String get circuitId => $_getSZ(20);
+  $core.String get circuitId => $_getSZ(22);
   @$pb.TagNumber(63)
-  set circuitId($core.String value) => $_setString(20, value);
+  set circuitId($core.String value) => $_setString(22, value);
   @$pb.TagNumber(63)
-  $core.bool hasCircuitId() => $_has(20);
+  $core.bool hasCircuitId() => $_has(22);
   @$pb.TagNumber(63)
   void clearCircuitId() => $_clearField(63);
 
   /// ── Route (CHAIN_PINNED only) ──
   @$pb.TagNumber(70)
-  $pb.PbList<InferenceHop> get hops => $_getList(21);
+  $pb.PbList<InferenceHop> get hops => $_getList(23);
 }
 
 class ChatMessage extends $pb.GeneratedMessage {

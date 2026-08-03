@@ -398,6 +398,52 @@ void main() {
     });
   });
 
+  group('correlation ids', () {
+    /// seq_pos is what the serving peer logs, so it must reach the row that
+    /// represents that request — it is the only greppable handle a row has.
+    test('a hop row carries the sequence position of its request', () {
+      final start =
+          _hop(pb.InferencePhase.INFERENCE_PHASE_HOP_START, start: 0, end: 32)
+            ..seqPos = 41;
+      final rows = collapseEvents([
+        start,
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_OK,
+          start: 0,
+          end: 32,
+          durationMs: 724,
+        ),
+      ]);
+
+      expect(rows.single.seqPos, 41);
+    });
+
+    /// Prefill covers the whole prompt, so the two diverge immediately.
+    /// Conflating them would send someone grepping for a position that was
+    /// never on the wire.
+    test('sequence position is not the token index', () {
+      final e =
+          _hop(
+            pb.InferencePhase.INFERENCE_PHASE_HOP_START,
+            start: 0,
+            end: 32,
+            token: 1,
+          )
+          ..seqPos = 41;
+      final rows = collapseEvents([e]);
+
+      expect(rows.single.seqPos, 41);
+      expect(rows.single.seqPos, isNot(1));
+    });
+
+    test('a row whose event carried no position leaves it null', () {
+      final rows = collapseEvents([
+        _hop(pb.InferencePhase.INFERENCE_PHASE_HOP_START, start: 0, end: 32),
+      ]);
+      expect(rows.single.seqPos, isNull);
+    });
+  });
+
   group('other phases', () {
     test('non-hop phases render one row each, in order', () {
       final rows = collapseEvents([

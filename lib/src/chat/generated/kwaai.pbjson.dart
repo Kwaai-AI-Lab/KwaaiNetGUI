@@ -984,6 +984,16 @@ const InferenceEvent$json = {
       '17': true
     },
     {'1': 'ok', '3': 44, '4': 1, '5': 8, '10': 'ok'},
+    {'1': 'session_id', '3': 45, '4': 1, '5': 9, '10': 'sessionId'},
+    {
+      '1': 'seq_pos',
+      '3': 46,
+      '4': 1,
+      '5': 13,
+      '9': 8,
+      '10': 'seqPos',
+      '17': true
+    },
     {
       '1': 'failure',
       '3': 50,
@@ -999,7 +1009,7 @@ const InferenceEvent$json = {
       '3': 62,
       '4': 1,
       '5': 13,
-      '9': 8,
+      '9': 9,
       '10': 'peerCount',
       '17': true
     },
@@ -1022,6 +1032,7 @@ const InferenceEvent$json = {
     {'1': '_token_index'},
     {'1': '_candidate_index'},
     {'1': '_attempt'},
+    {'1': '_seq_pos'},
     {'1': '_peer_count'},
   ],
 };
@@ -1038,13 +1049,14 @@ final $typed_data.Uint8List inferenceEventDescriptor = $convert.base64Decode(
     '5Nc4gBARIkCgt0b2tlbl9pbmRleBgoIAEoDUgFUgp0b2tlbkluZGV4iAEBEh0KCmlzX3ByZWZp'
     'bGwYKSABKAhSCWlzUHJlZmlsbBIsCg9jYW5kaWRhdGVfaW5kZXgYKiABKA1IBlIOY2FuZGlkYX'
     'RlSW5kZXiIAQESHQoHYXR0ZW1wdBgrIAEoDUgHUgdhdHRlbXB0iAEBEg4KAm9rGCwgASgIUgJv'
-    'axIuCgdmYWlsdXJlGDIgASgOMhQua3dhYWkudjEuSG9wRmFpbHVyZVIHZmFpbHVyZRIUCgVtb2'
-    'RlbBg8IAEoCVIFbW9kZWwSHQoKZGh0X3ByZWZpeBg9IAEoCVIJZGh0UHJlZml4EiIKCnBlZXJf'
-    'Y291bnQYPiABKA1ICFIJcGVlckNvdW50iAEBEh0KCmNpcmN1aXRfaWQYPyABKAlSCWNpcmN1aX'
-    'RJZBIqCgRob3BzGEYgAygLMhYua3dhYWkudjEuSW5mZXJlbmNlSG9wUgRob3BzQg4KDF9ibG9j'
-    'a19zdGFydEIMCgpfYmxvY2tfZW5kQg8KDV90b3RhbF9ibG9ja3NCEQoPX2NvdmVyZWRfYmxvY2'
-    'tzQg4KDF9kdXJhdGlvbl9tc0IOCgxfdG9rZW5faW5kZXhCEgoQX2NhbmRpZGF0ZV9pbmRleEIK'
-    'CghfYXR0ZW1wdEINCgtfcGVlcl9jb3VudA==');
+    'axIdCgpzZXNzaW9uX2lkGC0gASgJUglzZXNzaW9uSWQSHAoHc2VxX3BvcxguIAEoDUgIUgZzZX'
+    'FQb3OIAQESLgoHZmFpbHVyZRgyIAEoDjIULmt3YWFpLnYxLkhvcEZhaWx1cmVSB2ZhaWx1cmUS'
+    'FAoFbW9kZWwYPCABKAlSBW1vZGVsEh0KCmRodF9wcmVmaXgYPSABKAlSCWRodFByZWZpeBIiCg'
+    'pwZWVyX2NvdW50GD4gASgNSAlSCXBlZXJDb3VudIgBARIdCgpjaXJjdWl0X2lkGD8gASgJUglj'
+    'aXJjdWl0SWQSKgoEaG9wcxhGIAMoCzIWLmt3YWFpLnYxLkluZmVyZW5jZUhvcFIEaG9wc0IOCg'
+    'xfYmxvY2tfc3RhcnRCDAoKX2Jsb2NrX2VuZEIPCg1fdG90YWxfYmxvY2tzQhEKD19jb3ZlcmVk'
+    'X2Jsb2Nrc0IOCgxfZHVyYXRpb25fbXNCDgoMX3Rva2VuX2luZGV4QhIKEF9jYW5kaWRhdGVfaW'
+    '5kZXhCCgoIX2F0dGVtcHRCCgoIX3NlcV9wb3NCDQoLX3BlZXJfY291bnQ=');
 
 @$core.Deprecated('Use chatMessageDescriptor instead')
 const ChatMessage$json = {
