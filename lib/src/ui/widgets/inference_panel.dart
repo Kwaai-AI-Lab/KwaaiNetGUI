@@ -214,7 +214,8 @@ class _HopRow extends StatelessWidget {
     final theme = Theme.of(context);
     final dim = theme.colorScheme.onSurfaceVariant;
     final mono = theme.textTheme.bodySmall?.copyWith(
-      fontFamily: 'monospace',
+      fontFamily: kwaaiMonoFamily,
+      fontFamilyFallback: kwaaiMonoFallback,
       fontSize: 11,
       color: dim,
     );
@@ -333,7 +334,8 @@ class _LogRowView extends StatelessWidget {
     };
 
     final mono = theme.textTheme.bodySmall?.copyWith(
-      fontFamily: 'monospace',
+      fontFamily: kwaaiMonoFamily,
+      fontFamilyFallback: kwaaiMonoFallback,
       fontSize: 11,
       color: color ?? dim,
       // Pin the line box to the row's fixed extent, and centre the glyph
