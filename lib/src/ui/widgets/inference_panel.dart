@@ -1,11 +1,11 @@
 import 'dart:async';
 
-import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../chat/generated/kwaai.pb.dart' as pb;
 import '../../chat/inference_events_state.dart';
+import '../../chat/inference_log_rows.dart';
 import '../theme/kwaai_theme.dart';
 import 'kwaai_heading.dart';
 
@@ -278,22 +278,27 @@ class _EventLog extends StatelessWidget {
   Widget build(BuildContext context) {
     if (log.events.isEmpty) return _EmptyState(log: log);
 
+    // Collapsed on the way to the screen rather than on the way in, so the
+    // raw stream stays intact for anything else that wants it and a row
+    // can still be revised in place when its answer arrives.
+    final rows = collapseEvents(log.events);
+
     return ListView.builder(
       controller: controller,
       padding: const EdgeInsets.symmetric(vertical: 6),
       // Rows are single-line and uniform, so a fixed extent lets the list
       // stay cheap at the full event cap without measuring each child.
       itemExtent: 20,
-      itemCount: log.events.length,
-      itemBuilder: (context, i) => _EventRow(event: log.events[i]),
+      itemCount: rows.length,
+      itemBuilder: (context, i) => _LogRowView(row: rows[i]),
     );
   }
 }
 
-class _EventRow extends StatelessWidget {
-  const _EventRow({required this.event});
+class _LogRowView extends StatelessWidget {
+  const _LogRowView({required this.row});
 
-  final pb.InferenceEvent event;
+  final LogRow row;
 
   @override
   Widget build(BuildContext context) {
@@ -301,14 +306,16 @@ class _EventRow extends StatelessWidget {
     final dim = theme.colorScheme.onSurfaceVariant;
     final k = context.kwaai;
 
-    final color = switch (event.phase) {
-      pb.InferencePhase.INFERENCE_PHASE_HOP_FAILED =>
-        event.failure == pb.HopFailure.HOP_FAILURE_TRANSIENT
-            ? k.semanticWarning
-            : k.semanticError,
-      pb.InferencePhase.INFERENCE_PHASE_PATH_REBUILD => k.semanticWarning,
-      pb.InferencePhase.INFERENCE_PHASE_COMPLETE => k.semanticSuccess,
-      _ => null,
+    // A pending row is deliberately *not* coloured: it has not succeeded or
+    // failed yet, and colouring it would make an in-flight hop look like an
+    // outcome. Transient failures stay amber because the run recovers from
+    // them — only a terminal one is red.
+    final color = switch (row.outcome) {
+      RowOutcome.pending => null,
+      RowOutcome.ok => null,
+      RowOutcome.failed => row.failure == pb.HopFailure.HOP_FAILURE_TRANSIENT
+          ? k.semanticWarning
+          : k.semanticError,
     };
 
     final mono = theme.textTheme.bodySmall?.copyWith(
@@ -323,24 +330,41 @@ class _EventRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 42,
+            child: Text(_elapsed(row.elapsedMs), style: mono?.copyWith(color: dim)),
+          ),
+          SizedBox(
+            width: 58,
             child: Text(
-              _elapsed(event.elapsedMs),
-              style: mono?.copyWith(color: dim),
+              row.label.isEmpty ? '' : '${row.label} ${_glyph(row.outcome)}',
+              style: mono,
             ),
           ),
           Expanded(
             child: Text(
-              describeEvent(event),
+              row.detail,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: mono,
+              style: mono?.copyWith(
+                color: color ?? (row.isSelf ? k.accentPrimary : dim),
+              ),
             ),
           ),
+          if (row.trailing.isNotEmpty) ...[
+            const SizedBox(width: 6),
+            Text(row.trailing, style: mono),
+          ],
         ],
       ),
     );
   }
 }
+
+/// The outcome marker: a request still awaiting its answer, or the answer.
+String _glyph(RowOutcome outcome) => switch (outcome) {
+  RowOutcome.pending => '→',
+  RowOutcome.ok => '✓',
+  RowOutcome.failed => '✗',
+};
 
 /// What to show when a run has produced no rows.
 ///
@@ -452,75 +476,7 @@ class _JumpToLatest extends StatelessWidget {
   }
 }
 
-String _elapsed(Int64 ms) {
-  final v = ms.toInt();
-  if (v < 1000) return '${v}ms';
-  return '${(v / 1000).toStringAsFixed(1)}s';
+String _elapsed(int ms) {
+  if (ms < 1000) return '${ms}ms';
+  return '${(ms / 1000).toStringAsFixed(1)}s';
 }
-
-/// Elide a base58 peer id to something that still identifies it on sight.
-String shortPeerId(String id) {
-  if (id.length <= 14) return id;
-  return '${id.substring(0, 8)}…${id.substring(id.length - 4)}';
-}
-
-/// One line describing [e], for the log.
-///
-/// Falls back to the daemon's own `message` for any phase this build does
-/// not know — a newer daemon's added phases stay readable rather than
-/// rendering as a blank row.
-String describeEvent(pb.InferenceEvent e) {
-  String peer() {
-    if (e.isSelf) return 'you';
-    if (e.peerName.isNotEmpty) return e.peerName;
-    return shortPeerId(e.peerId);
-  }
-
-  String blocks() => e.hasBlockStart() && e.hasBlockEnd()
-      ? '${e.blockStart}–${e.blockEnd}'
-      : '';
-
-  switch (e.phase) {
-    case pb.InferencePhase.INFERENCE_PHASE_RESOLVED:
-      return 'resolved  ${e.hasTotalBlocks() ? '${e.totalBlocks} blocks' : e.model}';
-    case pb.InferencePhase.INFERENCE_PHASE_DISCOVERY_START:
-      return 'discover  round ${e.hasAttempt() ? e.attempt : 1}';
-    case pb.InferencePhase.INFERENCE_PHASE_DISCOVERY_RESULT:
-      final n = e.hasPeerCount() ? e.peerCount : 0;
-      final cov = e.hasCoveredBlocks() && e.hasTotalBlocks()
-          ? ', ${e.coveredBlocks}/${e.totalBlocks} blocks'
-          : '';
-      return 'discover  → $n peer${n == 1 ? '' : 's'}$cov';
-    case pb.InferencePhase.INFERENCE_PHASE_CIRCUIT_LOADED:
-      return 'circuit   ${e.circuitId}';
-    case pb.InferencePhase.INFERENCE_PHASE_CHAIN_PINNED:
-      return 'pinned    ${e.hops.length} hop${e.hops.length == 1 ? '' : 's'}';
-    case pb.InferencePhase.INFERENCE_PHASE_PEER_DIAL:
-      return 'dial ${e.ok ? '✓' : '✗'}    ${peer()}';
-    case pb.InferencePhase.INFERENCE_PHASE_HOP_START:
-      return 'hop →     ${blocks()}  ${peer()}';
-    case pb.InferencePhase.INFERENCE_PHASE_HOP_OK:
-      final ms = e.hasDurationMs() ? '  ${e.durationMs.round()}ms' : '';
-      return 'hop ✓     ${blocks()}  ${peer()}$ms';
-    case pb.InferencePhase.INFERENCE_PHASE_HOP_FAILED:
-      return 'hop ✗     ${blocks()}  ${peer()}  ${_failureLabel(e.failure)}';
-    case pb.InferencePhase.INFERENCE_PHASE_PATH_REBUILD:
-      return 'rebuild   path attempt ${e.hasAttempt() ? e.attempt : 2}';
-    case pb.InferencePhase.INFERENCE_PHASE_TOKEN_SAMPLED:
-      final ms = e.hasDurationMs() ? '  ${e.durationMs.round()}ms' : '';
-      final idx = e.hasTokenIndex() ? e.tokenIndex : 0;
-      return '${e.isPrefill ? 'prefill' : 'token'}   #$idx$ms';
-    case pb.InferencePhase.INFERENCE_PHASE_COMPLETE:
-      final n = e.hasTokenIndex() ? e.tokenIndex : 0;
-      return 'done      $n tokens (${e.message})';
-    default:
-      return e.message.isEmpty ? e.phase.name : e.message;
-  }
-}
-
-String _failureLabel(pb.HopFailure f) => switch (f) {
-  pb.HopFailure.HOP_FAILURE_NO_HANDLER => 'no handler',
-  pb.HopFailure.HOP_FAILURE_TRANSIENT => 'transient',
-  pb.HopFailure.HOP_FAILURE_TIMEOUT => 'timeout',
-  _ => 'failed',
-};
