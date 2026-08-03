@@ -121,6 +121,87 @@ void main() {
     expect(find.text('2103ms'), findsOneWidget);
   });
 
+  /// The log's rows have a fixed extent, so text that lays out taller than
+  /// its slot paints into the neighbouring rows — which showed up as stray
+  /// marks above and below the outcome glyphs. Every row's text must fit
+  /// inside the extent it is given.
+  testWidgets('row text stays inside its fixed extent', (tester) async {
+    final notifier = container.read(inferenceEventsProvider.notifier);
+    notifier.startRun();
+    await tester.pumpWidget(_host(container));
+
+    // One row per outcome, so the ✓ / ✗ / → glyphs are all laid out.
+    notifier.ingest(
+      Stream<pb.InferenceEvent>.fromIterable([
+        pb.InferenceEvent()
+          ..phase = pb.InferencePhase.INFERENCE_PHASE_RESOLVED
+          ..elapsedMs = Int64(0)
+          ..totalBlocks = 32,
+        pb.InferenceEvent()
+          ..phase = pb.InferencePhase.INFERENCE_PHASE_HOP_START
+          ..elapsedMs = Int64(3200)
+          ..peerName = 'rezarassool-macos-aarch64'
+          ..blockStart = 0
+          ..blockEnd = 32,
+        pb.InferenceEvent()
+          ..phase = pb.InferencePhase.INFERENCE_PHASE_HOP_FAILED
+          ..elapsedMs = Int64(33100)
+          ..peerName = 'rezarassool-macos-aarch64'
+          ..blockStart = 0
+          ..blockEnd = 32
+          ..failure = pb.HopFailure.HOP_FAILURE_TIMEOUT,
+        pb.InferenceEvent()
+          ..phase = pb.InferencePhase.INFERENCE_PHASE_HOP_START
+          ..elapsedMs = Int64(63200)
+          ..peerName = 'metro-linux'
+          ..blockStart = 0
+          ..blockEnd = 32
+          ..candidateIndex = 1,
+        pb.InferenceEvent()
+          ..phase = pb.InferencePhase.INFERENCE_PHASE_HOP_OK
+          ..elapsedMs = Int64(64300)
+          ..peerName = 'metro-linux'
+          ..blockStart = 0
+          ..blockEnd = 32
+          ..candidateIndex = 1
+          ..durationMs = 1081,
+      ]),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+
+    final texts = find.descendant(
+      of: find.byType(ListView),
+      matching: find.byType(Text),
+    );
+    expect(texts, findsWidgets);
+
+    // Asserting the *painted* height would pass either way: widget tests
+    // render in Ahem, whose glyphs are exactly em-sized, so the fallback
+    // font that actually overflowed is never consulted. Check the style
+    // that constrains it instead — that is the thing which, if dropped,
+    // lets the glyphs spill into the neighbouring rows again.
+    for (var i = 0; i < texts.evaluate().length; i++) {
+      final style = tester.widget<Text>(texts.at(i)).style;
+      expect(
+        style?.height,
+        isNotNull,
+        reason:
+            'row text must pin its line box, or a tall glyph paints over '
+            'its neighbours (text ${i + 1})',
+      );
+      expect(
+        (style!.height! * style.fontSize!).roundToDouble(),
+        kInferenceLogRowExtent,
+        reason: 'the line box must land on the row extent',
+      );
+      expect(
+        style.leadingDistribution,
+        TextLeadingDistribution.even,
+        reason: 'leading must be split evenly or the glyph sits off-centre',
+      );
+    }
+  });
+
   /// An old daemon ignores the request field silently, so the panel has to
   /// infer it from sustained silence rather than an error.
   testWidgets('reports a daemon that never sends events', (tester) async {

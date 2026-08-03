@@ -17,6 +17,20 @@ import 'kwaai_heading.dart';
 /// and a duration on one line without wrapping.
 const kInferencePanelWidth = 340.0;
 
+/// Height of one log row, and the line box its text is given.
+///
+/// The list uses a fixed extent to stay cheap at the full event cap, which
+/// means a row cannot grow to fit its content — anything taller simply
+/// paints outside its slot and into the neighbouring rows. The outcome
+/// glyphs (`✓`, `✗`, `→`) resolve through a fallback font whose natural
+/// line height exceeds this, so [_rowLineHeight] pins the text's line box
+/// to the extent rather than letting the font choose it.
+const kInferenceLogRowExtent = 20.0;
+
+/// Line height as a multiple of the 11px row font, so the line box lands
+/// on [kInferenceLogRowExtent] exactly.
+const _rowLineHeight = kInferenceLogRowExtent / 11.0;
+
 /// How long a run may produce nothing before we conclude the daemon does
 /// not know how to send events at all.
 ///
@@ -288,7 +302,7 @@ class _EventLog extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       // Rows are single-line and uniform, so a fixed extent lets the list
       // stay cheap at the full event cap without measuring each child.
-      itemExtent: 20,
+      itemExtent: kInferenceLogRowExtent,
       itemCount: rows.length,
       itemBuilder: (context, i) => _LogRowView(row: rows[i]),
     );
@@ -322,48 +336,64 @@ class _LogRowView extends StatelessWidget {
       fontFamily: 'monospace',
       fontSize: 11,
       color: color ?? dim,
+      // Pin the line box to the row's fixed extent, and centre the glyph
+      // within it. Left to itself the fallback font that supplies ✓/✗/→
+      // picks a taller line height, and the ink spills into the rows
+      // above and below as stray marks.
+      height: _rowLineHeight,
+      leadingDistribution: TextLeadingDistribution.even,
     );
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 42,
-            child: Text(_elapsed(row.elapsedMs), style: mono?.copyWith(color: dim)),
-          ),
-          SizedBox(
-            width: 58,
-            child: Text(
-              row.label.isEmpty ? '' : '${row.label} ${_glyph(row.outcome)}',
-              style: mono,
-            ),
-          ),
-          if (row.prefix.isNotEmpty) ...[
+    return ClipRect(
+      // A fixed-extent row cannot grow to fit an unexpectedly tall glyph,
+      // so whatever still overflows is cut at the row edge rather than
+      // drawn over its neighbours.
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
             SizedBox(
-              width: 46,
+              width: 42,
               child: Text(
-                row.prefix,
+                _elapsed(row.elapsedMs),
+                maxLines: 1,
                 style: mono?.copyWith(color: dim),
+              ),
+            ),
+            SizedBox(
+              width: 58,
+              child: Text(
+                row.label.isEmpty ? '' : '${row.label} ${_glyph(row.outcome)}',
+                maxLines: 1,
+                style: mono,
+              ),
+            ),
+            if (row.prefix.isNotEmpty)
+              SizedBox(
+                width: 46,
+                child: Text(
+                  row.prefix,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: mono?.copyWith(color: dim),
+                ),
+              ),
+            Expanded(
+              child: Text(
+                row.detail,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                style: mono?.copyWith(
+                  color: color ?? (row.isSelf ? k.accentPrimary : dim),
+                ),
               ),
             ),
+            if (row.trailing.isNotEmpty) ...[
+              const SizedBox(width: 6),
+              Text(row.trailing, maxLines: 1, style: mono),
+            ],
           ],
-          Expanded(
-            child: Text(
-              row.detail,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: mono?.copyWith(
-                color: color ?? (row.isSelf ? k.accentPrimary : dim),
-              ),
-            ),
-          ),
-          if (row.trailing.isNotEmpty) ...[
-            const SizedBox(width: 6),
-            Text(row.trailing, style: mono),
-          ],
-        ],
+        ),
       ),
     );
   }
