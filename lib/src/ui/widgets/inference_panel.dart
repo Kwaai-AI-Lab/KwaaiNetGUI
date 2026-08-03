@@ -162,6 +162,20 @@ class _Header extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ],
+          if (log.sessionId.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            // Selectable because its whole purpose is to be copied into a
+            // log search on another node.
+            SelectableText(
+              'session ${log.sessionId}',
+              maxLines: 1,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: dim,
+                fontFamily: 'monospace',
+                fontSize: 10,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -346,7 +360,10 @@ class _LogRowView extends StatelessWidget {
       leadingDistribution: TextLeadingDistribution.even,
     );
 
-    return ClipRect(
+    // The panel is too narrow for another column, and seq_pos matters only
+    // when you are actually correlating against a node's log — so it rides
+    // in a tooltip rather than costing width on every row.
+    final row0 = ClipRect(
       // A fixed-extent row cannot grow to fit an unexpectedly tall glyph,
       // so whatever still overflows is cut at the row edge rather than
       // drawn over its neighbours.
@@ -397,6 +414,13 @@ class _LogRowView extends StatelessWidget {
           ],
         ),
       ),
+    );
+
+    if (row.seqPos == null) return row0;
+    return Tooltip(
+      message: 'seq_pos ${row.seqPos} — the position the serving peer logs',
+      waitDuration: const Duration(milliseconds: 500),
+      child: row0,
     );
   }
 }

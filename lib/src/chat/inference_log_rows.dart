@@ -23,6 +23,7 @@ class LogRow {
     this.phase = pb.InferencePhase.INFERENCE_PHASE_UNSPECIFIED,
     this.failure = pb.HopFailure.HOP_FAILURE_UNSPECIFIED,
     this.isSelf = false,
+    this.seqPos,
   });
 
   /// Stable identity for this row across rebuilds, so a row that gains its
@@ -46,6 +47,13 @@ class LogRow {
 
   /// The right column, e.g. a duration. Filled in when the answer lands.
   String trailing;
+
+  /// Sequence position this row's request carried, when it had one.
+  ///
+  /// This is the value the serving peer logs, so it is what makes a row
+  /// greppable in another node's output. Deliberately not the token index
+  /// -- prefill advances it by the whole prompt length.
+  int? seqPos;
 
   RowOutcome outcome;
   pb.InferencePhase phase;
@@ -177,6 +185,7 @@ List<LogRow> collapseEvents(List<pb.InferenceEvent> events) {
           outcome: RowOutcome.pending,
           phase: e.phase,
           isSelf: e.isSelf,
+          seqPos: e.hasSeqPos() ? e.seqPos : null,
         );
         rows.add(row);
         byKey[key] = row;
@@ -199,6 +208,7 @@ List<LogRow> collapseEvents(List<pb.InferenceEvent> events) {
                 detail: '${_blocks(e)}  ${_peer(e)}',
                 outcome: RowOutcome.pending,
                 isSelf: e.isSelf,
+                seqPos: e.hasSeqPos() ? e.seqPos : null,
               );
               rows.add(r);
               byKey[key] = r;

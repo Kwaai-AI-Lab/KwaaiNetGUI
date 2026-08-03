@@ -202,6 +202,37 @@ void main() {
     }
   });
 
+  /// The session id is the handle for finding this run in another node's
+  /// logs, so it has to be visible — once, since it never varies within a
+  /// run.
+  testWidgets('shows the session id once in the header', (tester) async {
+    final notifier = container.read(inferenceEventsProvider.notifier);
+    notifier.startRun();
+    await tester.pumpWidget(_host(container));
+
+    notifier.ingest(
+      Stream<pb.InferenceEvent>.fromIterable([
+        // Run-level events precede the session, so the id must be latched
+        // from whichever event first carries it rather than a fixed phase.
+        pb.InferenceEvent()
+          ..phase = pb.InferencePhase.INFERENCE_PHASE_RESOLVED
+          ..elapsedMs = Int64(0)
+          ..totalBlocks = 32,
+        pb.InferenceEvent()
+          ..phase = pb.InferencePhase.INFERENCE_PHASE_HOP_START
+          ..elapsedMs = Int64(3200)
+          ..peerName = 'metro-linux'
+          ..blockStart = 0
+          ..blockEnd = 32
+          ..sessionId = '18446744073709551615'
+          ..seqPos = 41,
+      ]),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+
+    expect(find.textContaining('18446744073709551615'), findsOneWidget);
+  });
+
   /// An old daemon ignores the request field silently, so the panel has to
   /// infer it from sustained silence rather than an error.
   testWidgets('reports a daemon that never sends events', (tester) async {
