@@ -1186,7 +1186,10 @@ class _SystemPathResult extends StatelessWidget {
           const TextSpan(text: 'Binary found at: '),
           TextSpan(
             text: path,
-            style: const TextStyle(fontFamily: 'monospace'),
+            style: const TextStyle(
+              fontFamily: kwaaiMonoFamily,
+              fontFamilyFallback: kwaaiMonoFallback,
+            ),
           ),
         ],
       ),

@@ -131,7 +131,8 @@ class _InlineCode extends StatelessWidget {
       child: Text(
         code,
         style: style.copyWith(
-          fontFamily: 'monospace',
+          fontFamily: kwaaiMonoFamily,
+          fontFamilyFallback: kwaaiMonoFallback,
           fontSize: (style.fontSize ?? 14) * 0.92,
         ),
       ),
@@ -153,7 +154,8 @@ class _CodeBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final mono = Theme.of(context).textTheme.bodySmall?.copyWith(
-      fontFamily: 'monospace',
+      fontFamily: kwaaiMonoFamily,
+      fontFamilyFallback: kwaaiMonoFallback,
       color: scheme.onSurface,
       height: 1.4,
     );

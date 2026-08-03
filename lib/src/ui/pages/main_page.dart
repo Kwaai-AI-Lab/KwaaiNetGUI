@@ -993,7 +993,8 @@ class _ChatErrorBadgeState extends State<_ChatErrorBadge> {
                     details,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: dest.withValues(alpha: 0.85),
-                      fontFamily: 'monospace',
+                      fontFamily: kwaaiMonoFamily,
+                      fontFamilyFallback: kwaaiMonoFallback,
                     ),
                   ),
                 ),
