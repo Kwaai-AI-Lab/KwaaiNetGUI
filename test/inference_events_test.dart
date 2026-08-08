@@ -169,10 +169,7 @@ void main() {
       expect(log().events.length, lessThanOrEqualTo(kMaxInferenceEvents));
       expect(log().droppedFromFront, greaterThan(0));
       // The tail is what survives — the newest event is still present.
-      expect(
-        log().events.last.elapsedMs.toInt(),
-        kMaxInferenceEvents + 9,
-      );
+      expect(log().events.last.elapsedMs.toInt(), kMaxInferenceEvents + 9);
     });
 
     test('a closed stream ends the run', () async {

@@ -75,9 +75,8 @@ String _hopKey(pb.InferenceEvent e) {
   return 'hop:$token:$start:$cand';
 }
 
-String _blocks(pb.InferenceEvent e) => e.hasBlockStart() && e.hasBlockEnd()
-    ? '${e.blockStart}–${e.blockEnd}'
-    : '';
+String _blocks(pb.InferenceEvent e) =>
+    e.hasBlockStart() && e.hasBlockEnd() ? '${e.blockStart}–${e.blockEnd}' : '';
 
 String _peer(pb.InferenceEvent e) {
   if (e.isSelf) return 'you';
