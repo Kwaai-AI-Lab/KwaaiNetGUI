@@ -351,6 +351,184 @@ class SessionClient {
     return NetworkOperation(id: id, updates: updates);
   }
 
+  /// `kwaainet rag status` — the knowledge bases this daemon holds.
+  ///
+  /// An empty `kbs` list means RAG is compiled in but nothing has been
+  /// initialised yet. A daemon built without the `rag` feature answers
+  /// UNIMPLEMENTED instead — and so does one too old to know the frame at
+  /// all, since an unknown body is not a body it can act on. The two are
+  /// indistinguishable on the wire and mean the same thing to a user, so
+  /// callers treat both as "this daemon can't do RAG".
+  Future<pb.RagStatusUpdate> ragStatus() async {
+    final frames = _open(
+      (id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..ragStatus = pb.RagStatusRequest(),
+    );
+    pb.RagStatusUpdate? reply;
+    await for (final f in frames) {
+      if (f.whichBody() == pb.ServerFrame_Body.ragStatus) {
+        reply = f.ragStatus;
+      }
+    }
+    if (reply == null) {
+      throw SessionOpError(code: 0, message: 'ragStatus returned no update');
+    }
+    return reply;
+  }
+
+  /// `kwaainet rag init` — create a knowledge base.
+  ///
+  /// Empty [kb] means "default" and empty [embedModel] means the daemon's
+  /// configured default; both are resolved daemon-side, so the reply is
+  /// what the KB actually became rather than what was asked for. Init on an
+  /// existing KB is a no-op that returns it with its documents intact.
+  ///
+  /// Errors with UNAVAILABLE when Ollama isn't reachable or the embedding
+  /// model is missing; that message is written for a user to act on, so
+  /// callers should show it rather than replacing it.
+  Future<pb.RagInitReply> ragInit({
+    String kb = '',
+    String embedModel = '',
+  }) async {
+    final frames = _open(
+      (id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..ragInit = (pb.RagInitRequest()
+          ..kb = kb
+          ..embedModel = embedModel),
+    );
+    pb.RagInitReply? reply;
+    await for (final f in frames) {
+      if (f.whichBody() == pb.ServerFrame_Body.ragInit) {
+        reply = f.ragInit;
+      }
+    }
+    if (reply == null) {
+      throw SessionOpError(code: 0, message: 'ragInit returned no reply');
+    }
+    return reply;
+  }
+
+  /// `kwaainet rag query` — retrieve chunks for [text].
+  ///
+  /// [topK] 0 means the server default (20) and [minScore] 0 keeps
+  /// everything, so the defaults here send neither and let the daemon
+  /// decide. Errors with NOT_FOUND when the KB was never initialised.
+  Future<pb.RagQueryReply> ragQuery({
+    required String text,
+    String kb = '',
+    int topK = 0,
+    double minScore = 0,
+  }) async {
+    final frames = _open(
+      (id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..ragQuery = (pb.RagQueryRequest()
+          ..kb = kb
+          ..text = text
+          ..topK = topK
+          ..minScore = minScore),
+    );
+    pb.RagQueryReply? reply;
+    await for (final f in frames) {
+      if (f.whichBody() == pb.ServerFrame_Body.ragQuery) {
+        reply = f.ragQuery;
+      }
+    }
+    if (reply == null) {
+      throw SessionOpError(code: 0, message: 'ragQuery returned no reply');
+    }
+    return reply;
+  }
+
+  /// `kwaainet rag ingest` — read [path] into the KB, embedding as it goes.
+  ///
+  /// [path] is read by the *daemon*, not streamed, so it must be absolute
+  /// and on the daemon's filesystem. The GUI runs on the same machine, so a
+  /// path from the file picker or a drop is already valid.
+  ///
+  /// Unlike the other three ops this is long-running and reports as it
+  /// works, so it returns an operation rather than a bare Future: progress
+  /// frames arrive on [RagIngestOperation.progress] and the terminal reply
+  /// completes [RagIngestOperation.done]. Both come off the same router, so
+  /// a caller may ignore progress entirely and still get the reply.
+  RagIngestOperation ragIngest({
+    required String path,
+    String kb = '',
+    String docName = '',
+  }) {
+    ensureOpen();
+    if (_closed || _outbound == null) {
+      final ended = SessionEndedError(
+        kind: SessionEndKind.localClose,
+        reason: 'session not open',
+      );
+      return RagIngestOperation(
+        id: null,
+        progress: const Stream<pb.RagProgress>.empty(),
+        done: Future<pb.RagIngestReply>.error(ended),
+      );
+    }
+    final id = _nextId++;
+    final controller = StreamController<pb.ServerFrame>();
+    _routers[id] = controller;
+    _outbound!.add(
+      pb.ClientFrame()
+        ..id = Int64(id)
+        ..ragIngest = (pb.RagIngestRequest()
+          ..kb = kb
+          ..path = path
+          ..docName = docName),
+    );
+
+    // One router feeding two consumers, as in [_openOp]: the router is
+    // single-subscription so it cannot be listened to twice. A plain
+    // controller (not broadcast) buffers until the caller subscribes, so
+    // early progress on a fast local ingest isn't dropped in the gap
+    // between this returning and the UI listening.
+    final progress = StreamController<pb.RagProgress>();
+    final done = Completer<pb.RagIngestReply>();
+    controller.stream.listen(
+      (f) {
+        switch (f.whichBody()) {
+          case pb.ServerFrame_Body.ragProgress:
+            if (!progress.isClosed) progress.add(f.ragProgress);
+          case pb.ServerFrame_Body.ragIngest:
+            if (!done.isCompleted) done.complete(f.ragIngest);
+          default:
+            break;
+        }
+      },
+      onError: (Object e, StackTrace st) {
+        // The error goes to the Future, which is what a caller awaits;
+        // progress merely closes. Sending it to both would surface the
+        // same failure twice, and an unhandled error on a progress
+        // stream nobody listened to would escape as an uncaught async
+        // error.
+        if (!done.isCompleted) done.completeError(e, st);
+        if (!progress.isClosed) progress.close();
+      },
+      onDone: () {
+        if (!progress.isClosed) progress.close();
+        // Done without a terminal reply: the daemon ended the operation
+        // without saying what it did. Better a clear error than a Future
+        // that never settles and a spinner that never stops.
+        if (!done.isCompleted) {
+          done.completeError(
+            SessionOpError(code: 0, message: 'ragIngest returned no reply'),
+          );
+        }
+      },
+    );
+
+    return RagIngestOperation(
+      id: id,
+      progress: progress.stream,
+      done: done.future,
+    );
+  }
+
   /// Cancel an in-flight operation. The target operation's stream will
   /// error with SessionOpError(code=CANCELLED).
   Future<void> cancel(int operationId) async {
@@ -558,6 +736,32 @@ class NetworkOperation {
 
   final int? id;
   final Stream<pb.NetworkUpdate> updates;
+}
+
+/// An in-flight RAG ingest: its progress feed, the terminal reply, and the
+/// server operation id needed to [SessionClient.cancel] it. Same id
+/// semantics as [SessionOperation] — null means no frame was ever sent.
+///
+/// Unlike the subscription operations this exposes a Future as well as a
+/// Stream, because an ingest has a definite result (how much was stored)
+/// rather than running until cancelled. [progress] is optional detail;
+/// [done] is the outcome and carries any error.
+class RagIngestOperation {
+  RagIngestOperation({
+    required this.id,
+    required this.progress,
+    required this.done,
+  });
+
+  final int? id;
+
+  /// Phase/counter updates while the ingest runs. Closes when the
+  /// operation ends, however it ends. Safe to ignore.
+  final Stream<pb.RagProgress> progress;
+
+  /// Chunks stored and vectors uploaded, or an error — including
+  /// SessionOpError(code=UNAVAILABLE) when Ollama went away mid-ingest.
+  final Future<pb.RagIngestReply> done;
 }
 
 /// Thrown into a per-op stream when the server emits Error for that id.

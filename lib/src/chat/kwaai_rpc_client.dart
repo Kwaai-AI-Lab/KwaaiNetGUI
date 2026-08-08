@@ -494,6 +494,61 @@ class KwaaiRpcClient {
   @visibleForTesting
   String? get debugConnectionPath => _connectionPath;
 
+  /// The knowledge bases this daemon holds.
+  ///
+  /// Errors rather than returning null on failure: the RAG view has to tell
+  /// "no KBs yet" (an empty list, which is an init prompt) apart from "this
+  /// daemon can't do RAG" (SessionOpError code=UNIMPLEMENTED, which is a
+  /// dead end), and a null would collapse both into one.
+  ///
+  /// As with the other Session ops this doesn't reset the channel on
+  /// failure — the provider re-runs when connectivity returns.
+  Future<pb.RagStatusUpdate> ragStatus() async {
+    final session = await _sessionOrInit();
+    return session.ragStatus().timeout(const Duration(seconds: 10));
+  }
+
+  /// Create a knowledge base. Empty [kb] means "default"; empty
+  /// [embedModel] means the daemon's configured default.
+  ///
+  /// No timeout: init pulls the embedding model on first use, which on a
+  /// cold Ollama is a multi-minute download. Cutting that off would leave
+  /// the daemon still working while the GUI reported failure.
+  Future<pb.RagInitReply> ragInit({
+    String kb = '',
+    String embedModel = '',
+  }) async {
+    final session = await _sessionOrInit();
+    return session.ragInit(kb: kb, embedModel: embedModel);
+  }
+
+  /// Retrieve chunks for [text]. [topK] 0 means the server default.
+  Future<pb.RagQueryReply> ragQuery({
+    required String text,
+    String kb = '',
+    int topK = 0,
+    double minScore = 0,
+  }) async {
+    final session = await _sessionOrInit();
+    return session
+        .ragQuery(text: text, kb: kb, topK: topK, minScore: minScore)
+        .timeout(const Duration(seconds: 60));
+  }
+
+  /// Ingest the file at [path] (absolute, on the daemon's filesystem).
+  ///
+  /// Returns the operation so the caller can render progress; no timeout,
+  /// since embedding a large document legitimately takes minutes and the
+  /// progress feed already shows whether it is moving.
+  Future<RagIngestOperation> ragIngest({
+    required String path,
+    String kb = '',
+    String docName = '',
+  }) async {
+    final session = await _sessionOrInit();
+    return session.ragIngest(path: path, kb: kb, docName: docName);
+  }
+
   Future<void> _resetChannel({bool silent = false}) async {
     final ch = _channel;
     final path = _connectionPath;
