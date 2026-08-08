@@ -135,9 +135,7 @@ class _ShardingTabState extends ConsumerState<ShardingTab> {
             ? 'Querying the network for block coverage…'
             : unavailableHeadline(),
         spinner: running,
-        subtitle: running
-            ? null
-            : Text(unavailableHint('see coverage')),
+        subtitle: running ? null : Text(unavailableHint('see coverage')),
       );
     }
 

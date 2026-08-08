@@ -53,14 +53,16 @@ Widget _host(pb.NetworkUpdate update) {
 }
 
 Finder _summaryWith(String fragment) => find.byWidgetPredicate(
-      (w) => w is Text && (w.data ?? '').contains(fragment),
-    );
+  (w) => w is Text && (w.data ?? '').contains(fragment),
+);
 
 /// The client filter hides query-only peers by default. These pin the two ways
 /// that has previously gone wrong: the count contradicting what is on screen,
 /// and the control moving as it is used.
 void main() {
-  testWidgets('hides client peers by default and says how many', (tester) async {
+  testWidgets('hides client peers by default and says how many', (
+    tester,
+  ) async {
     await tester.pumpWidget(_host(_update(clients: 2)));
     await tester.pumpAndSettle();
 
@@ -114,10 +116,9 @@ void main() {
     await tester.pumpWidget(_host(_update(clients: 2)));
     await tester.pumpAndSettle();
 
-    final rects = _summaryWith('in routing table')
-        .evaluate()
-        .map((e) => tester.getRect(find.byWidget(e.widget)))
-        .toList();
+    final rects = _summaryWith(
+      'in routing table',
+    ).evaluate().map((e) => tester.getRect(find.byWidget(e.widget))).toList();
 
     expect(rects.length, 2, reason: 'header summary and caption summary');
     expect(rects[0].right, closeTo(rects[1].right, 0.5));

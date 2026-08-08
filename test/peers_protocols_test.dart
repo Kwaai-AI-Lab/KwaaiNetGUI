@@ -41,7 +41,8 @@ void main() {
         expect(
           describeProtocol(id),
           isNot(id),
-          reason: '$id is advertised on the live network but falls through to '
+          reason:
+              '$id is advertised on the live network but falls through to '
               'its raw id — no description matches it',
         );
       }
@@ -63,7 +64,8 @@ void main() {
         expect(
           entry.value,
           isNot(startsWith('/')),
-          reason: '${entry.key} is described by something that looks like an id',
+          reason:
+              '${entry.key} is described by something that looks like an id',
         );
         expect(
           entry.value.trim(),

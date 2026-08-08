@@ -153,9 +153,7 @@ class _PeersTabState extends ConsumerState<PeersTab> {
             ? 'Reading the local p2p state…'
             : unavailableHeadline(),
         spinner: running,
-        subtitle: running
-            ? null
-            : Text(unavailableHint('see the network')),
+        subtitle: running ? null : Text(unavailableHint('see the network')),
       );
     }
 
@@ -813,8 +811,7 @@ class PeerRow {
   /// with them: those are operator configuration, this is observed behaviour.
   /// A client-mode peer still advertises circuit relay hop, and one of our own
   /// nodes runs kad in client mode whenever it is only reachable via a relay.
-  bool get isDhtClient =>
-      primary?.dhtRole == pbenum.DhtRole.DHT_ROLE_CLIENT;
+  bool get isDhtClient => primary?.dhtRole == pbenum.DhtRole.DHT_ROLE_CLIENT;
 }
 
 /// Merge the two peer sets into one row per peer, in display order.
@@ -1299,8 +1296,7 @@ class _PeerConnections extends StatelessWidget {
                   values: row.routingAddrs,
                 ),
               ),
-          ]
-          else
+          ] else
             for (final c in row.connections)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -1496,10 +1492,7 @@ class _ProtocolLinesState extends State<_ProtocolLines> {
 /// it. The count belongs in the caption summary, where the answer to "are
 /// there peers I'm not seeing?" is visible without touching anything.
 class _DhtClientToggle extends StatelessWidget {
-  const _DhtClientToggle({
-    required this.value,
-    required this.onChanged,
-  });
+  const _DhtClientToggle({required this.value, required this.onChanged});
 
   final bool value;
   final ValueChanged<bool> onChanged;
@@ -1514,7 +1507,8 @@ class _DhtClientToggle extends StatelessWidget {
     const label = 'Show DHT clients';
 
     return Tooltip(
-      message: 'Peers that query the DHT without serving it. They are never '
+      message:
+          'Peers that query the DHT without serving it. They are never '
           'routing hops — typically hivemind/Python processes, or nodes '
           'reachable only via a relay.',
       // Whole control is the hit target, so the label toggles too — a bare
@@ -1582,10 +1576,7 @@ class _Caption extends StatelessWidget {
           // Sits immediately after the title, with the Spacer pushing the
           // summary to the right edge. The gap is fixed rather than flexible
           // so the control keeps its position as the summary text changes.
-          if (trailing != null) ...[
-            const SizedBox(width: 12),
-            trailing!,
-          ],
+          if (trailing != null) ...[const SizedBox(width: 12), trailing!],
           const Spacer(),
           if (detail != null) ...[
             // Flexible, not Expanded: the text takes only the width it needs
@@ -1703,8 +1694,8 @@ class _RoleCell extends StatelessWidget {
     final configured = row.isBootstrap
         ? ('bootstrap', kwaai.accentPrimary)
         : row.isTrustedRelay
-            ? ('trusted relay', kwaai.semanticInfo)
-            : null;
+        ? ('trusted relay', kwaai.semanticInfo)
+        : null;
 
     if (configured == null && !row.isDhtClient) {
       return Text('—', style: theme.textTheme.bodySmall);
@@ -1722,7 +1713,8 @@ class _RoleCell extends StatelessWidget {
           Text(' · ', style: theme.textTheme.bodySmall),
         if (row.isDhtClient)
           Tooltip(
-            message: 'Queries the DHT but does not serve it — never a routing '
+            message:
+                'Queries the DHT but does not serve it — never a routing '
                 'hop. Common for hivemind/Python peers and for nodes that are '
                 'only reachable via a relay.',
             child: Text(

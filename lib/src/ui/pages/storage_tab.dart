@@ -121,9 +121,7 @@ class _StorageTabState extends ConsumerState<StorageTab> {
             ? 'Querying the network for storage nodes…'
             : unavailableHeadline(),
         spinner: running,
-        subtitle: running
-            ? null
-            : Text(unavailableHint('see storage')),
+        subtitle: running ? null : Text(unavailableHint('see storage')),
       );
     }
 

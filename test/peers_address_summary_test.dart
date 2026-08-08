@@ -37,10 +37,9 @@ void main() {
     test('leaves a single observation exactly as it is', () {
       // The common case for a quiet node: nothing to summarise, so nothing is
       // added. A bare address must not grow a "(+0 more)" suffix.
-      expect(
-        summariseObservedAddrs(['/ip4/203.0.113.7/tcp/8080']),
-        ['/ip4/203.0.113.7/tcp/8080'],
-      );
+      expect(summariseObservedAddrs(['/ip4/203.0.113.7/tcp/8080']), [
+        '/ip4/203.0.113.7/tcp/8080',
+      ]);
     });
 
     test('keeps distinct hosts apart', () {

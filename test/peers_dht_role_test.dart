@@ -29,8 +29,7 @@ pb.RoutingPeer _routing(String peerId, {bool connected = false}) {
     ..connected = connected;
 }
 
-PeerRow _row(pb.ConnectedPeer conn) =>
-    mergePeerRows([conn], const []).single;
+PeerRow _row(pb.ConnectedPeer conn) => mergePeerRows([conn], const []).single;
 
 /// Client-mode peers query the DHT without serving it. They are real peers —
 /// every hivemind/Python process proxies through one, and one of our own nodes
@@ -68,21 +67,17 @@ void main() {
   /// observed from identify. Nothing stops a configured peer being client-mode,
   /// and the row must report both rather than letting one mask the other.
   test('a configured peer can also be client-mode', () {
-    final row = _row(_conn(
-      'A',
-      bootstrap: true,
-      role: pbenum.DhtRole.DHT_ROLE_CLIENT,
-    ));
+    final row = _row(
+      _conn('A', bootstrap: true, role: pbenum.DhtRole.DHT_ROLE_CLIENT),
+    );
     expect(row.isBootstrap, isTrue);
     expect(row.isDhtClient, isTrue);
   });
 
   test('a trusted relay can also be client-mode', () {
-    final row = _row(_conn(
-      'A',
-      trustedRelay: true,
-      role: pbenum.DhtRole.DHT_ROLE_CLIENT,
-    ));
+    final row = _row(
+      _conn('A', trustedRelay: true, role: pbenum.DhtRole.DHT_ROLE_CLIENT),
+    );
     expect(row.isTrustedRelay, isTrue);
     expect(row.isDhtClient, isTrue);
   });
@@ -91,13 +86,10 @@ void main() {
   /// the role must be read from that same connection rather than from whichever
   /// one happens to be first.
   test('the role follows the primary connection', () {
-    final rows = mergePeerRows(
-      [
-        _conn('A', relay: true, role: pbenum.DhtRole.DHT_ROLE_UNKNOWN),
-        _conn('A', role: pbenum.DhtRole.DHT_ROLE_CLIENT),
-      ],
-      const [],
-    );
+    final rows = mergePeerRows([
+      _conn('A', relay: true, role: pbenum.DhtRole.DHT_ROLE_UNKNOWN),
+      _conn('A', role: pbenum.DhtRole.DHT_ROLE_CLIENT),
+    ], const []);
     expect(rows.single.isDhtClient, isTrue);
   });
 }

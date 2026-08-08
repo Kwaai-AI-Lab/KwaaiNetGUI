@@ -17,50 +17,57 @@ import 'package:kwaainet_gui/src/chat/kwaai_rpc_client.dart';
 import 'package:kwaainet_gui/src/chat/session_client.dart';
 
 void main() {
-  test('a rejected network op leaves the session usable', () async {
-    final client = KwaaiRpcClient();
-    addTearDown(client.close);
+  test(
+    'a rejected network op leaves the session usable',
+    () async {
+      final client = KwaaiRpcClient();
+      addTearDown(client.close);
 
-    // Drive the Network op to whatever conclusion this daemon reaches.
-    Object? networkError;
-    var networkUpdates = 0;
-    final sub = client.networkStream(intervalSecs: 5).listen(
-      (_) => networkUpdates++,
-      onError: (Object e) => networkError = e,
-    );
-    addTearDown(sub.cancel);
+      // Drive the Network op to whatever conclusion this daemon reaches.
+      Object? networkError;
+      var networkUpdates = 0;
+      final sub = client
+          .networkStream(intervalSecs: 5)
+          .listen(
+            (_) => networkUpdates++,
+            onError: (Object e) => networkError = e,
+          );
+      addTearDown(sub.cancel);
 
-    await Future<void>.delayed(const Duration(seconds: 6));
+      await Future<void>.delayed(const Duration(seconds: 6));
 
-    if (networkError == null) {
-      // ignore: avoid_print
-      print(
-        'daemon serves the network op ($networkUpdates update(s)) — the '
-        'degradation path is not exercised here, but the session check below '
-        'still applies',
+      if (networkError == null) {
+        // ignore: avoid_print
+        print(
+          'daemon serves the network op ($networkUpdates update(s)) — the '
+          'degradation path is not exercised here, but the session check below '
+          'still applies',
+        );
+      } else {
+        final e = networkError!;
+        // ignore: avoid_print
+        print(
+          'network op rejected: '
+          '${e is SessionOpError ? "code=${e.code} ${e.message}" : e}',
+        );
+      }
+
+      // The real assertion: the same client, over the same Session, can still
+      // do other work. `daemonVersion` runs a Status operation end to end.
+      final version = await client.daemonVersion();
+      expect(
+        version,
+        isNotNull,
+        reason:
+            'the Session died with the rejected operation — every other '
+            'tab would have gone down with it',
       );
-    } else {
-      final e = networkError!;
       // ignore: avoid_print
-      print(
-        'network op rejected: '
-        '${e is SessionOpError ? "code=${e.code} ${e.message}" : e}',
-      );
-    }
+      print('session still usable — daemon version: $version');
 
-    // The real assertion: the same client, over the same Session, can still
-    // do other work. `daemonVersion` runs a Status operation end to end.
-    final version = await client.daemonVersion();
-    expect(
-      version,
-      isNotNull,
-      reason: 'the Session died with the rejected operation — every other '
-          'tab would have gone down with it',
-    );
-    // ignore: avoid_print
-    print('session still usable — daemon version: $version');
-
-    // And a second time, to rule out a session that limps once and then dies.
-    expect(await client.daemonVersion(), isNotNull);
-  }, timeout: const Timeout(Duration(seconds: 90)));
+      // And a second time, to rule out a session that limps once and then dies.
+      expect(await client.daemonVersion(), isNotNull);
+    },
+    timeout: const Timeout(Duration(seconds: 90)),
+  );
 }

@@ -23,7 +23,8 @@ void main() {
       expect(
         peersStaleAfter,
         greaterThan(daemonHeartbeat),
-        reason: 'a threshold at or below the heartbeat would flag every '
+        reason:
+            'a threshold at or below the heartbeat would flag every '
             'healthy quiet period as stale',
       );
       expect(
@@ -63,7 +64,9 @@ void main() {
     // daemon that somehow omitted the field must not read as a reachability
     // event.
     test('an unset reason decodes as TICK', () {
-      final decoded = pb.NetworkUpdate.fromBuffer(pb.NetworkUpdate().writeToBuffer());
+      final decoded = pb.NetworkUpdate.fromBuffer(
+        pb.NetworkUpdate().writeToBuffer(),
+      );
       expect(decoded.reason, pbenum.UpdateReason.UPDATE_REASON_TICK);
     });
 
@@ -101,9 +104,11 @@ void main() {
 
     test('the routing table can hold peers we are not connected to', () {
       final update = pb.NetworkUpdate()
-        ..routing.add(pb.RoutingPeer()
-          ..peerId = 'B'
-          ..connected = false);
+        ..routing.add(
+          pb.RoutingPeer()
+            ..peerId = 'B'
+            ..connected = false,
+        );
 
       final decoded = pb.NetworkUpdate.fromBuffer(update.writeToBuffer());
       expect(decoded.connected, isEmpty);
@@ -128,7 +133,8 @@ void main() {
       expect(
         decoded.rttMs,
         0,
-        reason: '0 means no ping has completed, never zero latency — the view '
+        reason:
+            '0 means no ping has completed, never zero latency — the view '
             'renders it as an em dash rather than "0 ms"',
       );
     });

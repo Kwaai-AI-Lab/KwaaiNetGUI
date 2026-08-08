@@ -43,7 +43,10 @@ pb.RoutingPeer _routing(
 void main() {
   group('mergePeerRows', () {
     test('a peer in both sets produces one row', () {
-      final rows = mergePeerRows([_conn('A')], [_routing('A', connected: true)]);
+      final rows = mergePeerRows(
+        [_conn('A')],
+        [_routing('A', connected: true)],
+      );
 
       expect(rows, hasLength(1));
       expect(rows.single.peerId, 'A');
@@ -151,25 +154,25 @@ void main() {
 
     test('a bootstrap sorts first even when reached over a relay', () {
       // "Did my bootstraps connect?" outranks how they connected.
-      final rows = mergePeerRows(
-        [_conn('zzz-boot', bootstrap: true, relay: true), _conn('aaa-direct')],
-        [],
-      );
+      final rows = mergePeerRows([
+        _conn('zzz-boot', bootstrap: true, relay: true),
+        _conn('aaa-direct'),
+      ], []);
       expect(rows.first.peerId, 'zzz-boot');
     });
 
     test('is stable, by peer id within a group', () {
-      final rows = mergePeerRows(
-        [_conn('c'), _conn('a'), _conn('b')],
-        [],
-      );
+      final rows = mergePeerRows([_conn('c'), _conn('a'), _conn('b')], []);
       expect(rows.map((r) => r.peerId).toList(), ['a', 'b', 'c']);
     });
 
     test('a routing-only bootstrap is still labelled and sorted first', () {
       // The flag comes off the routing entry when there is no connection to
       // read it from.
-      final rows = mergePeerRows([_conn('zzz')], [_routing('aaa', bootstrap: true)]);
+      final rows = mergePeerRows(
+        [_conn('zzz')],
+        [_routing('aaa', bootstrap: true)],
+      );
       expect(rows.first.peerId, 'aaa');
       expect(rows.first.isBootstrap, isTrue);
       expect(rows.first.isConnected, isFalse);
@@ -185,15 +188,9 @@ void main() {
       // The state this exists to make visible: kad knows the peer and holds a
       // way to reach it, but there is no connection. Without the addresses
       // that is indistinguishable from an entry we cannot dial at all.
-      final rows = mergePeerRows(
-        const [],
-        [
-          pb.RoutingPeer(
-            peerId: 'A',
-            addrs: ['/ip4/198.18.0.32/tcp/8080'],
-          ),
-        ],
-      );
+      final rows = mergePeerRows(const [], [
+        pb.RoutingPeer(peerId: 'A', addrs: ['/ip4/198.18.0.32/tcp/8080']),
+      ]);
       expect(rows.single.routingAddrs, ['/ip4/198.18.0.32/tcp/8080']);
       expect(rows.single.isConnected, isFalse);
     });
@@ -202,13 +199,10 @@ void main() {
       // This pair is the whole point: both are "in the routing table, not
       // connected", and only routingAddrs tells them apart. The empty one
       // cannot be connected to, so the UI must not offer it.
-      final rows = mergePeerRows(
-        const [],
-        [
-          pb.RoutingPeer(peerId: 'A', addrs: ['/ip4/198.18.0.32/tcp/8080']),
-          pb.RoutingPeer(peerId: 'B'),
-        ],
-      );
+      final rows = mergePeerRows(const [], [
+        pb.RoutingPeer(peerId: 'A', addrs: ['/ip4/198.18.0.32/tcp/8080']),
+        pb.RoutingPeer(peerId: 'B'),
+      ]);
       final byId = {for (final r in rows) r.peerId: r};
       expect(byId['A']!.routingAddrs, isNotEmpty);
       expect(byId['B']!.routingAddrs, isEmpty);
@@ -220,7 +214,9 @@ void main() {
       // connection can be relayed while the routing address is direct.
       final rows = mergePeerRows(
         [pb.ConnectedPeer(peerId: 'A', addr: '/ip4/1.2.3.4/tcp/1')],
-        [pb.RoutingPeer(peerId: 'A', addrs: ['/ip4/198.18.0.32/tcp/8080'])],
+        [
+          pb.RoutingPeer(peerId: 'A', addrs: ['/ip4/198.18.0.32/tcp/8080']),
+        ],
       );
       expect(rows.single.routingAddrs, ['/ip4/198.18.0.32/tcp/8080']);
       expect(rows.single.isConnected, isTrue);

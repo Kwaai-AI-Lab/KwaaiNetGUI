@@ -7,18 +7,18 @@ import 'package:kwaainet_gui/src/daemon/config_file.dart';
 /// Carrying it wrongly through an edit would silently flip that, so the
 /// copyWith semantics are worth pinning.
 ConfigSnapshot _snapshot({bool enableUpnp = true}) => ConfigSnapshot(
-      model: '',
-      shardingEnabled: true,
-      storageEnabled: true,
-      storageCapacityGb: null,
-      port: null,
-      publicIp: '',
-      initialPeers: const [],
-      forcePrivate: false,
-      enableUpnp: enableUpnp,
-      healthEnabled: true,
-      healthEndpoint: '',
-    );
+  model: '',
+  shardingEnabled: true,
+  storageEnabled: true,
+  storageCapacityGb: null,
+  port: null,
+  publicIp: '',
+  initialPeers: const [],
+  forcePrivate: false,
+  enableUpnp: enableUpnp,
+  healthEnabled: true,
+  healthEndpoint: '',
+);
 
 void main() {
   group('enableUpnp', () {
@@ -38,8 +38,10 @@ void main() {
 
     test('can be toggled explicitly in both directions', () {
       expect(_snapshot().copyWith(enableUpnp: false).enableUpnp, isFalse);
-      expect(_snapshot(enableUpnp: false).copyWith(enableUpnp: true).enableUpnp,
-          isTrue);
+      expect(
+        _snapshot(enableUpnp: false).copyWith(enableUpnp: true).enableUpnp,
+        isTrue,
+      );
     });
   });
 }

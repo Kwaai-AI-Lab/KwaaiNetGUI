@@ -54,9 +54,7 @@ pb.NetworkUpdate _update({int connected = 3, int routing = 3}) {
 
 Widget _host(pb.NetworkUpdate update, {Size size = const Size(900, 700)}) {
   return ProviderScope(
-    overrides: [
-      peersProvider.overrideWith((ref) => Stream.value(update)),
-    ],
+    overrides: [peersProvider.overrideWith((ref) => Stream.value(update))],
     child: MaterialApp(
       theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
       home: Scaffold(
@@ -71,8 +69,9 @@ Widget _host(pb.NetworkUpdate update, {Size size = const Size(900, 700)}) {
 }
 
 void main() {
-  testWidgets('lays out the merged table without hanging or overflowing',
-      (tester) async {
+  testWidgets('lays out the merged table without hanging or overflowing', (
+    tester,
+  ) async {
     await tester.pumpWidget(_host(_update()));
     await tester.pump();
 
@@ -85,8 +84,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('survives a narrow window, where the tables must scroll',
-      (tester) async {
+  testWidgets('survives a narrow window, where the tables must scroll', (
+    tester,
+  ) async {
     // The failure mode is width-sensitive: a table wider than the viewport is
     // exactly when the horizontal scroll view has to do something.
     await tester.pumpWidget(_host(_update(), size: const Size(420, 600)));
@@ -129,14 +129,16 @@ void main() {
     expect(
       large.inMicroseconds,
       lessThan(small.inMicroseconds * 20),
-      reason: 'layout cost grew far faster than row count (4x rows took '
+      reason:
+          'layout cost grew far faster than row count (4x rows took '
           '${large.inMilliseconds}ms vs ${small.inMilliseconds}ms) — the '
           'tables are probably being measured against unbounded constraints',
     );
   });
 
-  testWidgets('selecting a peer opens the connections panel below the table',
-      (tester) async {
+  testWidgets('selecting a peer opens the connections panel below the table', (
+    tester,
+  ) async {
     await tester.pumpWidget(_host(_update(connected: 3, routing: 3)));
     await tester.pump();
 
@@ -155,8 +157,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('every value is rendered when an address line is expanded',
-      (tester) async {
+  testWidgets('every value is rendered when an address line is expanded', (
+    tester,
+  ) async {
     // Regression: the values were joined into one Text with maxLines capped at
     // the value count, so once a long multiaddr wrapped, the last entry was
     // silently clipped — the toggle said "and 4 more" while showing four of
@@ -193,8 +196,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('shows what this node serves, beside what peers offer',
-      (tester) async {
+  testWidgets('shows what this node serves, beside what peers offer', (
+    tester,
+  ) async {
     // The comparison is the point: reading our list next to a peer's is how
     // you tell whether a missing capability is theirs or ours.
     final update = _update();
@@ -230,8 +234,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('offers connect only for peers we are not connected to',
-      (tester) async {
+  testWidgets('offers connect only for peers we are not connected to', (
+    tester,
+  ) async {
     // A routing-only peer is the case this exists for: known from the DHT,
     // no live connection. Connected rows show a check and no action — the
     // button would mean nothing there.
@@ -277,7 +282,8 @@ void main() {
     expect(
       perFrame,
       lessThan(2.0),
-      reason: 'an idle page cost ${perFrame.toStringAsFixed(2)}ms per frame; '
+      reason:
+          'an idle page cost ${perFrame.toStringAsFixed(2)}ms per frame; '
           'something on it is animating continuously (a per-row Tooltip, most '
           'likely), which is what makes the tab feel like it hangs',
     );
@@ -325,13 +331,15 @@ void main() {
     expect(
       perRebuild,
       lessThan(50),
-      reason: 'an update costs ${perRebuild.toStringAsFixed(1)}ms end to end, '
+      reason:
+          'an update costs ${perRebuild.toStringAsFixed(1)}ms end to end, '
           'far above the ~1ms this path should take',
     );
   });
 
-  testWidgets('the page scrolls vertically when the tables overflow it',
-      (tester) async {
+  testWidgets('the page scrolls vertically when the tables overflow it', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       _host(_update(connected: 40, routing: 40), size: const Size(900, 400)),
     );
