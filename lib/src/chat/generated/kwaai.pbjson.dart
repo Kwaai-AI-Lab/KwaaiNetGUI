@@ -77,6 +77,56 @@ final $typed_data.Uint8List storageReachabilityDescriptor = $convert.base64Decod
     'IiCh5TVE9SQUdFX1JFQUNIQUJJTElUWV9SRUFDSEFCTEUQARIkCiBTVE9SQUdFX1JFQUNIQUJJ'
     'TElUWV9VTlJFQUNIQUJMRRAC');
 
+@$core.Deprecated('Use inferencePhaseDescriptor instead')
+const InferencePhase$json = {
+  '1': 'InferencePhase',
+  '2': [
+    {'1': 'INFERENCE_PHASE_UNSPECIFIED', '2': 0},
+    {'1': 'INFERENCE_PHASE_RESOLVED', '2': 1},
+    {'1': 'INFERENCE_PHASE_DISCOVERY_START', '2': 2},
+    {'1': 'INFERENCE_PHASE_DISCOVERY_RESULT', '2': 3},
+    {'1': 'INFERENCE_PHASE_CIRCUIT_LOADED', '2': 4},
+    {'1': 'INFERENCE_PHASE_CHAIN_PINNED', '2': 5},
+    {'1': 'INFERENCE_PHASE_PEER_DIAL', '2': 6},
+    {'1': 'INFERENCE_PHASE_HOP_START', '2': 7},
+    {'1': 'INFERENCE_PHASE_HOP_OK', '2': 8},
+    {'1': 'INFERENCE_PHASE_HOP_FAILED', '2': 9},
+    {'1': 'INFERENCE_PHASE_PATH_REBUILD', '2': 10},
+    {'1': 'INFERENCE_PHASE_TOKEN_SAMPLED', '2': 11},
+    {'1': 'INFERENCE_PHASE_COMPLETE', '2': 12},
+  ],
+};
+
+/// Descriptor for `InferencePhase`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List inferencePhaseDescriptor = $convert.base64Decode(
+    'Cg5JbmZlcmVuY2VQaGFzZRIfChtJTkZFUkVOQ0VfUEhBU0VfVU5TUEVDSUZJRUQQABIcChhJTk'
+    'ZFUkVOQ0VfUEhBU0VfUkVTT0xWRUQQARIjCh9JTkZFUkVOQ0VfUEhBU0VfRElTQ09WRVJZX1NU'
+    'QVJUEAISJAogSU5GRVJFTkNFX1BIQVNFX0RJU0NPVkVSWV9SRVNVTFQQAxIiCh5JTkZFUkVOQ0'
+    'VfUEhBU0VfQ0lSQ1VJVF9MT0FERUQQBBIgChxJTkZFUkVOQ0VfUEhBU0VfQ0hBSU5fUElOTkVE'
+    'EAUSHQoZSU5GRVJFTkNFX1BIQVNFX1BFRVJfRElBTBAGEh0KGUlORkVSRU5DRV9QSEFTRV9IT1'
+    'BfU1RBUlQQBxIaChZJTkZFUkVOQ0VfUEhBU0VfSE9QX09LEAgSHgoaSU5GRVJFTkNFX1BIQVNF'
+    'X0hPUF9GQUlMRUQQCRIgChxJTkZFUkVOQ0VfUEhBU0VfUEFUSF9SRUJVSUxEEAoSIQodSU5GRV'
+    'JFTkNFX1BIQVNFX1RPS0VOX1NBTVBMRUQQCxIcChhJTkZFUkVOQ0VfUEhBU0VfQ09NUExFVEUQ'
+    'DA==');
+
+@$core.Deprecated('Use hopFailureDescriptor instead')
+const HopFailure$json = {
+  '1': 'HopFailure',
+  '2': [
+    {'1': 'HOP_FAILURE_UNSPECIFIED', '2': 0},
+    {'1': 'HOP_FAILURE_NO_HANDLER', '2': 1},
+    {'1': 'HOP_FAILURE_TRANSIENT', '2': 2},
+    {'1': 'HOP_FAILURE_TIMEOUT', '2': 3},
+    {'1': 'HOP_FAILURE_OTHER', '2': 4},
+  ],
+};
+
+/// Descriptor for `HopFailure`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List hopFailureDescriptor = $convert.base64Decode(
+    'CgpIb3BGYWlsdXJlEhsKF0hPUF9GQUlMVVJFX1VOU1BFQ0lGSUVEEAASGgoWSE9QX0ZBSUxVUk'
+    'VfTk9fSEFORExFUhABEhkKFUhPUF9GQUlMVVJFX1RSQU5TSUVOVBACEhcKE0hPUF9GQUlMVVJF'
+    'X1RJTUVPVVQQAxIVChFIT1BfRkFJTFVSRV9PVEhFUhAE');
+
 @$core.Deprecated('Use clientFrameDescriptor instead')
 const ClientFrame$json = {
   '1': 'ClientFrame',
@@ -128,6 +178,42 @@ const ClientFrame$json = {
       '10': 'cancel'
     },
     {
+      '1': 'rag_status',
+      '3': 20,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.RagStatusRequest',
+      '9': 0,
+      '10': 'ragStatus'
+    },
+    {
+      '1': 'rag_init',
+      '3': 21,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.RagInitRequest',
+      '9': 0,
+      '10': 'ragInit'
+    },
+    {
+      '1': 'rag_ingest',
+      '3': 22,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.RagIngestRequest',
+      '9': 0,
+      '10': 'ragIngest'
+    },
+    {
+      '1': 'rag_query',
+      '3': 23,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.RagQueryRequest',
+      '9': 0,
+      '10': 'ragQuery'
+    },
+    {
       '1': 'block_coverage',
       '3': 15,
       '4': 1,
@@ -163,6 +249,15 @@ const ClientFrame$json = {
       '9': 0,
       '10': 'storageDiscovery'
     },
+    {
+      '1': 'rag_delete',
+      '3': 25,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.RagDeleteRequest',
+      '9': 0,
+      '10': 'ragDelete'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -176,11 +271,17 @@ final $typed_data.Uint8List clientFrameDescriptor = $convert.base64Decode(
     'ZVJlcXVlc3RIAFIIZ2VuZXJhdGUSOAoJc2hhcmRfcnVuGAwgASgLMhkua3dhYWkudjEuU2hhcm'
     'RSdW5SZXF1ZXN0SABSCHNoYXJkUnVuEjEKBnN0YXR1cxgNIAEoCzIXLmt3YWFpLnYxLlN0YXR1'
     'c1JlcXVlc3RIAFIGc3RhdHVzEioKBmNhbmNlbBgOIAEoCzIQLmt3YWFpLnYxLkNhbmNlbEgAUg'
-    'ZjYW5jZWwSRwoOYmxvY2tfY292ZXJhZ2UYDyABKAsyHi5rd2FhaS52MS5CbG9ja0NvdmVyYWdl'
-    'UmVxdWVzdEgAUg1ibG9ja0NvdmVyYWdlEjQKB25ldHdvcmsYESABKAsyGC5rd2FhaS52MS5OZX'
-    'R3b3JrUmVxdWVzdEgAUgduZXR3b3JrEjQKB2Nvbm5lY3QYEiABKAsyGC5rd2FhaS52MS5Db25u'
-    'ZWN0UmVxdWVzdEgAUgdjb25uZWN0ElAKEXN0b3JhZ2VfZGlzY292ZXJ5GBAgASgLMiEua3dhYW'
-    'kudjEuU3RvcmFnZURpc2NvdmVyeVJlcXVlc3RIAFIQc3RvcmFnZURpc2NvdmVyeUIGCgRib2R5');
+    'ZjYW5jZWwSOwoKcmFnX3N0YXR1cxgUIAEoCzIaLmt3YWFpLnYxLlJhZ1N0YXR1c1JlcXVlc3RI'
+    'AFIJcmFnU3RhdHVzEjUKCHJhZ19pbml0GBUgASgLMhgua3dhYWkudjEuUmFnSW5pdFJlcXVlc3'
+    'RIAFIHcmFnSW5pdBI7CgpyYWdfaW5nZXN0GBYgASgLMhoua3dhYWkudjEuUmFnSW5nZXN0UmVx'
+    'dWVzdEgAUglyYWdJbmdlc3QSOAoJcmFnX3F1ZXJ5GBcgASgLMhkua3dhYWkudjEuUmFnUXVlcn'
+    'lSZXF1ZXN0SABSCHJhZ1F1ZXJ5EkcKDmJsb2NrX2NvdmVyYWdlGA8gASgLMh4ua3dhYWkudjEu'
+    'QmxvY2tDb3ZlcmFnZVJlcXVlc3RIAFINYmxvY2tDb3ZlcmFnZRI0CgduZXR3b3JrGBEgASgLMh'
+    'gua3dhYWkudjEuTmV0d29ya1JlcXVlc3RIAFIHbmV0d29yaxI0Cgdjb25uZWN0GBIgASgLMhgu'
+    'a3dhYWkudjEuQ29ubmVjdFJlcXVlc3RIAFIHY29ubmVjdBJQChFzdG9yYWdlX2Rpc2NvdmVyeR'
+    'gQIAEoCzIhLmt3YWFpLnYxLlN0b3JhZ2VEaXNjb3ZlcnlSZXF1ZXN0SABSEHN0b3JhZ2VEaXNj'
+    'b3ZlcnkSOwoKcmFnX2RlbGV0ZRgZIAEoCzIaLmt3YWFpLnYxLlJhZ0RlbGV0ZVJlcXVlc3RIAF'
+    'IJcmFnRGVsZXRlQgYKBGJvZHk=');
 
 @$core.Deprecated('Use serverFrameDescriptor instead')
 const ServerFrame$json = {
@@ -233,6 +334,60 @@ const ServerFrame$json = {
       '10': 'status'
     },
     {
+      '1': 'inference_event',
+      '3': 19,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.InferenceEvent',
+      '9': 0,
+      '10': 'inferenceEvent'
+    },
+    {
+      '1': 'rag_status',
+      '3': 20,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.RagStatusUpdate',
+      '9': 0,
+      '10': 'ragStatus'
+    },
+    {
+      '1': 'rag_init',
+      '3': 21,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.RagInitReply',
+      '9': 0,
+      '10': 'ragInit'
+    },
+    {
+      '1': 'rag_progress',
+      '3': 22,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.RagProgress',
+      '9': 0,
+      '10': 'ragProgress'
+    },
+    {
+      '1': 'rag_query',
+      '3': 23,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.RagQueryReply',
+      '9': 0,
+      '10': 'ragQuery'
+    },
+    {
+      '1': 'rag_ingest',
+      '3': 24,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.RagIngestReply',
+      '9': 0,
+      '10': 'ragIngest'
+    },
+    {
       '1': 'block_coverage',
       '3': 15,
       '4': 1,
@@ -268,6 +423,15 @@ const ServerFrame$json = {
       '9': 0,
       '10': 'storage'
     },
+    {
+      '1': 'rag_delete',
+      '3': 25,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.RagDeleteReply',
+      '9': 0,
+      '10': 'ragDelete'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -280,11 +444,19 @@ final $typed_data.Uint8List serverFrameDescriptor = $convert.base64Decode(
     'BpbmdSZXBseUgAUgRwb25nEisKBXRva2VuGAsgASgLMhMua3dhYWkudjEuQ2hhdFRva2VuSABS'
     'BXRva2VuEiQKBGRvbmUYDCABKAsyDi5rd2FhaS52MS5Eb25lSABSBGRvbmUSJwoFZXJyb3IYDS'
     'ABKAsyDy5rd2FhaS52MS5FcnJvckgAUgVlcnJvchIvCgZzdGF0dXMYDiABKAsyFS5rd2FhaS52'
-    'MS5TdGF0dXNSZXBseUgAUgZzdGF0dXMSRgoOYmxvY2tfY292ZXJhZ2UYDyABKAsyHS5rd2FhaS'
-    '52MS5CbG9ja0NvdmVyYWdlVXBkYXRlSABSDWJsb2NrQ292ZXJhZ2USMwoHbmV0d29yaxgRIAEo'
-    'CzIXLmt3YWFpLnYxLk5ldHdvcmtVcGRhdGVIAFIHbmV0d29yaxIyCgdjb25uZWN0GBIgASgLMh'
-    'Yua3dhYWkudjEuQ29ubmVjdFJlcGx5SABSB2Nvbm5lY3QSMwoHc3RvcmFnZRgQIAEoCzIXLmt3'
-    'YWFpLnYxLlN0b3JhZ2VVcGRhdGVIAFIHc3RvcmFnZUIGCgRib2R5');
+    'MS5TdGF0dXNSZXBseUgAUgZzdGF0dXMSQwoPaW5mZXJlbmNlX2V2ZW50GBMgASgLMhgua3dhYW'
+    'kudjEuSW5mZXJlbmNlRXZlbnRIAFIOaW5mZXJlbmNlRXZlbnQSOgoKcmFnX3N0YXR1cxgUIAEo'
+    'CzIZLmt3YWFpLnYxLlJhZ1N0YXR1c1VwZGF0ZUgAUglyYWdTdGF0dXMSMwoIcmFnX2luaXQYFS'
+    'ABKAsyFi5rd2FhaS52MS5SYWdJbml0UmVwbHlIAFIHcmFnSW5pdBI6CgxyYWdfcHJvZ3Jlc3MY'
+    'FiABKAsyFS5rd2FhaS52MS5SYWdQcm9ncmVzc0gAUgtyYWdQcm9ncmVzcxI2CglyYWdfcXVlcn'
+    'kYFyABKAsyFy5rd2FhaS52MS5SYWdRdWVyeVJlcGx5SABSCHJhZ1F1ZXJ5EjkKCnJhZ19pbmdl'
+    'c3QYGCABKAsyGC5rd2FhaS52MS5SYWdJbmdlc3RSZXBseUgAUglyYWdJbmdlc3QSRgoOYmxvY2'
+    'tfY292ZXJhZ2UYDyABKAsyHS5rd2FhaS52MS5CbG9ja0NvdmVyYWdlVXBkYXRlSABSDWJsb2Nr'
+    'Q292ZXJhZ2USMwoHbmV0d29yaxgRIAEoCzIXLmt3YWFpLnYxLk5ldHdvcmtVcGRhdGVIAFIHbm'
+    'V0d29yaxIyCgdjb25uZWN0GBIgASgLMhYua3dhYWkudjEuQ29ubmVjdFJlcGx5SABSB2Nvbm5l'
+    'Y3QSMwoHc3RvcmFnZRgQIAEoCzIXLmt3YWFpLnYxLlN0b3JhZ2VVcGRhdGVIAFIHc3RvcmFnZR'
+    'I5CgpyYWdfZGVsZXRlGBkgASgLMhgua3dhYWkudjEuUmFnRGVsZXRlUmVwbHlIAFIJcmFnRGVs'
+    'ZXRlQgYKBGJvZHk=');
 
 @$core.Deprecated('Use cancelDescriptor instead')
 const Cancel$json = {
@@ -414,6 +586,7 @@ const ShardRunRequest$json = {
       '10': 'conversationId',
       '17': true
     },
+    {'1': 'events', '3': 5, '4': 1, '5': 8, '10': 'events'},
   ],
   '8': [
     {'1': '_model'},
@@ -425,8 +598,8 @@ const ShardRunRequest$json = {
 final $typed_data.Uint8List shardRunRequestDescriptor = $convert.base64Decode(
     'Cg9TaGFyZFJ1blJlcXVlc3QSEgoEcm9sZRgBIAEoCVIEcm9sZRIYCgdjb250ZW50GAIgASgJUg'
     'djb250ZW50EhkKBW1vZGVsGAMgASgJSABSBW1vZGVsiAEBEiwKD2NvbnZlcnNhdGlvbl9pZBgE'
-    'IAEoCUgBUg5jb252ZXJzYXRpb25JZIgBAUIICgZfbW9kZWxCEgoQX2NvbnZlcnNhdGlvbl9pZA'
-    '==');
+    'IAEoCUgBUg5jb252ZXJzYXRpb25JZIgBARIWCgZldmVudHMYBSABKAhSBmV2ZW50c0IICgZfbW'
+    '9kZWxCEgoQX2NvbnZlcnNhdGlvbl9pZA==');
 
 @$core.Deprecated('Use statusRequestDescriptor instead')
 const StatusRequest$json = {
@@ -649,7 +822,6 @@ const SelfStatus$json = {
     {'1': 'observed_addrs', '3': 7, '4': 3, '5': 9, '10': 'observedAddrs'},
     {'1': 'relay_addrs', '3': 8, '4': 3, '5': 9, '10': 'relayAddrs'},
     {'1': 'local_protocols', '3': 9, '4': 3, '5': 9, '10': 'localProtocols'},
-    {'1': 'ipv6', '3': 10, '4': 1, '5': 9, '10': 'ipv6'},
   ],
 };
 
@@ -661,7 +833,7 @@ final $typed_data.Uint8List selfStatusDescriptor = $convert.base64Decode(
     'VhYmxlGAUgASgIUgxhbm5vdW5jZWFibGUSIQoMbGlzdGVuX2FkZHJzGAYgAygJUgtsaXN0ZW5B'
     'ZGRycxIlCg5vYnNlcnZlZF9hZGRycxgHIAMoCVINb2JzZXJ2ZWRBZGRycxIfCgtyZWxheV9hZG'
     'RycxgIIAMoCVIKcmVsYXlBZGRycxInCg9sb2NhbF9wcm90b2NvbHMYCSADKAlSDmxvY2FsUHJv'
-    'dG9jb2xzEhIKBGlwdjYYCiABKAlSBGlwdjY=');
+    'dG9jb2xz');
 
 @$core.Deprecated('Use networkUpdateDescriptor instead')
 const NetworkUpdate$json = {
@@ -819,6 +991,437 @@ const ConnectReply$json = {
 final $typed_data.Uint8List connectReplyDescriptor = $convert.base64Decode(
     'CgxDb25uZWN0UmVwbHkSHAoJY29ubmVjdGVkGAEgASgIUgljb25uZWN0ZWQSFAoFZXJyb3IYAi'
     'ABKAlSBWVycm9y');
+
+@$core.Deprecated('Use inferenceHopDescriptor instead')
+const InferenceHop$json = {
+  '1': 'InferenceHop',
+  '2': [
+    {'1': 'peer_id', '3': 1, '4': 1, '5': 9, '10': 'peerId'},
+    {'1': 'peer_name', '3': 2, '4': 1, '5': 9, '10': 'peerName'},
+    {'1': 'block_start', '3': 3, '4': 1, '5': 13, '10': 'blockStart'},
+    {'1': 'block_end', '3': 4, '4': 1, '5': 13, '10': 'blockEnd'},
+    {'1': 'is_self', '3': 5, '4': 1, '5': 8, '10': 'isSelf'},
+    {
+      '1': 'trust_score',
+      '3': 6,
+      '4': 1,
+      '5': 1,
+      '9': 0,
+      '10': 'trustScore',
+      '17': true
+    },
+    {'1': 'throughput', '3': 7, '4': 1, '5': 1, '10': 'throughput'},
+  ],
+  '8': [
+    {'1': '_trust_score'},
+  ],
+};
+
+/// Descriptor for `InferenceHop`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List inferenceHopDescriptor = $convert.base64Decode(
+    'CgxJbmZlcmVuY2VIb3ASFwoHcGVlcl9pZBgBIAEoCVIGcGVlcklkEhsKCXBlZXJfbmFtZRgCIA'
+    'EoCVIIcGVlck5hbWUSHwoLYmxvY2tfc3RhcnQYAyABKA1SCmJsb2NrU3RhcnQSGwoJYmxvY2tf'
+    'ZW5kGAQgASgNUghibG9ja0VuZBIXCgdpc19zZWxmGAUgASgIUgZpc1NlbGYSJAoLdHJ1c3Rfc2'
+    'NvcmUYBiABKAFIAFIKdHJ1c3RTY29yZYgBARIeCgp0aHJvdWdocHV0GAcgASgBUgp0aHJvdWdo'
+    'cHV0Qg4KDF90cnVzdF9zY29yZQ==');
+
+@$core.Deprecated('Use inferenceEventDescriptor instead')
+const InferenceEvent$json = {
+  '1': 'InferenceEvent',
+  '2': [
+    {'1': 'elapsed_ms', '3': 1, '4': 1, '5': 4, '10': 'elapsedMs'},
+    {
+      '1': 'phase',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.kwaai.v1.InferencePhase',
+      '10': 'phase'
+    },
+    {'1': 'message', '3': 3, '4': 1, '5': 9, '10': 'message'},
+    {'1': 'peer_id', '3': 10, '4': 1, '5': 9, '10': 'peerId'},
+    {'1': 'peer_name', '3': 11, '4': 1, '5': 9, '10': 'peerName'},
+    {'1': 'is_self', '3': 12, '4': 1, '5': 8, '10': 'isSelf'},
+    {
+      '1': 'block_start',
+      '3': 20,
+      '4': 1,
+      '5': 13,
+      '9': 0,
+      '10': 'blockStart',
+      '17': true
+    },
+    {
+      '1': 'block_end',
+      '3': 21,
+      '4': 1,
+      '5': 13,
+      '9': 1,
+      '10': 'blockEnd',
+      '17': true
+    },
+    {
+      '1': 'total_blocks',
+      '3': 22,
+      '4': 1,
+      '5': 13,
+      '9': 2,
+      '10': 'totalBlocks',
+      '17': true
+    },
+    {
+      '1': 'covered_blocks',
+      '3': 23,
+      '4': 1,
+      '5': 13,
+      '9': 3,
+      '10': 'coveredBlocks',
+      '17': true
+    },
+    {
+      '1': 'duration_ms',
+      '3': 30,
+      '4': 1,
+      '5': 1,
+      '9': 4,
+      '10': 'durationMs',
+      '17': true
+    },
+    {
+      '1': 'token_index',
+      '3': 40,
+      '4': 1,
+      '5': 13,
+      '9': 5,
+      '10': 'tokenIndex',
+      '17': true
+    },
+    {'1': 'is_prefill', '3': 41, '4': 1, '5': 8, '10': 'isPrefill'},
+    {
+      '1': 'candidate_index',
+      '3': 42,
+      '4': 1,
+      '5': 13,
+      '9': 6,
+      '10': 'candidateIndex',
+      '17': true
+    },
+    {
+      '1': 'attempt',
+      '3': 43,
+      '4': 1,
+      '5': 13,
+      '9': 7,
+      '10': 'attempt',
+      '17': true
+    },
+    {'1': 'ok', '3': 44, '4': 1, '5': 8, '10': 'ok'},
+    {'1': 'session_id', '3': 45, '4': 1, '5': 9, '10': 'sessionId'},
+    {
+      '1': 'seq_pos',
+      '3': 46,
+      '4': 1,
+      '5': 13,
+      '9': 8,
+      '10': 'seqPos',
+      '17': true
+    },
+    {
+      '1': 'failure',
+      '3': 50,
+      '4': 1,
+      '5': 14,
+      '6': '.kwaai.v1.HopFailure',
+      '10': 'failure'
+    },
+    {'1': 'model', '3': 60, '4': 1, '5': 9, '10': 'model'},
+    {'1': 'dht_prefix', '3': 61, '4': 1, '5': 9, '10': 'dhtPrefix'},
+    {
+      '1': 'peer_count',
+      '3': 62,
+      '4': 1,
+      '5': 13,
+      '9': 9,
+      '10': 'peerCount',
+      '17': true
+    },
+    {'1': 'circuit_id', '3': 63, '4': 1, '5': 9, '10': 'circuitId'},
+    {
+      '1': 'hops',
+      '3': 70,
+      '4': 3,
+      '5': 11,
+      '6': '.kwaai.v1.InferenceHop',
+      '10': 'hops'
+    },
+  ],
+  '8': [
+    {'1': '_block_start'},
+    {'1': '_block_end'},
+    {'1': '_total_blocks'},
+    {'1': '_covered_blocks'},
+    {'1': '_duration_ms'},
+    {'1': '_token_index'},
+    {'1': '_candidate_index'},
+    {'1': '_attempt'},
+    {'1': '_seq_pos'},
+    {'1': '_peer_count'},
+  ],
+};
+
+/// Descriptor for `InferenceEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List inferenceEventDescriptor = $convert.base64Decode(
+    'Cg5JbmZlcmVuY2VFdmVudBIdCgplbGFwc2VkX21zGAEgASgEUgllbGFwc2VkTXMSLgoFcGhhc2'
+    'UYAiABKA4yGC5rd2FhaS52MS5JbmZlcmVuY2VQaGFzZVIFcGhhc2USGAoHbWVzc2FnZRgDIAEo'
+    'CVIHbWVzc2FnZRIXCgdwZWVyX2lkGAogASgJUgZwZWVySWQSGwoJcGVlcl9uYW1lGAsgASgJUg'
+    'hwZWVyTmFtZRIXCgdpc19zZWxmGAwgASgIUgZpc1NlbGYSJAoLYmxvY2tfc3RhcnQYFCABKA1I'
+    'AFIKYmxvY2tTdGFydIgBARIgCglibG9ja19lbmQYFSABKA1IAVIIYmxvY2tFbmSIAQESJgoMdG'
+    '90YWxfYmxvY2tzGBYgASgNSAJSC3RvdGFsQmxvY2tziAEBEioKDmNvdmVyZWRfYmxvY2tzGBcg'
+    'ASgNSANSDWNvdmVyZWRCbG9ja3OIAQESJAoLZHVyYXRpb25fbXMYHiABKAFIBFIKZHVyYXRpb2'
+    '5Nc4gBARIkCgt0b2tlbl9pbmRleBgoIAEoDUgFUgp0b2tlbkluZGV4iAEBEh0KCmlzX3ByZWZp'
+    'bGwYKSABKAhSCWlzUHJlZmlsbBIsCg9jYW5kaWRhdGVfaW5kZXgYKiABKA1IBlIOY2FuZGlkYX'
+    'RlSW5kZXiIAQESHQoHYXR0ZW1wdBgrIAEoDUgHUgdhdHRlbXB0iAEBEg4KAm9rGCwgASgIUgJv'
+    'axIdCgpzZXNzaW9uX2lkGC0gASgJUglzZXNzaW9uSWQSHAoHc2VxX3BvcxguIAEoDUgIUgZzZX'
+    'FQb3OIAQESLgoHZmFpbHVyZRgyIAEoDjIULmt3YWFpLnYxLkhvcEZhaWx1cmVSB2ZhaWx1cmUS'
+    'FAoFbW9kZWwYPCABKAlSBW1vZGVsEh0KCmRodF9wcmVmaXgYPSABKAlSCWRodFByZWZpeBIiCg'
+    'pwZWVyX2NvdW50GD4gASgNSAlSCXBlZXJDb3VudIgBARIdCgpjaXJjdWl0X2lkGD8gASgJUglj'
+    'aXJjdWl0SWQSKgoEaG9wcxhGIAMoCzIWLmt3YWFpLnYxLkluZmVyZW5jZUhvcFIEaG9wc0IOCg'
+    'xfYmxvY2tfc3RhcnRCDAoKX2Jsb2NrX2VuZEIPCg1fdG90YWxfYmxvY2tzQhEKD19jb3ZlcmVk'
+    'X2Jsb2Nrc0IOCgxfZHVyYXRpb25fbXNCDgoMX3Rva2VuX2luZGV4QhIKEF9jYW5kaWRhdGVfaW'
+    '5kZXhCCgoIX2F0dGVtcHRCCgoIX3NlcV9wb3NCDQoLX3BlZXJfY291bnQ=');
+
+@$core.Deprecated('Use ragKbDescriptor instead')
+const RagKb$json = {
+  '1': 'RagKb',
+  '2': [
+    {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'embed_model', '3': 2, '4': 1, '5': 9, '10': 'embedModel'},
+    {'1': 'docs', '3': 3, '4': 3, '5': 9, '10': 'docs'},
+    {'1': 'remote', '3': 4, '4': 1, '5': 8, '10': 'remote'},
+    {
+      '1': 'documents',
+      '3': 5,
+      '4': 3,
+      '5': 11,
+      '6': '.kwaai.v1.RagDoc',
+      '10': 'documents'
+    },
+  ],
+};
+
+/// Descriptor for `RagKb`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragKbDescriptor = $convert.base64Decode(
+    'CgVSYWdLYhISCgRuYW1lGAEgASgJUgRuYW1lEh8KC2VtYmVkX21vZGVsGAIgASgJUgplbWJlZE'
+    '1vZGVsEhIKBGRvY3MYAyADKAlSBGRvY3MSFgoGcmVtb3RlGAQgASgIUgZyZW1vdGUSLgoJZG9j'
+    'dW1lbnRzGAUgAygLMhAua3dhYWkudjEuUmFnRG9jUglkb2N1bWVudHM=');
+
+@$core.Deprecated('Use ragDocDescriptor instead')
+const RagDoc$json = {
+  '1': 'RagDoc',
+  '2': [
+    {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'chunks', '3': 2, '4': 1, '5': 13, '10': 'chunks'},
+  ],
+};
+
+/// Descriptor for `RagDoc`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragDocDescriptor = $convert.base64Decode(
+    'CgZSYWdEb2MSEgoEbmFtZRgBIAEoCVIEbmFtZRIWCgZjaHVua3MYAiABKA1SBmNodW5rcw==');
+
+@$core.Deprecated('Use ragStatusRequestDescriptor instead')
+const RagStatusRequest$json = {
+  '1': 'RagStatusRequest',
+};
+
+/// Descriptor for `RagStatusRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragStatusRequestDescriptor =
+    $convert.base64Decode('ChBSYWdTdGF0dXNSZXF1ZXN0');
+
+@$core.Deprecated('Use ragStatusUpdateDescriptor instead')
+const RagStatusUpdate$json = {
+  '1': 'RagStatusUpdate',
+  '2': [
+    {'1': 'kbs', '3': 1, '4': 3, '5': 11, '6': '.kwaai.v1.RagKb', '10': 'kbs'},
+  ],
+};
+
+/// Descriptor for `RagStatusUpdate`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragStatusUpdateDescriptor = $convert.base64Decode(
+    'Cg9SYWdTdGF0dXNVcGRhdGUSIQoDa2JzGAEgAygLMg8ua3dhYWkudjEuUmFnS2JSA2ticw==');
+
+@$core.Deprecated('Use ragInitRequestDescriptor instead')
+const RagInitRequest$json = {
+  '1': 'RagInitRequest',
+  '2': [
+    {'1': 'kb', '3': 1, '4': 1, '5': 9, '10': 'kb'},
+    {'1': 'embed_model', '3': 2, '4': 1, '5': 9, '10': 'embedModel'},
+  ],
+};
+
+/// Descriptor for `RagInitRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragInitRequestDescriptor = $convert.base64Decode(
+    'Cg5SYWdJbml0UmVxdWVzdBIOCgJrYhgBIAEoCVICa2ISHwoLZW1iZWRfbW9kZWwYAiABKAlSCm'
+    'VtYmVkTW9kZWw=');
+
+@$core.Deprecated('Use ragInitReplyDescriptor instead')
+const RagInitReply$json = {
+  '1': 'RagInitReply',
+  '2': [
+    {'1': 'kb', '3': 1, '4': 1, '5': 11, '6': '.kwaai.v1.RagKb', '10': 'kb'},
+  ],
+};
+
+/// Descriptor for `RagInitReply`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragInitReplyDescriptor = $convert.base64Decode(
+    'CgxSYWdJbml0UmVwbHkSHwoCa2IYASABKAsyDy5rd2FhaS52MS5SYWdLYlICa2I=');
+
+@$core.Deprecated('Use ragIngestRequestDescriptor instead')
+const RagIngestRequest$json = {
+  '1': 'RagIngestRequest',
+  '2': [
+    {'1': 'kb', '3': 1, '4': 1, '5': 9, '10': 'kb'},
+    {'1': 'path', '3': 2, '4': 1, '5': 9, '10': 'path'},
+    {'1': 'doc_name', '3': 3, '4': 1, '5': 9, '10': 'docName'},
+  ],
+};
+
+/// Descriptor for `RagIngestRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragIngestRequestDescriptor = $convert.base64Decode(
+    'ChBSYWdJbmdlc3RSZXF1ZXN0Eg4KAmtiGAEgASgJUgJrYhISCgRwYXRoGAIgASgJUgRwYXRoEh'
+    'kKCGRvY19uYW1lGAMgASgJUgdkb2NOYW1l');
+
+@$core.Deprecated('Use ragProgressDescriptor instead')
+const RagProgress$json = {
+  '1': 'RagProgress',
+  '2': [
+    {
+      '1': 'phase',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.kwaai.v1.RagProgress.RagPhase',
+      '10': 'phase'
+    },
+    {'1': 'done', '3': 2, '4': 1, '5': 13, '10': 'done'},
+    {'1': 'total', '3': 3, '4': 1, '5': 13, '10': 'total'},
+    {'1': 'detail', '3': 4, '4': 1, '5': 9, '10': 'detail'},
+  ],
+  '4': [RagProgress_RagPhase$json],
+};
+
+@$core.Deprecated('Use ragProgressDescriptor instead')
+const RagProgress_RagPhase$json = {
+  '1': 'RagPhase',
+  '2': [
+    {'1': 'RAG_PHASE_UNSPECIFIED', '2': 0},
+    {'1': 'RAG_PHASE_EXTRACTING', '2': 1},
+    {'1': 'RAG_PHASE_EMBEDDING', '2': 2},
+    {'1': 'RAG_PHASE_UPLOADING', '2': 3},
+  ],
+};
+
+/// Descriptor for `RagProgress`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragProgressDescriptor = $convert.base64Decode(
+    'CgtSYWdQcm9ncmVzcxI0CgVwaGFzZRgBIAEoDjIeLmt3YWFpLnYxLlJhZ1Byb2dyZXNzLlJhZ1'
+    'BoYXNlUgVwaGFzZRISCgRkb25lGAIgASgNUgRkb25lEhQKBXRvdGFsGAMgASgNUgV0b3RhbBIW'
+    'CgZkZXRhaWwYBCABKAlSBmRldGFpbCJxCghSYWdQaGFzZRIZChVSQUdfUEhBU0VfVU5TUEVDSU'
+    'ZJRUQQABIYChRSQUdfUEhBU0VfRVhUUkFDVElORxABEhcKE1JBR19QSEFTRV9FTUJFRERJTkcQ'
+    'AhIXChNSQUdfUEhBU0VfVVBMT0FESU5HEAM=');
+
+@$core.Deprecated('Use ragIngestReplyDescriptor instead')
+const RagIngestReply$json = {
+  '1': 'RagIngestReply',
+  '2': [
+    {'1': 'chunks_ingested', '3': 1, '4': 1, '5': 13, '10': 'chunksIngested'},
+    {'1': 'vectors_uploaded', '3': 2, '4': 1, '5': 13, '10': 'vectorsUploaded'},
+  ],
+};
+
+/// Descriptor for `RagIngestReply`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragIngestReplyDescriptor = $convert.base64Decode(
+    'Cg5SYWdJbmdlc3RSZXBseRInCg9jaHVua3NfaW5nZXN0ZWQYASABKA1SDmNodW5rc0luZ2VzdG'
+    'VkEikKEHZlY3RvcnNfdXBsb2FkZWQYAiABKA1SD3ZlY3RvcnNVcGxvYWRlZA==');
+
+@$core.Deprecated('Use ragQueryRequestDescriptor instead')
+const RagQueryRequest$json = {
+  '1': 'RagQueryRequest',
+  '2': [
+    {'1': 'kb', '3': 1, '4': 1, '5': 9, '10': 'kb'},
+    {'1': 'text', '3': 2, '4': 1, '5': 9, '10': 'text'},
+    {'1': 'top_k', '3': 3, '4': 1, '5': 13, '10': 'topK'},
+    {'1': 'min_score', '3': 4, '4': 1, '5': 1, '10': 'minScore'},
+  ],
+};
+
+/// Descriptor for `RagQueryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragQueryRequestDescriptor = $convert.base64Decode(
+    'Cg9SYWdRdWVyeVJlcXVlc3QSDgoCa2IYASABKAlSAmtiEhIKBHRleHQYAiABKAlSBHRleHQSEw'
+    'oFdG9wX2sYAyABKA1SBHRvcEsSGwoJbWluX3Njb3JlGAQgASgBUghtaW5TY29yZQ==');
+
+@$core.Deprecated('Use ragChunkDescriptor instead')
+const RagChunk$json = {
+  '1': 'RagChunk',
+  '2': [
+    {'1': 'rank', '3': 1, '4': 1, '5': 13, '10': 'rank'},
+    {'1': 'score', '3': 2, '4': 1, '5': 1, '10': 'score'},
+    {'1': 'doc', '3': 3, '4': 1, '5': 9, '10': 'doc'},
+    {'1': 'chunk_index', '3': 4, '4': 1, '5': 13, '10': 'chunkIndex'},
+    {'1': 'text', '3': 5, '4': 1, '5': 9, '10': 'text'},
+  ],
+};
+
+/// Descriptor for `RagChunk`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragChunkDescriptor = $convert.base64Decode(
+    'CghSYWdDaHVuaxISCgRyYW5rGAEgASgNUgRyYW5rEhQKBXNjb3JlGAIgASgBUgVzY29yZRIQCg'
+    'Nkb2MYAyABKAlSA2RvYxIfCgtjaHVua19pbmRleBgEIAEoDVIKY2h1bmtJbmRleBISCgR0ZXh0'
+    'GAUgASgJUgR0ZXh0');
+
+@$core.Deprecated('Use ragQueryReplyDescriptor instead')
+const RagQueryReply$json = {
+  '1': 'RagQueryReply',
+  '2': [
+    {
+      '1': 'chunks',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.kwaai.v1.RagChunk',
+      '10': 'chunks'
+    },
+  ],
+};
+
+/// Descriptor for `RagQueryReply`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragQueryReplyDescriptor = $convert.base64Decode(
+    'Cg1SYWdRdWVyeVJlcGx5EioKBmNodW5rcxgBIAMoCzISLmt3YWFpLnYxLlJhZ0NodW5rUgZjaH'
+    'Vua3M=');
+
+@$core.Deprecated('Use ragDeleteRequestDescriptor instead')
+const RagDeleteRequest$json = {
+  '1': 'RagDeleteRequest',
+  '2': [
+    {'1': 'kb', '3': 1, '4': 1, '5': 9, '10': 'kb'},
+    {'1': 'doc_name', '3': 2, '4': 1, '5': 9, '10': 'docName'},
+  ],
+};
+
+/// Descriptor for `RagDeleteRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragDeleteRequestDescriptor = $convert.base64Decode(
+    'ChBSYWdEZWxldGVSZXF1ZXN0Eg4KAmtiGAEgASgJUgJrYhIZCghkb2NfbmFtZRgCIAEoCVIHZG'
+    '9jTmFtZQ==');
+
+@$core.Deprecated('Use ragDeleteReplyDescriptor instead')
+const RagDeleteReply$json = {
+  '1': 'RagDeleteReply',
+  '2': [
+    {'1': 'chunks_deleted', '3': 1, '4': 1, '5': 13, '10': 'chunksDeleted'},
+  ],
+};
+
+/// Descriptor for `RagDeleteReply`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragDeleteReplyDescriptor = $convert.base64Decode(
+    'Cg5SYWdEZWxldGVSZXBseRIlCg5jaHVua3NfZGVsZXRlZBgBIAEoDVINY2h1bmtzRGVsZXRlZA'
+    '==');
 
 @$core.Deprecated('Use chatMessageDescriptor instead')
 const ChatMessage$json = {
