@@ -22,8 +22,45 @@ import 'src/window/dock_icon.dart';
 import 'src/window/shutdown_gate.dart';
 import 'src/window/window_focus.dart';
 
+/// Mirror framework and isolate-level errors to stderr.
+///
+/// A build/layout assertion is normally reported only through the debugger.
+/// If the paused isolate belongs to a VS Code window other than the one in
+/// front of you — easy to hit with several windows open, or with a stale
+/// `flutter run` still holding the DDS connection — the app just freezes with
+/// an empty Call Stack and a clean Debug Console, and nothing names the
+/// widget that failed. Writing to stderr as well means the assertion text and
+/// its stack land in the run log no matter which session owns the pause.
+///
+/// [FlutterError.presentError] is still called first so the usual red error
+/// box and DevTools reporting are unchanged.
+void _installErrorHandlers() {
+  final priorOnError = FlutterError.onError;
+  FlutterError.onError = (details) {
+    (priorOnError ?? FlutterError.presentError)(details);
+    stderr.writeln('[flutter-error] ${details.exceptionAsString()}');
+    if (details.stack != null) {
+      stderr.writeln(
+        FlutterError.defaultStackFilter(
+          details.stack.toString().trimRight().split('\n'),
+        ).join('\n'),
+      );
+    }
+  };
+
+  // Errors that escape the framework entirely (async gaps, platform
+  // channel callbacks) never reach FlutterError.onError.
+  PlatformDispatcher.instance.onError = (error, stack) {
+    stderr.writeln('[uncaught] $error\n$stack');
+    return true; // handled — do not tear the isolate down
+  };
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Before any window or plugin setup, so failures in that setup are
+  // reported too.
+  _installErrorHandlers();
   await windowManager.ensureInitialized();
   await windowManager.setTitle('KwaaiNet');
   await windowManager.setMinimumSize(const Size(560, 400));
