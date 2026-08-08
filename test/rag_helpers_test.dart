@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kwaainet_gui/src/chat/generated/kwaai.pb.dart' as pb;
@@ -176,21 +177,65 @@ void main() {
 
   group('RagIngestJob.fraction', () {
     test('is null when the phase reports no total', () {
-      const job = RagIngestJob(path: '/a.md', name: 'a.md');
+      const job = RagIngestJob(path: '/a.md', name: 'a.md', kb: 'default');
       expect(job.fraction, isNull);
     });
 
     test('is a clamped ratio when counts are present', () {
-      const job = RagIngestJob(path: '/a.md', name: 'a.md', done: 5, total: 10);
+      const job = RagIngestJob(
+        path: '/a.md',
+        name: 'a.md',
+        kb: 'default',
+        done: 5,
+        total: 10,
+      );
       expect(job.fraction, 0.5);
       // A daemon reporting done > total must not produce a bar past 100%.
       const over = RagIngestJob(
         path: '/a.md',
         name: 'a.md',
+        kb: 'default',
         done: 12,
         total: 10,
       );
       expect(over.fraction, 1.0);
+    });
+
+    test('carries its KB through copyWith', () {
+      // The KB identifies where the file lands, so it must survive every
+      // progress update — each of which rebuilds the job via copyWith.
+      const job = RagIngestJob(path: '/a.md', name: 'a.md', kb: 'archive');
+      expect(job.copyWith(status: RagJobStatus.running).kb, 'archive');
+      expect(job.copyWith(done: 3, total: 4).kb, 'archive');
+    });
+  });
+
+  group('RagIngestQueue', () {
+    test('stamps each job with the KB it was queued for', () {
+      // Regression: the KB used to be a parameter of the drain loop rather
+      // than a property of the job. Enqueuing while a drain was already
+      // running returned early and left the original loop to pick the new
+      // jobs up with *its* KB, so files dropped after switching the
+      // dropdown were ingested into the previously selected KB.
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final queue = container.read(ragIngestQueueProvider.notifier);
+
+      queue.enqueue(const ['/docs/a.md'], kb: 'alpha');
+      queue.enqueue(const ['/docs/b.md'], kb: 'beta');
+
+      final jobs = container.read(ragIngestQueueProvider);
+      expect(jobs.map((j) => j.name), ['a.md', 'b.md']);
+      expect(jobs.map((j) => j.kb), ['alpha', 'beta']);
+    });
+
+    test('ignores an empty enqueue', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final queue = container.read(ragIngestQueueProvider.notifier);
+
+      queue.enqueue(const [], kb: 'alpha');
+      expect(container.read(ragIngestQueueProvider), isEmpty);
     });
   });
 }

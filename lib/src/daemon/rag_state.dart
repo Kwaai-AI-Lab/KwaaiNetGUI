@@ -79,6 +79,7 @@ class RagIngestJob {
   const RagIngestJob({
     required this.path,
     required this.name,
+    required this.kb,
     this.status = RagJobStatus.queued,
     this.phase = pb.RagProgress_RagPhase.RAG_PHASE_UNSPECIFIED,
     this.done = 0,
@@ -94,6 +95,14 @@ class RagIngestJob {
 
   /// Basename, for display.
   final String name;
+
+  /// KB this file is destined for, fixed when the job was queued.
+  ///
+  /// Carried per job rather than per drain pass: the user can change the
+  /// selected KB while an ingest is running, and a job must land where it
+  /// was dropped rather than wherever the dropdown happens to point when
+  /// its turn comes round.
+  final String kb;
 
   final RagJobStatus status;
 
@@ -131,6 +140,7 @@ class RagIngestJob {
     return RagIngestJob(
       path: path,
       name: name,
+      kb: kb,
       status: status ?? this.status,
       phase: phase ?? this.phase,
       done: done ?? this.done,
@@ -155,13 +165,20 @@ class RagIngestQueue extends StateNotifier<List<RagIngestJob>> {
   bool _draining = false;
 
   /// Queue [paths] for ingest into [kb] and start draining if idle.
+  ///
+  /// The KB is stamped onto each job here rather than passed to the drain
+  /// loop. Enqueuing while a drain is already running is the common case —
+  /// a second drop lands mid-ingest — and that call returns immediately,
+  /// leaving the *original* loop to pick the new jobs up. Were the KB the
+  /// loop's, those jobs would be ingested into whichever KB started the
+  /// drain instead of the one they were dropped into.
   void enqueue(Iterable<String> paths, {required String kb}) {
     final added = [
-      for (final p in paths) RagIngestJob(path: p, name: basename(p)),
+      for (final p in paths) RagIngestJob(path: p, name: basename(p), kb: kb),
     ];
     if (added.isEmpty) return;
     state = [...state, ...added];
-    _drain(kb);
+    _drain();
   }
 
   /// Drop finished rows, keeping anything still queued or running.
@@ -182,7 +199,7 @@ class RagIngestQueue extends StateNotifier<List<RagIngestJob>> {
     ];
   }
 
-  Future<void> _drain(String kb) async {
+  Future<void> _drain() async {
     if (_draining) return;
     _draining = true;
     try {
@@ -191,7 +208,7 @@ class RagIngestQueue extends StateNotifier<List<RagIngestJob>> {
             .where((j) => j.status == RagJobStatus.queued)
             .firstOrNull;
         if (next == null) break;
-        await _run(next, kb);
+        await _run(next);
         // Each file changes the KB's document list, so refresh as we go
         // rather than only at the end — a long queue should show its
         // documents appearing.
@@ -202,11 +219,11 @@ class RagIngestQueue extends StateNotifier<List<RagIngestJob>> {
     }
   }
 
-  Future<void> _run(RagIngestJob job, String kb) async {
+  Future<void> _run(RagIngestJob job) async {
     _update(job.path, (j) => j.copyWith(status: RagJobStatus.running));
     final client = _ref.read(kwaaiRpcClientProvider);
     try {
-      final op = await client.ragIngest(path: job.path, kb: kb);
+      final op = await client.ragIngest(path: job.path, kb: job.kb);
       final sub = op.progress.listen((p) {
         _update(
           job.path,
