@@ -20,6 +20,7 @@ import '../widgets/kwaai_chat_composer.dart';
 import '../widgets/kwaai_markdown_body.dart';
 import '../widgets/kwaai_status_bar.dart';
 import '../widgets/service_status_view.dart';
+import 'rag_tab.dart';
 import 'settings_page.dart';
 
 class MainPage extends ConsumerStatefulWidget {
@@ -51,6 +52,7 @@ class _MainPageState extends ConsumerState<MainPage> {
     final localChatOn = ref.watch(localChatEnabledProvider);
     return [
       const _TabSpec(label: 'Chat', path: ChatPath.shardRun),
+      const _TabSpec(label: 'RAG'),
       if (localChatOn)
         const _TabSpec(label: 'Local chat', path: ChatPath.generateLocal),
     ];
@@ -115,7 +117,10 @@ class _MainPageState extends ConsumerState<MainPage> {
                 index: _selectedTab,
                 children: [
                   for (final t in tabs)
-                    _ChatTab(path: t.path, onOpenSettings: _openSettings),
+                    if (t.path case final path?)
+                      _ChatTab(path: path, onOpenSettings: _openSettings)
+                    else
+                      const RagTab(),
                 ],
               ),
             ),
@@ -128,10 +133,15 @@ class _MainPageState extends ConsumerState<MainPage> {
 
 /// Per-tab metadata: display label + which gRPC operation drives the
 /// chat surface.
+///
+/// [path] is null for tabs that aren't a chat surface at all (RAG), which
+/// is what the body switch keys off. Kept as a nullable field rather than a
+/// separate enum because chat tabs remain the common case and every other
+/// tab is defined by what it *isn't* driving.
 class _TabSpec {
-  const _TabSpec({required this.label, required this.path});
+  const _TabSpec({required this.label, this.path});
   final String label;
-  final ChatPath path;
+  final ChatPath? path;
 }
 
 /// The contents of one tab — body + input — driven by a [ChatPath].
