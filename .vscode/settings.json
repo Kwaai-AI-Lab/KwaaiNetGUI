@@ -1,0 +1,39 @@
+{
+    // Mirror the full flutter run / DAP traffic to a file. Without this a
+    // debugger pause that lands in a VS Code window you are not looking at
+    // (easy to hit with several windows open) leaves no trace anywhere:
+    // the app just freezes, the Debug Console stays clean, and Call Stack /
+    // Variables are empty because the session belongs to another window.
+    // With it, the pause and its reason are on disk regardless.
+    "dart.flutterRunLogFile": "${workspaceFolder}/.dart_tool/flutter_run.log",
+    "dart.devToolsLogFile": "${workspaceFolder}/.dart_tool/devtools.log",
+
+    // Surface the pause in the window that owns the session rather than
+    // leaving the app silently frozen.
+    "dart.openDevTools": "flutter",
+    "dart.flutterDebuggerRestartBehaviour": "hotRestart",
+
+    // Assertion failures during build/layout are the common case here
+    // (see the FlutterError.onError handler in lib/main.dart). Break on
+    // them so the offending widget is on the stack, and do not swallow
+    // exceptions that framework code has already caught and rethrown.
+    "dart.debugExternalPackageLibraries": false,
+    "dart.debugSdkLibraries": false,
+
+    "dart.previewFlutterUiGuides": true,
+    "dart.lineLength": 80,
+    "editor.rulers": [80],
+
+    "[dart]": {
+        "editor.formatOnSave": true,
+        "editor.selectionHighlight": false,
+        "editor.suggestSelection": "first",
+        "editor.tabCompletion": "onlySnippets",
+        "editor.wordBasedSuggestions": "off"
+    },
+
+    "files.exclude": {
+        "**/.dart_tool": true,
+        "**/build": true
+    }
+}
