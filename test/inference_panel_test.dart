@@ -19,10 +19,9 @@ Widget _host(ProviderContainer container) => UncontrolledProviderScope(
   ),
 );
 
-pb.InferenceEvent _event(pb.InferencePhase phase) =>
-    pb.InferenceEvent()
-      ..phase = phase
-      ..elapsedMs = Int64(120);
+pb.InferenceEvent _event(pb.InferencePhase phase) => pb.InferenceEvent()
+  ..phase = phase
+  ..elapsedMs = Int64(120);
 
 void main() {
   late ProviderContainer container;

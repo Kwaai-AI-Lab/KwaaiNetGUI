@@ -57,9 +57,7 @@ Future<void> main() async {
       // Seed the localChatEnabled provider from the durable setting so
       // the main page's tab bar reflects the user's last choice on
       // first paint.
-      localChatEnabledProvider.overrideWith(
-        (_) => settings.localChatEnabled,
-      ),
+      localChatEnabledProvider.overrideWith((_) => settings.localChatEnabled),
       // Same for the inference panel, so it is already open on first paint
       // if that is how the user left it.
       inferencePanelEnabledProvider.overrideWith(
@@ -81,18 +79,14 @@ Future<void> main() async {
   // Edge-trigger via lastKnown so flapping doesn't tear down and
   // rebuild the channel on every poll.
   bool? lastKnownRunning;
-  container.listen<AsyncValue<NodeStatus>>(
-    daemonStatusProvider,
-    (_, next) {
-      final v = next.valueOrNull;
-      if (v == null) return; // not a confirmed reading yet — leave probe as-is
-      final running = v.running;
-      if (running == lastKnownRunning) return;
-      lastKnownRunning = running;
-      container.read(kwaaiRpcClientProvider).setProbingEnabled(running);
-    },
-    fireImmediately: true,
-  );
+  container.listen<AsyncValue<NodeStatus>>(daemonStatusProvider, (_, next) {
+    final v = next.valueOrNull;
+    if (v == null) return; // not a confirmed reading yet — leave probe as-is
+    final running = v.running;
+    if (running == lastKnownRunning) return;
+    lastKnownRunning = running;
+    container.read(kwaaiRpcClientProvider).setProbingEnabled(running);
+  }, fireImmediately: true);
 
   final tray = TrayController(container: container);
   // Only install the menu-bar icon when the user opts in. The toggle in

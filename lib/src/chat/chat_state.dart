@@ -96,8 +96,7 @@ class ChatTranscriptNotifier
     // daemon for the detail when the panel is actually open — producing it
     // is real work on its side.
     final wantEvents =
-        _path == ChatPath.shardRun &&
-        ref.read(inferencePanelEnabledProvider);
+        _path == ChatPath.shardRun && ref.read(inferencePanelEnabledProvider);
     final eventsNotifier = ref.read(inferenceEventsProvider.notifier);
     if (wantEvents) eventsNotifier.startRun();
 

@@ -57,8 +57,7 @@ class Settings {
   /// run: chain discovery, the pinned route, and each block's peer as its
   /// activations pass through. Off by default; asking for it makes the
   /// daemon do extra work, so it is only requested while the panel is open.
-  bool get inferencePanelEnabled =>
-      _prefs.getBool(_inferencePanelKey) ?? false;
+  bool get inferencePanelEnabled => _prefs.getBool(_inferencePanelKey) ?? false;
 
   /// The app release version the user chose to "Skip" from the update
   /// banner (e.g. "0.1.3", normalized without a leading "v"). The banner

@@ -133,8 +133,7 @@ class _ChatTab extends ConsumerWidget {
     // Only on the distributed tab: local inference runs entirely in the
     // daemon's own process, so there is no route to show.
     final showPanel =
-        path == ChatPath.shardRun &&
-        ref.watch(inferencePanelEnabledProvider);
+        path == ChatPath.shardRun && ref.watch(inferencePanelEnabledProvider);
 
     final chat = Column(
       children: [

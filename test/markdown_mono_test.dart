@@ -97,8 +97,9 @@ void main() {
     }
   });
 
-  testWidgets('prose around code keeps the proportional UI font',
-      (tester) async {
+  testWidgets('prose around code keeps the proportional UI font', (
+    tester,
+  ) async {
     // The fix is scoped to code: widening it to the whole body would
     // render ordinary paragraphs in Menlo.
     await tester.pumpWidget(

@@ -93,8 +93,7 @@ class KwaaiRpcClient {
     // Fire the first probe immediately so initial UI doesn't spend
     // _probeInterval seconds in "connecting".
     scheduleMicrotask(_probe);
-    _probeTimer =
-        Timer.periodic(_probeInterval, (_) => _probe());
+    _probeTimer = Timer.periodic(_probeInterval, (_) => _probe());
   }
 
   /// Toggle the periodic Ping probe. Used by the GUI to suppress probes
@@ -140,8 +139,7 @@ class KwaaiRpcClient {
       // we cap the wait and proceed regardless.
       final pending = _pendingReset;
       if (pending != null) {
-        await pending
-            .timeout(const Duration(seconds: 1), onTimeout: () {});
+        await pending.timeout(const Duration(seconds: 1), onTimeout: () {});
         _pendingReset = null;
       }
       final session = await _sessionOrInit();
@@ -223,9 +221,7 @@ class KwaaiRpcClient {
     return ClientChannel(
       '127.0.0.1',
       port: kDefaultGrpcPort,
-      options: const ChannelOptions(
-        credentials: ChannelCredentials.insecure(),
-      ),
+      options: const ChannelOptions(credentials: ChannelCredentials.insecure()),
     );
   }
 

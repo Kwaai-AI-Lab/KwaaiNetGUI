@@ -106,7 +106,9 @@ class _InferencePanelState extends ConsumerState<InferencePanel> {
           _Header(log: log),
           if (log.chain.isNotEmpty) _ChainView(log: log),
           const Divider(height: 1),
-          Expanded(child: _EventLog(log: log, controller: _scroll)),
+          Expanded(
+            child: _EventLog(log: log, controller: _scroll),
+          ),
           if (!_follow)
             _JumpToLatest(
               onTap: () {
@@ -198,10 +200,9 @@ class _ChainView extends StatelessWidget {
         children: [
           Text(
             'CHAIN · ${log.chain.length} hop${log.chain.length == 1 ? '' : 's'}',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: dim,
-              letterSpacing: 0.6,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: dim, letterSpacing: 0.6),
           ),
           const SizedBox(height: 6),
           for (final hop in log.chain)
@@ -249,10 +250,7 @@ class _HopRow extends StatelessWidget {
           const SizedBox(width: 6),
           SizedBox(
             width: 52,
-            child: Text(
-              '${hop.blockStart}–${hop.blockEnd}',
-              style: mono,
-            ),
+            child: Text('${hop.blockStart}–${hop.blockEnd}', style: mono),
           ),
           Expanded(
             child: Text(
@@ -282,8 +280,9 @@ class _StatusDot extends StatelessWidget {
   Widget build(BuildContext context) {
     final k = context.kwaai;
     final color = switch (status) {
-      HopStatus.pending => Theme.of(context).colorScheme.onSurfaceVariant
-          .withValues(alpha: 0.35),
+      HopStatus.pending => Theme.of(
+        context,
+      ).colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
       HopStatus.inFlight => k.accentPrimary,
       HopStatus.ok => k.semanticSuccess,
       HopStatus.failed => k.semanticError,
@@ -342,9 +341,10 @@ class _LogRowView extends StatelessWidget {
     final color = switch (row.outcome) {
       RowOutcome.pending => null,
       RowOutcome.ok => null,
-      RowOutcome.failed => row.failure == pb.HopFailure.HOP_FAILURE_TRANSIENT
-          ? k.semanticWarning
-          : k.semanticError,
+      RowOutcome.failed =>
+        row.failure == pb.HopFailure.HOP_FAILURE_TRANSIENT
+            ? k.semanticWarning
+            : k.semanticError,
     };
 
     final mono = theme.textTheme.bodySmall?.copyWith(
@@ -533,9 +533,9 @@ class _JumpToLatest extends StatelessWidget {
         child: Text(
           'Jump to latest ↓',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: context.kwaai.accentPrimary,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: context.kwaai.accentPrimary),
         ),
       ),
     );

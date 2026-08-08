@@ -593,11 +593,13 @@ class _StatusHeader extends ConsumerWidget {
     // answers — including part-way through a start, which is exactly when the
     // selected binary-location row hands the display back over. Hidden once
     // stopped, where those rows carry the versions instead.
-    final stopped = transition == DaemonTransition.none &&
+    final stopped =
+        transition == DaemonTransition.none &&
         status != null &&
         !status.running;
-    final version =
-        stopped ? null : ref.watch(daemonVersionProvider).valueOrNull;
+    final version = stopped
+        ? null
+        : ref.watch(daemonVersionProvider).valueOrNull;
 
     final Color color;
     final textColor = unknown ? cs.onSurfaceVariant : cs.onSurface;
@@ -923,10 +925,7 @@ class _DaemonSourcePickerState extends State<_DaemonSourcePicker> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _RadioRow(
-            value: DaemonMode.builtIn,
-            label: builtInDaemonLabel,
-          ),
+          _RadioRow(value: DaemonMode.builtIn, label: builtInDaemonLabel),
           // "Use system" is only selectable when kwaainet is on PATH.
           _RadioRow(
             value: DaemonMode.system,

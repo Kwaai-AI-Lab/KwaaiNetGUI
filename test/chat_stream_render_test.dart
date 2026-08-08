@@ -88,8 +88,9 @@ String _rendered(WidgetTester tester) =>
     tester.widget<Text>(find.byKey(const Key('assistant'))).data ?? '';
 
 void main() {
-  testWidgets('buffered tokens reach the frame when the stream closes',
-      (tester) async {
+  testWidgets('buffered tokens reach the frame when the stream closes', (
+    tester,
+  ) async {
     final controller = StreamController<String>();
     final container = _containerFor(controller.stream);
 
@@ -100,8 +101,9 @@ void main() {
       ),
     );
 
-    final notifier =
-        container.read(chatTranscriptProvider(ChatPath.shardRun).notifier);
+    final notifier = container.read(
+      chatTranscriptProvider(ChatPath.shardRun).notifier,
+    );
     final send = notifier.send('hi');
     // Yield so the StreamSubscription is wired up before tokens are
     // added; tokens added beforehand are dropped and the test would be
@@ -120,8 +122,11 @@ void main() {
     controller.add('world');
     await tester.idle();
     await tester.pump();
-    expect(_rendered(tester), 'Hello ',
-        reason: 'mid-window tokens should still be coalesced');
+    expect(
+      _rendered(tester),
+      'Hello ',
+      reason: 'mid-window tokens should still be coalesced',
+    );
 
     await controller.close();
     await send;
@@ -141,8 +146,9 @@ void main() {
       ),
     );
 
-    final notifier =
-        container.read(chatTranscriptProvider(ChatPath.shardRun).notifier);
+    final notifier = container.read(
+      chatTranscriptProvider(ChatPath.shardRun).notifier,
+    );
     unawaited(notifier.send('hi'));
     await tester.idle();
     await tester.pump();
@@ -159,8 +165,9 @@ void main() {
     expect(_rendered(tester), 'partial tail');
   });
 
-  testWidgets('a token burst is coalesced into far fewer rebuilds',
-      (tester) async {
+  testWidgets('a token burst is coalesced into far fewer rebuilds', (
+    tester,
+  ) async {
     final controller = StreamController<String>();
     final container = _containerFor(controller.stream);
 
@@ -172,8 +179,9 @@ void main() {
       ),
     );
 
-    final notifier =
-        container.read(chatTranscriptProvider(ChatPath.shardRun).notifier);
+    final notifier = container.read(
+      chatTranscriptProvider(ChatPath.shardRun).notifier,
+    );
     final send = notifier.send('hi');
     // Yield so the StreamSubscription is wired up before tokens are
     // added; tokens added beforehand are dropped and the test would be
@@ -194,8 +202,11 @@ void main() {
     await tester.idle();
     await tester.pump();
 
-    expect(builds, lessThan(10),
-        reason: '200 tokens should coalesce into a handful of rebuilds');
+    expect(
+      builds,
+      lessThan(10),
+      reason: '200 tokens should coalesce into a handful of rebuilds',
+    );
     // Coalescing must not cost content: every token still lands.
     expect(_rendered(tester), 'tok ' * 200);
   });

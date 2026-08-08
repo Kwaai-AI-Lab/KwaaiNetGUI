@@ -111,17 +111,16 @@ void main() {
         Stream<String> source, {
         void Function(SessionSlowNotice)? onSlow,
         Duration? slowAfter,
-      }) =>
-          watchdogged<String, String>(
-            source,
-            extract: (s) => s.startsWith('tok') ? s : null,
-            counts: (s) => s.startsWith('tok'),
-            onSlow: onSlow,
-            firstTimeout: _first,
-            stallTimeout: _stall,
-            slowAfter: slowAfter ?? _first,
-            slowTick: _stall,
-          );
+      }) => watchdogged<String, String>(
+        source,
+        extract: (s) => s.startsWith('tok') ? s : null,
+        counts: (s) => s.startsWith('tok'),
+        onSlow: onSlow,
+        firstTimeout: _first,
+        stallTimeout: _stall,
+        slowAfter: slowAfter ?? _first,
+        slowTick: _stall,
+      );
 
       test('progress alone keeps a run alive indefinitely', () async {
         final ctrl = StreamController<String>();

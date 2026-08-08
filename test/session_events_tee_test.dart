@@ -109,13 +109,10 @@ void main() {
         ..add(_done(id));
 
       expect(await tokens, ['Hello', ' world']);
-      expect(
-        (await events).map((e) => e.phase),
-        [
-          pb.InferencePhase.INFERENCE_PHASE_RESOLVED,
-          pb.InferencePhase.INFERENCE_PHASE_HOP_OK,
-        ],
-      );
+      expect((await events).map((e) => e.phase), [
+        pb.InferencePhase.INFERENCE_PHASE_RESOLVED,
+        pb.InferencePhase.INFERENCE_PHASE_HOP_OK,
+      ]);
     });
 
     /// Both sides have to see the failure. If the error only reached the
