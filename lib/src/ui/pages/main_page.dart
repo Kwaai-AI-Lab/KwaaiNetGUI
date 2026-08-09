@@ -111,6 +111,9 @@ class _MainPageState extends ConsumerState<MainPage> {
               tabs: tabs.length > 1 ? tabs : const [],
               selectedTab: _selectedTab,
               onSelectTab: (i) => setState(() => _selectedTab = i),
+              // The KB picker belongs to the RAG tab alone; on any other
+              // tab there is nothing for it to scope.
+              showKbPicker: tabs[_selectedTab].path == null,
             ),
             const _UpdateBanner(),
             Expanded(
@@ -240,6 +243,7 @@ class _MainTopBar extends StatelessWidget {
     this.tabs = const [],
     this.selectedTab = 0,
     this.onSelectTab,
+    this.showKbPicker = false,
   });
 
   final VoidCallback onOpenSettings;
@@ -249,6 +253,10 @@ class _MainTopBar extends StatelessWidget {
   final List<_TabSpec> tabs;
   final int selectedTab;
   final ValueChanged<int>? onSelectTab;
+
+  /// Whether to offer the knowledge-base picker. True only on the RAG
+  /// tab; the picker itself also hides when no KB exists yet.
+  final bool showKbPicker;
 
   @override
   Widget build(BuildContext context) {
@@ -281,6 +289,15 @@ class _MainTopBar extends StatelessWidget {
               ),
             ),
           ],
+          // Two Spacers rather than one: they share the leftover width
+          // equally, which centres the picker between the tab strip and
+          // the settings icon regardless of how wide either grows.
+          const Spacer(),
+          if (showKbPicker)
+            const Padding(
+              padding: EdgeInsets.only(top: tabTop),
+              child: RagKbPicker(),
+            ),
           const Spacer(),
           // No tooltip here, deliberately. This is the one control that both
           // carries a tooltip and pushes an opaque route (Settings). Once that

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +12,7 @@ import 'package:kwaainet_gui/src/daemon/rag_state.dart';
 import 'package:kwaainet_gui/src/ui/pages/rag_tab.dart';
 import 'package:kwaainet_gui/src/ui/theme/theme_variants.dart';
 import 'package:kwaainet_gui/src/ui/widgets/kwaai_button.dart';
+import 'package:kwaainet_gui/src/ui/widgets/kwaai_text_field.dart';
 
 /// Tests for the RAG tab.
 ///
@@ -74,8 +76,9 @@ void main() {
 
     expect(find.text('RAG isn\'t set up yet'), findsOneWidget);
     expect(find.text('Initialize RAG'), findsOneWidget);
-    // The init gate must not be confused with the ready state.
-    expect(find.text('Knowledge base'), findsNothing);
+    // The init gate must not be confused with the ready state, whose
+    // document panel is the thing that would otherwise show through.
+    expect(find.text('Documents'), findsNothing);
   });
 
   testWidgets('reports a daemon built without RAG as unavailable', (
@@ -124,8 +127,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Knowledge base'), findsOneWidget);
-    // Doc count and embedding model share the subtitle line.
+    // Doc count and embedding model share the panel's subtitle line.
+    // (The KB *name* is shown by RagKbPicker in the window's top bar,
+    // which is outside this widget — see the picker tests below.)
     expect(find.textContaining('2 documents'), findsOneWidget);
     expect(find.textContaining('nomic-embed-text'), findsOneWidget);
     expect(find.text('handbook.pdf'), findsOneWidget);
@@ -202,6 +206,147 @@ void main() {
 
     expect(find.textContaining('Nothing matched'), findsOneWidget);
   });
+
+  testWidgets('the search field sits below the results area', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        status: AsyncValue.data(
+          _status([
+            _kb(docs: const ['handbook.pdf']),
+          ]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The point of the layout: the query row is pinned to the bottom, so
+    // the placeholder (and later, results) occupies the space above it.
+    final field = tester.getRect(find.byType(KwaaiTextField));
+    final placeholder = tester.getRect(
+      find.textContaining('Search this knowledge base'),
+    );
+    expect(field.top, greaterThan(placeholder.bottom));
+    // ...and it is pinned to the bottom of the tab rather than floating
+    // directly under a header. Measured against the tab's own rect (the
+    // 700px host is clipped by the 800x600 test window), leaving only the
+    // query row's bottom padding.
+    final tab = tester.getRect(find.byType(RagTab));
+    expect(field.bottom, greaterThan(tab.bottom - 40));
+  });
+
+  testWidgets('each document offers a delete control on hover', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        status: AsyncValue.data(
+          _status([
+            _kb(docs: const ['handbook.pdf']),
+          ]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Hidden until pointed at, so the list reads as filenames rather than
+    // as a column of buttons.
+    expect(find.byTooltip('Delete document'), findsNothing);
+
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    addTearDown(gesture.removePointer);
+    await gesture.moveTo(tester.getCenter(find.text('handbook.pdf')));
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Delete document'), findsOneWidget);
+  });
+
+  testWidgets('deleting asks before destroying anything', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        status: AsyncValue.data(
+          _status([
+            _kb(docs: const ['handbook.pdf']),
+          ]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    addTearDown(gesture.removePointer);
+    await gesture.moveTo(tester.getCenter(find.text('handbook.pdf')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Delete document'));
+    await tester.pumpAndSettle();
+
+    // A confirmation naming the document, not an immediate delete — the
+    // rpc client here is unoverridden, so reaching it would throw.
+    expect(find.text('Delete document?'), findsOneWidget);
+    expect(find.textContaining('handbook.pdf'), findsWidgets);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete document?'), findsNothing);
+  });
+
+  testWidgets('a remote KB offers no delete control', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        status: AsyncValue.data(
+          _status([
+            _kb(name: 'shared', remote: true, docs: const ['a.txt']),
+          ]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    addTearDown(gesture.removePointer);
+    await gesture.moveTo(tester.getCenter(find.text('a.txt')));
+    await tester.pumpAndSettle();
+
+    // Deleting from a remote KB fails daemon-side, so don't offer it.
+    expect(find.byTooltip('Delete document'), findsNothing);
+  });
+
+  group('RagKbPicker', () {
+    testWidgets('lists every KB and marks the selected one', (tester) async {
+      await tester.pumpWidget(
+        _pickerHost([_kb(), _kb(name: 'archive')]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('default'), findsOneWidget);
+      expect(find.byTooltip('New knowledge base'), findsOneWidget);
+    });
+
+    testWidgets('renders nothing when no KB exists', (tester) async {
+      await tester.pumpWidget(_pickerHost(const []));
+      await tester.pumpAndSettle();
+
+      // Nothing to pick between, and the tab is showing its init gate —
+      // an empty dropdown in the title bar would be noise.
+      expect(find.byTooltip('New knowledge base'), findsNothing);
+    });
+  });
+}
+
+/// Hosts [RagKbPicker] alone — it reads the same status provider as the
+/// tab but lives in the window's top bar, so it is driven separately.
+Widget _pickerHost(List<pb.RagKb> kbs) {
+  return ProviderScope(
+    overrides: [
+      daemonAvailableProvider.overrideWithValue(true),
+      ragStatusProvider.overrideWith((ref) async => _status(kbs)),
+    ],
+    child: MaterialApp(
+      theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
+      home: const Scaffold(body: Row(children: [RagKbPicker()])),
+    ),
+  );
 }
 
 pb.RagChunk _chunk({
