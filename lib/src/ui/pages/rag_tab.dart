@@ -1091,9 +1091,11 @@ class _ChunkCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
+          // Unclipped: a chunk is the evidence for its score, and a
+          // truncated one can cut off the very passage that explains why
+          // it ranked. The card grows and the result list scrolls.
           SelectableText(
             chunk.text,
-            maxLines: 12,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],
