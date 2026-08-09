@@ -320,7 +320,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('default'), findsOneWidget);
-      expect(find.byTooltip('New knowledge base'), findsOneWidget);
+      expect(find.text('Create KB'), findsOneWidget);
     });
 
     testWidgets('renders nothing when no KB exists', (tester) async {
@@ -329,7 +329,7 @@ void main() {
 
       // Nothing to pick between, and the tab is showing its init gate —
       // an empty dropdown in the title bar would be noise.
-      expect(find.byTooltip('New knowledge base'), findsNothing);
+      expect(find.text('Create KB'), findsNothing);
     });
   });
 }
