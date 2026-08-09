@@ -322,18 +322,14 @@ class RagKbPicker extends ConsumerWidget {
             }
           },
         ),
-        const SizedBox(width: 4),
-        Tooltip(
-          message: 'New knowledge base',
-          child: IconButton(
-            icon: const Icon(Icons.add, size: 18),
-            onPressed: () => _newKbDialog(context, ref),
-            style: IconButton.styleFrom(
-              minimumSize: const Size(28, 28),
-              padding: EdgeInsets.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
+        const SizedBox(width: 8),
+        // Labelled rather than a bare "+": in the title bar it sits beside
+        // the tab strip, where a lone glyph reads as another piece of
+        // window chrome instead of an action on the KB next to it.
+        KwaaiButton(
+          label: 'Create KB',
+          variant: KwaaiButtonVariant.secondary,
+          onPressed: () => _newKbDialog(context, ref),
         ),
       ],
     );
