@@ -535,6 +535,22 @@ class KwaaiRpcClient {
         .timeout(const Duration(seconds: 60));
   }
 
+  /// Remove [docName] from the KB, along with every chunk it produced.
+  ///
+  /// Generous timeout for a delete: it touches three stores (metadata,
+  /// vectors, keyword index) and the vector store's in-memory graph is
+  /// rebuilt on first use, so a cold KB pays that open before deleting
+  /// anything.
+  Future<pb.RagDeleteReply> ragDelete({
+    required String docName,
+    String kb = '',
+  }) async {
+    final session = await _sessionOrInit();
+    return session
+        .ragDelete(docName: docName, kb: kb)
+        .timeout(const Duration(seconds: 60));
+  }
+
   /// Ingest the file at [path] (absolute, on the daemon's filesystem).
   ///
   /// Returns the operation so the caller can render progress; no timeout,

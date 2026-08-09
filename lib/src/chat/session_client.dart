@@ -442,6 +442,39 @@ class SessionClient {
     return reply;
   }
 
+  /// `kwaainet rag delete` — remove [docName] and every chunk it produced.
+  ///
+  /// [docName] is a name as it appears in `RagKb.docs`, not a path: the
+  /// daemon deletes what it recorded at ingest, so a caller passes back
+  /// what a status reply gave it.
+  ///
+  /// Errors with NOT_FOUND both when the KB was never initialised and when
+  /// it simply doesn't hold that document — the daemon deliberately does
+  /// not treat a missing document as a successful no-op, so a stale list
+  /// row can't report a delete that never happened.
+  Future<pb.RagDeleteReply> ragDelete({
+    required String docName,
+    String kb = '',
+  }) async {
+    final frames = _open(
+      (id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..ragDelete = (pb.RagDeleteRequest()
+          ..kb = kb
+          ..docName = docName),
+    );
+    pb.RagDeleteReply? reply;
+    await for (final f in frames) {
+      if (f.whichBody() == pb.ServerFrame_Body.ragDelete) {
+        reply = f.ragDelete;
+      }
+    }
+    if (reply == null) {
+      throw SessionOpError(code: 0, message: 'ragDelete returned no reply');
+    }
+    return reply;
+  }
+
   /// `kwaainet rag ingest` — read [path] into the KB, embedding as it goes.
   ///
   /// [path] is read by the *daemon*, not streamed, so it must be absolute
