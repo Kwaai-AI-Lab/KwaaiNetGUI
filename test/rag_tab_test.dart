@@ -23,15 +23,26 @@ import 'package:kwaainet_gui/src/ui/widgets/kwaai_text_field.dart';
 pb.RagStatusUpdate _status(List<pb.RagKb> kbs) =>
     pb.RagStatusUpdate()..kbs.addAll(kbs);
 
+/// [chunks] gives each doc a chunk count, keyed by name. A doc absent
+/// from it still appears, with no `documents` entry — which is how a
+/// daemon predating RagKb.documents reports, and what the fallback path
+/// renders.
 pb.RagKb _kb({
   String name = 'default',
   String embedModel = 'nomic-embed-text',
   List<String> docs = const [],
+  Map<String, int> chunks = const {},
   bool remote = false,
 }) => pb.RagKb()
   ..name = name
   ..embedModel = embedModel
   ..docs.addAll(docs)
+  ..documents.addAll([
+    for (final d in docs)
+      if (chunks[d] case final n?) pb.RagDoc()
+        ..name = d
+        ..chunks = n,
+  ])
   ..remote = remote;
 
 /// Hosts [RagTab] with the daemon reported available and the status future
@@ -310,6 +321,65 @@ void main() {
 
     // Deleting from a remote KB fails daemon-side, so don't offer it.
     expect(find.byTooltip('Delete document'), findsNothing);
+  });
+
+  testWidgets('a document shows its size under its name', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        status: AsyncValue.data(
+          _status([
+            _kb(
+              docs: const ['handbook.pdf'],
+              chunks: const {'handbook.pdf': 885},
+            ),
+          ]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Chunks and vectors are 1:1 by construction, so one count is stated
+    // both ways rather than risking two numbers that disagree.
+    expect(find.text('885 chunks · 885 vectors'), findsOneWidget);
+
+    // Below the name, not beside it — the whole point, since a 260px
+    // sidebar can't fit both on one line.
+    final name = tester.getRect(find.text('handbook.pdf'));
+    final size = tester.getRect(find.text('885 chunks · 885 vectors'));
+    expect(size.top, greaterThanOrEqualTo(name.bottom - 1));
+  });
+
+  testWidgets('singular counts read naturally', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        status: AsyncValue.data(
+          _status([
+            _kb(docs: const ['note.md'], chunks: const {'note.md': 1}),
+          ]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 chunk · 1 vector'), findsOneWidget);
+  });
+
+  testWidgets('a daemon that reports no counts shows none', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        status: AsyncValue.data(
+          _status([
+            _kb(docs: const ['handbook.pdf']),
+          ]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The name still lists; "0 chunks" would be a lie about a document
+    // the daemon simply didn't measure.
+    expect(find.text('handbook.pdf'), findsOneWidget);
+    expect(find.textContaining('chunks ·'), findsNothing);
   });
 
   group('RagKbPicker', () {

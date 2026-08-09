@@ -620,32 +620,26 @@ class _IngestJobRow extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final muted = onSurface.withValues(alpha: 0.6);
 
-    Widget trailing;
+    // Status sits on its own line under the name rather than beside it:
+    // in a 260px sidebar a filename and "885 chunks · 885 vectors" both
+    // want the full width, and sharing a row ellipsised the name away to
+    // nothing.
+    final String statusText;
+    final Color statusColor;
     switch (job.status) {
       case RagJobStatus.queued:
-        trailing = Text(
-          'Queued',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: muted),
-        );
+        statusText = 'Queued';
+        statusColor = muted;
       case RagJobStatus.running:
-        trailing = Text(
-          ragPhaseLabel(job.phase, done: job.done, total: job.total),
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: muted),
-        );
+        statusText = ragPhaseLabel(job.phase, done: job.done, total: job.total);
+        statusColor = muted;
       case RagJobStatus.done:
-        trailing = Text(
-          '${job.chunksIngested} chunks · ${job.vectorsUploaded} vectors',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: context.kwaai.semanticSuccess),
-        );
+        statusText =
+            '${job.chunksIngested} chunks · ${job.vectorsUploaded} vectors';
+        statusColor = context.kwaai.semanticSuccess;
       case RagJobStatus.failed:
-        trailing = Text(
-          job.error ?? 'Failed',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: context.kwaai.semanticError),
-        );
+        statusText = job.error ?? 'Failed';
+        statusColor = context.kwaai.semanticError;
     }
 
     return Padding(
@@ -653,20 +647,17 @@ class _IngestJobRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  job.name,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Flexible(
-                child: Align(alignment: Alignment.centerRight, child: trailing),
-              ),
-            ],
+          Text(
+            job.name,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            statusText,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: statusColor),
           ),
           if (job.status == RagJobStatus.running) ...[
             const SizedBox(height: 6),
@@ -729,8 +720,21 @@ class _DocumentList extends StatelessWidget {
       children: [
         Text('In this KB', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        for (final d in kb.docs)
-          _DocumentRow(kb: kb.name, doc: d, enabled: enabled),
+        // Prefer `documents`, which carries chunk counts. A daemon that
+        // predates that field sends only `docs`, so fall back to the bare
+        // names and render them without a size line rather than showing
+        // every document as "0 chunks".
+        if (kb.documents.isNotEmpty)
+          for (final d in kb.documents)
+            _DocumentRow(
+              kb: kb.name,
+              doc: d.name,
+              chunks: d.chunks,
+              enabled: enabled,
+            )
+        else
+          for (final d in kb.docs)
+            _DocumentRow(kb: kb.name, doc: d, enabled: enabled),
       ],
     );
   }
@@ -744,11 +748,17 @@ class _DocumentRow extends ConsumerStatefulWidget {
     required this.kb,
     required this.doc,
     required this.enabled,
+    this.chunks,
   });
 
   final String kb;
   final String doc;
   final bool enabled;
+
+  /// Chunks this document contributed, or null when the daemon is too old
+  /// to report it — in which case no size line is shown at all, rather
+  /// than claiming zero.
+  final int? chunks;
 
   @override
   ConsumerState<_DocumentRow> createState() => _DocumentRowState();
@@ -813,28 +823,53 @@ class _DocumentRowState extends ConsumerState<_DocumentRow> {
       child: Padding(
         padding: const EdgeInsets.only(bottom: 4),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              Icons.description_outlined,
-              size: 15,
-              color: onSurface.withValues(alpha: 0.5),
+            Padding(
+              // Nudged to sit on the name's line rather than centring
+              // against the two-line block.
+              padding: const EdgeInsets.only(top: 1),
+              child: Icon(
+                Icons.description_outlined,
+                size: 15,
+                color: onSurface.withValues(alpha: 0.5),
+              ),
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: Tooltip(
-                message: widget.doc,
-                child: Text(
-                  widget.doc,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Tooltip(
+                    message: widget.doc,
+                    child: Text(
+                      widget.doc,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                  // Size on its own line: in a 260px sidebar it would
+                  // otherwise eat the width the filename needs. Chunks and
+                  // vectors are 1:1 by construction — one vector is stored
+                  // per chunk — so one number is stated two ways rather
+                  // than two numbers that could disagree.
+                  if (widget.chunks case final n?)
+                    Text(
+                      '$n ${n == 1 ? 'chunk' : 'chunks'} · $n '
+                      '${n == 1 ? 'vector' : 'vectors'}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                ],
               ),
             ),
             // Fixed-size slot either way, so the filename doesn't reflow
-            // as the pointer moves down the list.
+            // as the pointer moves down the list. Sized to the name line
+            // so it aligns with it rather than the row's full height.
             SizedBox(
               width: 22,
-              height: 22,
+              height: 18,
               child: !showDelete
                   ? null
                   : _busy
