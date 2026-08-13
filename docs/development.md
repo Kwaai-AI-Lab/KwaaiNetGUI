@@ -51,6 +51,37 @@ against a NATed or relay-only node rather than your own.
 An unparseable or out-of-range value logs a line and falls back to 8093 rather
 than failing the connection outright.
 
+### Not managing the daemon
+
+`KWAAINET_EXTERNAL_DAEMON=1` forces the "Service managed externally" mode
+regardless of what is stored on disk, so the app neither spawns nor stops a
+daemon:
+
+```bash
+KWAAINET_GRPC_PORT=8099 KWAAINET_EXTERNAL_DAEMON=1 flutter run -d macos
+```
+
+Pair it with `KWAAINET_GRPC_PORT` whenever you point the GUI at a container.
+The port override only changes *who the app talks to*; without this variable
+the app still starts a **local** daemon at boot that nothing is connected to,
+and the Status tab then reports that local process while the data tabs stream
+from the container. That split is the usual "the daemon is not running"
+confusion — the tabs work because they check reachability, but Status checks
+the local PID and correctly finds nothing.
+
+The override does not rewrite the saved setting. The picker in
+Settings → Service keeps showing your real stored choice, greyed out with a
+note, and that choice applies again the moment you run without the variable.
+
+Falsey values (`0`, `false`, `no`, `off`) and an empty value all count as
+unset, so `KWAAINET_EXTERNAL_DAEMON=` does not silently take over.
+
+kwaaiai-env sets both variables for you: `make gui-run NODE=node-f` to run
+under `flutter run`, or its "KwaaiNet GUI (NAT test node)" launch
+configuration to run under the VS Code debugger. Both live in that repo
+rather than this one, since the topology they target is defined there — open
+the kwaaiai-env folder (or `kwaaiai.code-workspace`) to get the launch config.
+
 ## Tests & lint
 
 ```bash

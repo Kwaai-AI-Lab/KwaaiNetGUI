@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,6 +19,23 @@ String _serialize(DaemonMode m) => switch (m) {
   DaemonMode.external => 'external',
 };
 
+/// Whether [raw] — the value of `KWAAINET_EXTERNAL_DAEMON` — pins the app to
+/// [DaemonMode.external].
+///
+/// Absent, empty, and the usual falsey spellings all mean "not forced", so
+/// exporting the variable empty (a common shell accident, and what
+/// `FOO=$UNSET` expands to) does not silently take over daemon management.
+/// Anything else is true, on the reasoning that someone who sets this at all
+/// is opting out of management.
+///
+/// Split from [Settings.externalDaemonForced] so it is testable — Dart cannot
+/// mutate `Platform.environment` in-process. Mirrors `parseGrpcPort`.
+bool isExternalDaemonForced(String? raw) {
+  final v = raw?.trim().toLowerCase();
+  if (v == null || v.isEmpty) return false;
+  return v != '0' && v != 'false' && v != 'no' && v != 'off';
+}
+
 class Settings {
   Settings._(this._prefs);
 
@@ -34,7 +53,34 @@ class Settings {
     return Settings._(await SharedPreferences.getInstance());
   }
 
-  DaemonMode get mode => _parse(_prefs.getString(_modeKey));
+  /// Env override that forces [DaemonMode.external] regardless of what is
+  /// stored on disk. Set it to pin the app to "don't manage the daemon".
+  /// Public so the settings UI can name it in the note it shows.
+  static const externalDaemonEnvVar = 'KWAAINET_EXTERNAL_DAEMON';
+
+  /// True when [externalDaemonEnvVar] pins external mode.
+  static bool get externalDaemonForced =>
+      isExternalDaemonForced(Platform.environment[externalDaemonEnvVar]);
+
+  /// The effective daemon mode.
+  ///
+  /// [externalDaemonEnvVar] wins over the stored value so a throwaway run can
+  /// disclaim daemon management without mutating the user's saved settings —
+  /// which matters because the on-disk mode is shared with their normal
+  /// desktop use of the app. Pointing the GUI at a containerised node with
+  /// `KWAAINET_GRPC_PORT` and leaving the mode at its stored default means
+  /// the app spawns a *local* daemon at startup that nothing is talking to,
+  /// then reports that local process's state in the Status tab while the
+  /// data tabs stream from the container.
+  DaemonMode get mode =>
+      externalDaemonForced ? DaemonMode.external : _storedMode;
+
+  /// The mode as persisted, ignoring [externalDaemonEnvVar]. The settings UI reads
+  /// this so the picker still shows — and can still edit — the user's real
+  /// stored choice while the override is in force.
+  DaemonMode get storedMode => _storedMode;
+
+  DaemonMode get _storedMode => _parse(_prefs.getString(_modeKey));
   String? get customPath => _prefs.getString(_pathKey);
 
   /// When true, closing the window hides it to the menu-bar tray and the

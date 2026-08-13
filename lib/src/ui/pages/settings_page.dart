@@ -944,12 +944,21 @@ class _DaemonSourcePickerState extends State<_DaemonSourcePicker> {
 
   @override
   Widget build(BuildContext context) {
-    final mode = widget.settings.mode;
+    // The stored choice, not the effective one: while the env override pins
+    // external mode, the radio should still show what the user actually
+    // picked, so the setting they return to is not silently rewritten.
+    final forced = Settings.externalDaemonForced;
+    final mode = forced
+        ? widget.settings.storedMode
+        : widget.settings.mode;
     final systemBinaryFound = widget.daemon.findSystemBinary() != null;
     return RadioGroup<DaemonMode>(
       groupValue: mode,
       onChanged: (m) {
-        if (m == null) return;
+        // Inert while the env override pins the mode — changing the stored
+        // value here would have no visible effect until the app is
+        // restarted without the variable, which reads as a broken control.
+        if (m == null || forced) return;
         _set(m);
       },
       child: Column(
@@ -992,6 +1001,8 @@ class _DaemonSourcePickerState extends State<_DaemonSourcePicker> {
             label: 'Service managed externally',
           ),
           const _PathRow(child: _ExternalModeHelp()),
+          // Without this, the pinned picker just looks unresponsive.
+          if (forced) const _PathRow(child: _ExternalModeForcedNote()),
         ],
       ),
     );
@@ -1012,6 +1023,26 @@ class _ExternalModeHelp extends StatelessWidget {
       'terminal); the GUI only observes the gRPC channel.',
       style: Theme.of(context).textTheme.bodySmall?.copyWith(
         color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
+}
+
+/// Shown under the picker when `KWAAINET_EXTERNAL_DAEMON` is set, which pins
+/// external mode and makes the radios inert. Names the variable so the reader
+/// knows what to unset, and says the stored choice is intact — otherwise a
+/// frozen picker looks like a bug rather than a deliberate override.
+class _ExternalModeForcedNote extends StatelessWidget {
+  const _ExternalModeForcedNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'Pinned by ${Settings.externalDaemonEnvVar} in this app\'s environment, '
+      'so this setting is read-only for this run. Your saved choice is '
+      'unchanged and applies again without that variable.',
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: context.kwaai.semanticInfo,
       ),
     );
   }
