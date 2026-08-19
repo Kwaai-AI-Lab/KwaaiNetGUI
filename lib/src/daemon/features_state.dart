@@ -39,6 +39,7 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
       s.publicIp;
       s.initialPeers;
       s.forcePrivate;
+      s.enableUpnp;
       s.healthEnabled;
       s.healthEndpoint;
       return true;
@@ -79,6 +80,7 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
       publicIp: s.publicIp,
       initialPeers: s.initialPeers,
       forcePrivate: s.forcePrivate,
+      enableUpnp: s.enableUpnp,
       healthEnabled: s.healthEnabled,
       healthEndpoint: s.healthEndpoint,
     );
@@ -96,6 +98,7 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
       publicIp: s.publicIp,
       initialPeers: s.initialPeers,
       forcePrivate: s.forcePrivate,
+      enableUpnp: s.enableUpnp,
       healthEnabled: s.healthEnabled,
       healthEndpoint: s.healthEndpoint,
     );
@@ -117,6 +120,12 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
     final s = state;
     if (s == null) return;
     state = s.copyWith(forcePrivate: v);
+  }
+
+  void setEnableUpnp(bool v) {
+    final s = state;
+    if (s == null) return;
+    state = s.copyWith(enableUpnp: v);
   }
 
   void setHealthEnabled(bool v) {

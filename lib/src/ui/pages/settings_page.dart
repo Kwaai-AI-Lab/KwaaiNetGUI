@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../chat/kwaai_rpc_client.dart';
 import '../../daemon/config_file.dart';
 import '../../daemon/daemon_controller.dart';
 import '../../daemon/daemon_state.dart';
@@ -22,6 +23,7 @@ import '../widgets/kwaai_dropdown.dart';
 import '../widgets/kwaai_heading.dart';
 import '../widgets/kwaai_status_bar.dart';
 import '../widgets/kwaai_text_field.dart';
+import 'peers_tab.dart';
 import 'sharding_tab.dart';
 import 'storage_tab.dart';
 
@@ -254,6 +256,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       const StorageTab()
                     else
                       const SizedBox.shrink(),
+                    // Same again: mounting this subscribes to the daemon's
+                    // live swarm state, which it samples every 5s.
+                    if (_selectedTab == _peersTabIndex)
+                      const PeersTab()
+                    else
+                      const SizedBox.shrink(),
                     const _ContributeTab(),
                     const _NetworkTab(),
                     const _AppearanceTab(),
@@ -368,6 +376,9 @@ const _settingsNavEntries = <_SettingsNavEntry>[
   ),
   _SettingsNavEntry(Icons.grid_view_outlined, Icons.grid_view, 'Sharding'),
   _SettingsNavEntry(Icons.storage_outlined, Icons.storage, 'VPK'),
+  // Live p2p state. Named "Peers" rather than "Network" because that name is
+  // already taken below by the bind/initial-peers *configuration* tab.
+  _SettingsNavEntry(Icons.hub_outlined, Icons.hub, 'Peers'),
   _SettingsNavEntry(
     Icons.volunteer_activism_outlined,
     Icons.volunteer_activism,
@@ -385,6 +396,7 @@ const _settingsNavEntries = <_SettingsNavEntry>[
 /// the DHT — or dialling storage nodes — for a view nobody is looking at.
 const _shardingTabIndex = 1;
 const _storageTabIndex = 2;
+const _peersTabIndex = 3;
 
 class _SettingsNav extends StatelessWidget {
   const _SettingsNav({
@@ -593,11 +605,13 @@ class _StatusHeader extends ConsumerWidget {
     // answers — including part-way through a start, which is exactly when the
     // selected binary-location row hands the display back over. Hidden once
     // stopped, where those rows carry the versions instead.
-    final stopped = transition == DaemonTransition.none &&
+    final stopped =
+        transition == DaemonTransition.none &&
         status != null &&
         !status.running;
-    final version =
-        stopped ? null : ref.watch(daemonVersionProvider).valueOrNull;
+    final version = stopped
+        ? null
+        : ref.watch(daemonVersionProvider).valueOrNull;
 
     final Color color;
     final textColor = unknown ? cs.onSurfaceVariant : cs.onSurface;
@@ -627,7 +641,27 @@ class _StatusHeader extends ConsumerWidget {
           void sep() => bitWidgets.add(bitText('  •  '));
 
           bitWidgets.add(bitText(status.running ? 'Running' : 'Stopped'));
-          if (status.running && status.pid != null) {
+          // An explicit port means the daemon is somewhere else, so the local
+          // pid describes a different process — or nothing at all. Name the
+          // port instead: that is what this app is actually talking to.
+          if (grpcPortOverridden) {
+            sep();
+            bitWidgets.add(bitText('port $grpcPort'));
+            bitWidgets.add(const SizedBox(width: 4));
+            bitWidgets.add(
+              Tooltip(
+                message:
+                    '$kGrpcPortEnvVar=$grpcPort — this app is talking to a '
+                    'daemon on that port, not the one it manages locally. '
+                    'Start/Stop below still act on the local daemon.',
+                child: Icon(
+                  Icons.lan_outlined,
+                  size: 16,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            );
+          } else if (status.running && status.pid != null) {
             sep();
             bitWidgets.add(bitText('pid ${status.pid}'));
             // Info icon sits immediately after the pid bit, before
@@ -923,10 +957,7 @@ class _DaemonSourcePickerState extends State<_DaemonSourcePicker> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _RadioRow(
-            value: DaemonMode.builtIn,
-            label: builtInDaemonLabel,
-          ),
+          _RadioRow(value: DaemonMode.builtIn, label: builtInDaemonLabel),
           // "Use system" is only selectable when kwaainet is on PATH.
           _RadioRow(
             value: DaemonMode.system,
@@ -1295,7 +1326,7 @@ class _NetworkTab extends ConsumerWidget {
             const SizedBox(height: 12),
             _FeatureCard(child: _InitialPeersSection(draft: draft)),
             const SizedBox(height: 12),
-            _FeatureCard(child: _AlwaysPrivateSection(draft: draft)),
+            _FeatureCard(child: _ReachabilitySection(draft: draft)),
             const SizedBox(height: 12),
             _FeatureCard(child: _HealthMonitoringSection(draft: draft)),
           ],
@@ -1330,6 +1361,7 @@ bool _tabDirty(int tab, ConfigSnapshot draft, ConfigSnapshot snapshot) {
           draft.publicIp != snapshot.publicIp ||
           !_peersEqual(draft.initialPeers, snapshot.initialPeers) ||
           draft.forcePrivate != snapshot.forcePrivate ||
+          draft.enableUpnp != snapshot.enableUpnp ||
           draft.healthEnabled != snapshot.healthEnabled ||
           draft.healthEndpoint != snapshot.healthEndpoint;
     default:
@@ -1337,8 +1369,8 @@ bool _tabDirty(int tab, ConfigSnapshot draft, ConfigSnapshot snapshot) {
   }
 }
 
-class _AlwaysPrivateSection extends ConsumerWidget {
-  const _AlwaysPrivateSection({required this.draft});
+class _ReachabilitySection extends ConsumerWidget {
+  const _ReachabilitySection({required this.draft});
   final ConfigSnapshot draft;
 
   @override
@@ -1347,12 +1379,21 @@ class _AlwaysPrivateSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const KwaaiHeading('Always private'),
+        const KwaaiHeading('Reachability'),
         const SizedBox(height: 4),
         _SwitchRow(
           label: 'Force private reachability (disable AutoNAT)',
           value: draft.forcePrivate,
           onChanged: notifier.setForcePrivate,
+        ),
+        _SwitchRow(
+          // Off means a genuinely NATed node: no port mapping requested, so
+          // the node falls back to relays and hole punching. That is the
+          // setting to reach for when testing those paths, or when you would
+          // rather the node did not ask the router to open a port.
+          label: 'Map port via UPnP',
+          value: draft.enableUpnp,
+          onChanged: notifier.setEnableUpnp,
         ),
       ],
     );

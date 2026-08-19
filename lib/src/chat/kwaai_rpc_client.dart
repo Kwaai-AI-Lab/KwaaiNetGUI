@@ -14,9 +14,57 @@ void _log(String msg) {
 }
 
 /// Default TCP port the daemon binds — mirrors
-/// `kwaai_cli::grpc_server::DEFAULT_GRPC_TCP_PORT` on the Rust side. If we
-/// expose this in config.yaml later, wire it through here too.
+/// `kwaai_cli::grpc_server::DEFAULT_GRPC_TCP_PORT` on the Rust side.
 const int kDefaultGrpcPort = 8093;
+
+/// Environment variable naming the port to reach the daemon on.
+const String kGrpcPortEnvVar = 'KWAAINET_GRPC_PORT';
+
+/// TCP port to reach the daemon on, honouring [kGrpcPortEnvVar].
+///
+/// The default is the only port a locally-run daemon uses, so this exists for
+/// the case where the daemon *isn't* local: kwaaiai-env's NAT test topology
+/// publishes each containerised node's gRPC on its own host port, and pointing
+/// the GUI at one is how you inspect that node's swarm state.
+int get grpcPort => parseGrpcPort(Platform.environment[kGrpcPortEnvVar]);
+
+/// Whether an explicit port was requested.
+///
+/// Load-bearing on POSIX, where the client prefers the Unix socket and only
+/// falls back to TCP: a local daemon's socket would otherwise always win and
+/// the port override would silently do nothing. Setting the port means "talk
+/// to *that* daemon", so it has to skip the socket.
+bool get grpcPortOverridden =>
+    isGrpcPortOverridden(Platform.environment[kGrpcPortEnvVar]);
+
+/// [raw] as a port, or [kDefaultGrpcPort] if it is absent or unusable.
+///
+/// Falls back rather than throwing: a typo should not take out every RPC in
+/// the app, including against a local daemon that is running perfectly well.
+/// The log line says which port was actually used, so a silent fallback is
+/// still traceable.
+///
+/// Split from [grpcPort] so it is testable — Dart cannot mutate
+/// `Platform.environment` in-process.
+int parseGrpcPort(String? raw) {
+  if (raw == null || raw.isEmpty) return kDefaultGrpcPort;
+  final parsed = int.tryParse(raw.trim());
+  // 0 is "any port" when binding but meaningless when connecting, so it is
+  // rejected alongside genuinely out-of-range values.
+  if (parsed == null || parsed < 1 || parsed > 65535) {
+    _log('ignoring invalid $kGrpcPortEnvVar="$raw"');
+    return kDefaultGrpcPort;
+  }
+  return parsed;
+}
+
+/// Whether [raw] represents a deliberate override.
+///
+/// True even when [parseGrpcPort] rejects the value: the user asked for a
+/// non-local daemon, so silently answering from the *local Unix socket* would
+/// be a worse response to a typo than falling back to the default TCP port,
+/// which at least keeps the transport they asked for.
+bool isGrpcPortOverridden(String? raw) => raw != null && raw.isNotEmpty;
 
 /// High-level connection state the GUI gates UI on. The grpc-dart
 /// package's own ConnectionState has more states (idle vs ready vs
@@ -93,8 +141,7 @@ class KwaaiRpcClient {
     // Fire the first probe immediately so initial UI doesn't spend
     // _probeInterval seconds in "connecting".
     scheduleMicrotask(_probe);
-    _probeTimer =
-        Timer.periodic(_probeInterval, (_) => _probe());
+    _probeTimer = Timer.periodic(_probeInterval, (_) => _probe());
   }
 
   /// Toggle the periodic Ping probe. Used by the GUI to suppress probes
@@ -140,8 +187,7 @@ class KwaaiRpcClient {
       // we cap the wait and proceed regardless.
       final pending = _pendingReset;
       if (pending != null) {
-        await pending
-            .timeout(const Duration(seconds: 1), onTimeout: () {});
+        await pending.timeout(const Duration(seconds: 1), onTimeout: () {});
         _pendingReset = null;
       }
       final session = await _sessionOrInit();
@@ -200,7 +246,10 @@ class KwaaiRpcClient {
   }
 
   Future<ClientChannel> _openChannel() async {
-    if (Platform.isMacOS || Platform.isLinux) {
+    // An explicit port names a specific daemon, so the Unix socket must not
+    // pre-empt it — that socket belongs to whatever is running locally, which
+    // is precisely what the override exists to bypass.
+    if ((Platform.isMacOS || Platform.isLinux) && !grpcPortOverridden) {
       final sockPath = unixSocketPath;
       // Async exists() — moves the stat off the synchronous critical
       // path so the UI isolate doesn't pay even microseconds of FS
@@ -218,14 +267,13 @@ class KwaaiRpcClient {
       }
       _log('Unix socket not found, falling back to TCP');
     }
-    _connectionPath = 'tcp://127.0.0.1:$kDefaultGrpcPort';
-    _log('opening TCP: 127.0.0.1:$kDefaultGrpcPort');
+    final port = grpcPort;
+    _connectionPath = 'tcp://127.0.0.1:$port';
+    _log('opening TCP: 127.0.0.1:$port');
     return ClientChannel(
       '127.0.0.1',
-      port: kDefaultGrpcPort,
-      options: const ChannelOptions(
-        credentials: ChannelCredentials.insecure(),
-      ),
+      port: port,
+      options: const ChannelOptions(credentials: ChannelCredentials.insecure()),
     );
   }
 
@@ -358,6 +406,28 @@ class KwaaiRpcClient {
     }
   }
 
+  /// Live local-p2p feed: connections, DHT routing table and this node's own
+  /// reachability. The daemon samples every [intervalSecs] and additionally
+  /// pushes immediately on a reachability change; the daemon-side operation is
+  /// cancelled when the listener unsubscribes.
+  ///
+  /// Errors with SessionOpError(code=UNIMPLEMENTED) when the daemon is running
+  /// the Go p2p stack, which cannot supply this view. As with the two streams
+  /// above, this doesn't reset the channel — the provider resubscribes when
+  /// connectivity returns.
+  Stream<pb.NetworkUpdate> networkStream({int intervalSecs = 5}) async* {
+    final session = await _sessionOrInit();
+    final op = session.networkSubscribe(intervalSecs: intervalSecs);
+    try {
+      yield* op.updates;
+    } finally {
+      final id = op.id;
+      if (id != null) {
+        await cancelOperation(id);
+      }
+    }
+  }
+
   /// Version of the *running* daemon, read from `StatusReply.version`.
   ///
   /// Returns null when the daemon isn't reachable, or when it predates the
@@ -376,6 +446,20 @@ class KwaaiRpcClient {
       return reply.version.isEmpty ? null : reply.version;
     } catch (e) {
       _log('daemonVersion failed: $e');
+      return null;
+    }
+  }
+
+  /// Dial a peer by id, resolving its address through the DHT.
+  ///
+  /// Returns null when the session itself could not be reached; otherwise the
+  /// daemon's reply, whose `error` carries a failed dial.
+  Future<pb.ConnectReply?> connectPeer(String peerId) async {
+    try {
+      final session = await _sessionOrInit();
+      return await session.connect(peerId).timeout(const Duration(seconds: 30));
+    } catch (e) {
+      _log('connectPeer($peerId) failed: $e');
       return null;
     }
   }

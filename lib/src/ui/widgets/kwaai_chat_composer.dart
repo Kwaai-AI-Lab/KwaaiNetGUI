@@ -173,9 +173,7 @@ class KwaaiChatComposer extends StatelessWidget {
             // and the ConstrainedBox then imposes the button-height
             // floor for the alignment to distribute.
             child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minHeight: _kButtonDiameter,
-              ),
+              constraints: const BoxConstraints(minHeight: _kButtonDiameter),
               child: Align(
                 alignment: AlignmentDirectional.centerStart,
                 heightFactor: 1.0,
@@ -203,10 +201,7 @@ class KwaaiChatComposer extends StatelessWidget {
             width: _kButtonDiameter,
             // Send and Stop share this slot — see [onStop].
             child: onStop != null
-                ? _StopButton(
-                    onPressed: onStop,
-                    accent: ext.accentPrimary,
-                  )
+                ? _StopButton(onPressed: onStop, accent: ext.accentPrimary)
                 : _SendButton(
                     onPressed: _canSend ? onSend : null,
                     accent: ext.accentPrimary,

@@ -1,0 +1,7 @@
+# Tests tagged `manual` need a running kwaainet daemon, so they are excluded
+# from the default `flutter test` run (and from CI). Run them deliberately:
+#
+#   flutter test test/manual/ --tags manual
+tags:
+  manual:
+    skip: "needs a running daemon; run with --tags manual"

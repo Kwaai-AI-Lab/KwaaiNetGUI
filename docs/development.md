@@ -27,6 +27,30 @@ Release builds land under `build/<platform>/` — e.g.
 `build/linux/x64/release/bundle/`,
 `build/windows/x64/runner/Release/`.
 
+## Pointing the GUI at another daemon
+
+By default the GUI talks to the daemon on this machine: the Unix socket at
+`~/.kwaainet/run/kwaai.sock` on macOS/Linux, falling back to TCP `127.0.0.1:8093`.
+
+`KWAAINET_GRPC_PORT` overrides the port, which is how you inspect a daemon that
+is not the local one:
+
+```bash
+KWAAINET_GRPC_PORT=8099 flutter run -d macos
+```
+
+Setting it also skips the Unix socket. That is deliberate — the socket belongs
+to whatever is running locally, so leaving it in the chain would mean the local
+daemon silently answered and the override did nothing.
+
+The main use is kwaaiai-env's NAT test topology, which publishes each
+containerised node's gRPC on its own host port (`make gui-bridge NODE=node-f`
+in that repo, then port 8099 for node-f). Handy for seeing the Network tab
+against a NATed or relay-only node rather than your own.
+
+An unparseable or out-of-range value logs a line and falls back to 8093 rather
+than failing the connection outright.
+
 ## Tests & lint
 
 ```bash

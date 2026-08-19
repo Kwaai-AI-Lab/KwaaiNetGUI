@@ -81,10 +81,12 @@ class SessionClient {
         router.close();
         _routers.remove(id);
       case pb.ServerFrame_Body.error:
-        router.addError(SessionOpError(
-          code: frame.error.code.value,
-          message: frame.error.message,
-        ));
+        router.addError(
+          SessionOpError(
+            code: frame.error.code.value,
+            message: frame.error.message,
+          ),
+        );
         router.close();
         _routers.remove(id);
       default:
@@ -119,9 +121,11 @@ class SessionClient {
 
   /// `ping` — cheap liveness probe; server emits Pong then Done.
   Future<pb.PingReply> ping() async {
-    final frames = _open((id) => pb.ClientFrame()
-      ..id = Int64(id)
-      ..ping = pb.PingRequest());
+    final frames = _open(
+      (id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..ping = pb.PingRequest(),
+    );
     pb.PingReply? reply;
     await for (final f in frames) {
       if (f.whichBody() == pb.ServerFrame_Body.pong) {
@@ -136,9 +140,11 @@ class SessionClient {
 
   /// `status` — daemon-side state snapshot.
   Future<pb.StatusReply> status() async {
-    final frames = _open((id) => pb.ClientFrame()
-      ..id = Int64(id)
-      ..status = pb.StatusRequest());
+    final frames = _open(
+      (id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..status = pb.StatusRequest(),
+    );
     pb.StatusReply? reply;
     await for (final f in frames) {
       if (f.whichBody() == pb.ServerFrame_Body.status) {
@@ -151,6 +157,30 @@ class SessionClient {
     return reply;
   }
 
+  /// `connect` — dial a peer we know of but hold no connection to.
+  ///
+  /// The daemon resolves the bare peer id through the DHT, so no address is
+  /// needed. Returns the reply rather than throwing on a failed dial: "could
+  /// not reach that peer" is an ordinary outcome here, not an error in the
+  /// operation.
+  Future<pb.ConnectReply> connect(String peerId) async {
+    final frames = _open(
+      (id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..connect = (pb.ConnectRequest()..peerId = peerId),
+    );
+    pb.ConnectReply? reply;
+    await for (final f in frames) {
+      if (f.whichBody() == pb.ServerFrame_Body.connect) {
+        reply = f.connect;
+      }
+    }
+    if (reply == null) {
+      throw SessionOpError(code: 0, message: 'connect returned no reply');
+    }
+    return reply;
+  }
+
   /// `kwaainet shard run <PROMPT>` — distributed inference. Default
   /// path used by the GUI's main chat.
   Stream<String> shardRun(String prompt, {String role = 'user'}) =>
@@ -159,12 +189,13 @@ class SessionClient {
   /// As [shardRun], but also exposes the operation id so the caller can
   /// [cancel] it. Stopping generation needs the id, and `_open` would
   /// otherwise allocate and discard it.
-  SessionOperation shardRunOp(String prompt, {String role = 'user'}) =>
-      _openOp((id) => pb.ClientFrame()
-        ..id = Int64(id)
-        ..shardRun = (pb.ShardRunRequest()
-          ..role = role
-          ..content = prompt));
+  SessionOperation shardRunOp(String prompt, {String role = 'user'}) => _openOp(
+    (id) => pb.ClientFrame()
+      ..id = Int64(id)
+      ..shardRun = (pb.ShardRunRequest()
+        ..role = role
+        ..content = prompt),
+  );
 
   /// `kwaainet generate <PROMPT>` — single-node local inference. Used
   /// by the Developer tab to drive the local InferenceEngine directly.
@@ -172,19 +203,22 @@ class SessionClient {
       generateOp(prompt, role: role).tokens;
 
   /// As [generate], but exposes the operation id for cancellation.
-  SessionOperation generateOp(String prompt, {String role = 'user'}) =>
-      _openOp((id) => pb.ClientFrame()
-        ..id = Int64(id)
-        ..generate = (pb.GenerateRequest()
-          ..role = role
-          ..content = prompt));
+  SessionOperation generateOp(String prompt, {String role = 'user'}) => _openOp(
+    (id) => pb.ClientFrame()
+      ..id = Int64(id)
+      ..generate = (pb.GenerateRequest()
+        ..role = role
+        ..content = prompt),
+  );
 
   /// `kwaainet shard chain` — one-shot block-coverage snapshot: which
   /// peers serve which blocks of the model, per the DHT.
   Future<pb.BlockCoverageUpdate> blockCoverage() async {
-    final frames = _open((id) => pb.ClientFrame()
-      ..id = Int64(id)
-      ..blockCoverage = pb.BlockCoverageRequest());
+    final frames = _open(
+      (id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..blockCoverage = pb.BlockCoverageRequest(),
+    );
     pb.BlockCoverageUpdate? reply;
     await for (final f in frames) {
       if (f.whichBody() == pb.ServerFrame_Body.blockCoverage) {
@@ -192,7 +226,10 @@ class SessionClient {
       }
     }
     if (reply == null) {
-      throw SessionOpError(code: 0, message: 'blockCoverage returned no update');
+      throw SessionOpError(
+        code: 0,
+        message: 'blockCoverage returned no update',
+      );
     }
     return reply;
   }
@@ -216,11 +253,13 @@ class SessionClient {
     final id = _nextId++;
     final controller = StreamController<pb.ServerFrame>();
     _routers[id] = controller;
-    _outbound!.add(pb.ClientFrame()
-      ..id = Int64(id)
-      ..blockCoverage = (pb.BlockCoverageRequest()
-        ..subscribe = true
-        ..intervalSecs = intervalSecs));
+    _outbound!.add(
+      pb.ClientFrame()
+        ..id = Int64(id)
+        ..blockCoverage = (pb.BlockCoverageRequest()
+          ..subscribe = true
+          ..intervalSecs = intervalSecs),
+    );
     // No silence watchdog here: a subscription is legitimately quiet
     // while the daemon's p2p layer is still coming up, and session-end
     // errors already propagate through the router.
@@ -238,9 +277,7 @@ class SessionClient {
   /// The default cadence matches the daemon's: a round dials every
   /// advertised node, so this is deliberately far slower than the
   /// block-coverage feed.
-  StorageDiscoveryOperation storageDiscoverySubscribe({
-    int intervalSecs = 30,
-  }) {
+  StorageDiscoveryOperation storageDiscoverySubscribe({int intervalSecs = 30}) {
     ensureOpen();
     if (_closed || _outbound == null) {
       return StorageDiscoveryOperation(
@@ -256,11 +293,13 @@ class SessionClient {
     final id = _nextId++;
     final controller = StreamController<pb.ServerFrame>();
     _routers[id] = controller;
-    _outbound!.add(pb.ClientFrame()
-      ..id = Int64(id)
-      ..storageDiscovery = (pb.StorageDiscoveryRequest()
-        ..subscribe = true
-        ..intervalSecs = intervalSecs));
+    _outbound!.add(
+      pb.ClientFrame()
+        ..id = Int64(id)
+        ..storageDiscovery = (pb.StorageDiscoveryRequest()
+          ..subscribe = true
+          ..intervalSecs = intervalSecs),
+    );
     // As with block coverage, no silence watchdog: a subscription is
     // legitimately quiet while the daemon's p2p layer comes up, and
     // session-end errors already propagate through the router.
@@ -270,12 +309,56 @@ class SessionClient {
     return StorageDiscoveryOperation(id: id, updates: updates);
   }
 
+  /// Subscribe to local p2p state: connections, DHT routing table and this
+  /// node's own reachability.
+  ///
+  /// Unlike the two subscriptions above, updates are not purely periodic — a
+  /// reachability change is pushed as it happens. `NetworkUpdate.reason` says
+  /// which it was, so a caller can react to a NAT transition immediately while
+  /// treating peer-table churn as routine.
+  ///
+  /// Requires the daemon to be running the native p2p stack; otherwise the
+  /// stream errors with SessionOpError(code=UNIMPLEMENTED).
+  NetworkOperation networkSubscribe({int intervalSecs = 5}) {
+    ensureOpen();
+    if (_closed || _outbound == null) {
+      return NetworkOperation(
+        id: null,
+        updates: Stream<pb.NetworkUpdate>.error(
+          SessionEndedError(
+            kind: SessionEndKind.localClose,
+            reason: 'session not open',
+          ),
+        ),
+      );
+    }
+    final id = _nextId++;
+    final controller = StreamController<pb.ServerFrame>();
+    _routers[id] = controller;
+    _outbound!.add(
+      pb.ClientFrame()
+        ..id = Int64(id)
+        ..network = (pb.NetworkRequest()
+          ..subscribe = true
+          ..intervalSecs = intervalSecs),
+    );
+    // No silence watchdog, for the same reason as the other two: the daemon
+    // heartbeats an unchanged snapshot, so genuine silence is already
+    // distinguishable, and session-end errors propagate through the router.
+    final updates = controller.stream
+        .where((f) => f.whichBody() == pb.ServerFrame_Body.network)
+        .map((f) => f.network);
+    return NetworkOperation(id: id, updates: updates);
+  }
+
   /// Cancel an in-flight operation. The target operation's stream will
   /// error with SessionOpError(code=CANCELLED).
   Future<void> cancel(int operationId) async {
-    final frames = _open((id) => pb.ClientFrame()
-      ..id = Int64(id)
-      ..cancel = (pb.Cancel()..targetId = Int64(operationId)));
+    final frames = _open(
+      (id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..cancel = (pb.Cancel()..targetId = Int64(operationId)),
+    );
     await frames.drain<void>();
   }
 
@@ -465,6 +548,16 @@ class StorageDiscoveryOperation {
 
   final int? id;
   final Stream<pb.StorageUpdate> updates;
+}
+
+/// An in-flight network subscription: its update stream plus the server
+/// operation id needed to [SessionClient.cancel] it. Same id semantics as
+/// [SessionOperation] — null means no frame was ever sent.
+class NetworkOperation {
+  NetworkOperation({required this.id, required this.updates});
+
+  final int? id;
+  final Stream<pb.NetworkUpdate> updates;
 }
 
 /// Thrown into a per-op stream when the server emits Error for that id.

@@ -80,10 +80,9 @@ class ReleaseChecker {
   /// normalized first, so a leading "v" on either side is fine.
   static bool isNewer(String latest, String current) {
     (int, int, int) parse(String s) {
-      final parts = normalizeVersion(s)
-          .split('.')
-          .map((p) => int.tryParse(p) ?? 0)
-          .toList();
+      final parts = normalizeVersion(
+        s,
+      ).split('.').map((p) => int.tryParse(p) ?? 0).toList();
       return (
         parts.isNotEmpty ? parts[0] : 0,
         parts.length > 1 ? parts[1] : 0,
@@ -150,7 +149,8 @@ class UpdateAvailabilityNotifier extends AsyncNotifier<UpdateAvailability> {
     final info = await PackageInfo.fromPlatform();
     final current = ReleaseChecker.normalizeVersion(info.version);
 
-    final enabled = kReleaseMode ||
+    final enabled =
+        kReleaseMode ||
         const bool.fromEnvironment('KWAAINET_GUI_FORCE_UPDATE_CHECK');
     if (!enabled) {
       return UpdateAvailability(current: current);
@@ -175,8 +175,9 @@ class UpdateAvailabilityNotifier extends AsyncNotifier<UpdateAvailability> {
     if (_dismissedForSession) return;
     _dismissedForSession = true;
     // Re-emit current state so watchers (banner) recompute visibility.
-    state = AsyncData(state.valueOrNull ??
-        const UpdateAvailability(current: ''));
+    state = AsyncData(
+      state.valueOrNull ?? const UpdateAvailability(current: ''),
+    );
   }
 
   /// "Skip" — persist this version so the banner stays hidden until a
@@ -192,8 +193,8 @@ class UpdateAvailabilityNotifier extends AsyncNotifier<UpdateAvailability> {
 
 final updateAvailabilityProvider =
     AsyncNotifierProvider<UpdateAvailabilityNotifier, UpdateAvailability>(
-  UpdateAvailabilityNotifier.new,
-);
+      UpdateAvailabilityNotifier.new,
+    );
 
 /// The release to offer right now, or null if there's nothing to show.
 ///

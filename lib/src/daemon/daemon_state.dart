@@ -43,6 +43,26 @@ final daemonStatusProvider = StreamProvider<NodeStatus>((ref) {
   return ref.watch(statusWatcherProvider).stream;
 });
 
+/// Whether a daemon is available to serve the data-bearing tabs.
+///
+/// Not the same question as [daemonStatusProvider]'s `running`, which is a
+/// *local* fact: it reads this machine's PID file and status JSON. That is the
+/// right check for the daemon this app manages, and the wrong one entirely
+/// when [kGrpcPortEnvVar] names a daemon somewhere else — a containerised node
+/// in the NAT test topology has no PID on this host, so every tab would report
+/// "not running" while happily streaming its data.
+///
+/// With an explicit port the local PID is moot, so reachability is the honest
+/// signal: the gRPC connection either stands up or it does not. This mirrors
+/// `_openChannel`, which skips the Unix socket for the same reason.
+final daemonAvailableProvider = Provider<bool>((ref) {
+  if (grpcPortOverridden) {
+    return ref.watch(kwaaiRpcConnectionProvider).valueOrNull ==
+        RpcConnection.connected;
+  }
+  return ref.watch(daemonStatusProvider).valueOrNull?.running ?? false;
+});
+
 /// Version of the binary a *specific* [DaemonMode] resolves to, independent
 /// of which mode is currently selected — so the settings picker can label
 /// every option without the user having to select it first.
@@ -80,7 +100,7 @@ final daemonVersionProvider = FutureProvider<String?>((ref) async {
   // once the socket is actually up.
   final connected =
       ref.watch(kwaaiRpcConnectionProvider).valueOrNull ==
-          RpcConnection.connected;
+      RpcConnection.connected;
 
   if (running && connected) {
     // Whatever the daemon says — including null for a daemon older than

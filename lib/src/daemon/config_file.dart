@@ -21,6 +21,7 @@ class ConfigSnapshot {
     required this.publicIp,
     required this.initialPeers,
     required this.forcePrivate,
+    required this.enableUpnp,
     required this.healthEnabled,
     required this.healthEndpoint,
   });
@@ -56,6 +57,13 @@ class ConfigSnapshot {
   /// (no hole-punching attempts on incoming dials).
   final bool forcePrivate;
 
+  /// `enable_upnp` — ask the local gateway to map our listen port.
+  ///
+  /// Defaults true on the daemon side. Turning it off is how you get a
+  /// genuinely NATed node without touching router settings; it also stops the
+  /// node asking the router to open a port at all.
+  final bool enableUpnp;
+
   /// `health_monitoring.enabled`.
   final bool healthEnabled;
 
@@ -71,6 +79,7 @@ class ConfigSnapshot {
     String? publicIp,
     List<String>? initialPeers,
     bool? forcePrivate,
+    bool? enableUpnp,
     bool? healthEnabled,
     String? healthEndpoint,
   }) {
@@ -83,6 +92,7 @@ class ConfigSnapshot {
       publicIp: publicIp ?? this.publicIp,
       initialPeers: initialPeers ?? this.initialPeers,
       forcePrivate: forcePrivate ?? this.forcePrivate,
+      enableUpnp: enableUpnp ?? this.enableUpnp,
       healthEnabled: healthEnabled ?? this.healthEnabled,
       healthEndpoint: healthEndpoint ?? this.healthEndpoint,
     );
@@ -104,6 +114,9 @@ class ConfigFile {
     publicIp: '',
     initialPeers: [],
     forcePrivate: false,
+    // Mirrors the daemon's own default, so a config that has never set the
+    // key reads the same here as it behaves there.
+    enableUpnp: true,
     healthEnabled: true,
     healthEndpoint: '',
   );
@@ -142,6 +155,7 @@ class ConfigFile {
           ? rawPeers.map((e) => e.toString()).toList()
           : <String>[];
       final forcePrivate = (doc['force_private'] as bool?) ?? false;
+      final enableUpnp = (doc['enable_upnp'] as bool?) ?? true;
       final health = doc['health_monitoring'];
       final healthEnabled = health is YamlMap
           ? (health['enabled'] as bool? ?? true)
@@ -158,6 +172,7 @@ class ConfigFile {
         publicIp: publicIp,
         initialPeers: initialPeers,
         forcePrivate: forcePrivate,
+        enableUpnp: enableUpnp,
         healthEnabled: healthEnabled,
         healthEndpoint: healthEndpoint,
       );
@@ -189,16 +204,12 @@ class ConfigFile {
     _setScalar(editor, ['public_ip'], updated.publicIp);
     _setScalar(editor, ['initial_peers'], updated.initialPeers);
     _setScalar(editor, ['force_private'], updated.forcePrivate);
-    _setScalar(
-      editor,
-      ['health_monitoring', 'enabled'],
-      updated.healthEnabled,
-    );
-    _setScalar(
-      editor,
-      ['health_monitoring', 'api_endpoint'],
-      updated.healthEndpoint,
-    );
+    _setScalar(editor, ['enable_upnp'], updated.enableUpnp);
+    _setScalar(editor, ['health_monitoring', 'enabled'], updated.healthEnabled);
+    _setScalar(editor, [
+      'health_monitoring',
+      'api_endpoint',
+    ], updated.healthEndpoint);
 
     f.writeAsStringSync(editor.toString());
     _log('wrote ${f.path}');

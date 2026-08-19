@@ -139,11 +139,7 @@ class KwaaiThemeExtension extends ThemeExtension<KwaaiThemeExtension> {
       )!,
       divider: Color.lerp(divider, other.divider, t)!,
       cardBackground: Color.lerp(cardBackground, other.cardBackground, t)!,
-      elevatedSurface: Color.lerp(
-        elevatedSurface,
-        other.elevatedSurface,
-        t,
-      )!,
+      elevatedSurface: Color.lerp(elevatedSurface, other.elevatedSurface, t)!,
       menuBackground: Color.lerp(menuBackground, other.menuBackground, t)!,
       inputBackground: Color.lerp(inputBackground, other.inputBackground, t)!,
       accentPrimary: Color.lerp(accentPrimary, other.accentPrimary, t)!,

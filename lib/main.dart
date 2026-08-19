@@ -94,9 +94,7 @@ Future<void> main() async {
       // Seed the localChatEnabled provider from the durable setting so
       // the main page's tab bar reflects the user's last choice on
       // first paint.
-      localChatEnabledProvider.overrideWith(
-        (_) => settings.localChatEnabled,
-      ),
+      localChatEnabledProvider.overrideWith((_) => settings.localChatEnabled),
       // Seed the skipped-version mirror so the update banner suppresses a
       // previously-skipped release on first paint.
       skippedVersionProvider.overrideWith((_) => settings.skippedVersion),
@@ -112,19 +110,23 @@ Future<void> main() async {
   // never on AsyncValue.loading (which flickers between status polls).
   // Edge-trigger via lastKnown so flapping doesn't tear down and
   // rebuild the channel on every poll.
-  bool? lastKnownRunning;
-  container.listen<AsyncValue<NodeStatus>>(
-    daemonStatusProvider,
-    (_, next) {
+  // Only when this app owns the daemon. An explicit KWAAINET_GRPC_PORT names
+  // one running elsewhere — typically a container, whose pid does not exist on
+  // this host — so the local reading is always "stopped" and would switch
+  // probing off permanently, guaranteeing the connection it is meant to
+  // report on can never come up. Probe continuously in that case and let
+  // reachability speak for itself.
+  if (!grpcPortOverridden) {
+    bool? lastKnownRunning;
+    container.listen<AsyncValue<NodeStatus>>(daemonStatusProvider, (_, next) {
       final v = next.valueOrNull;
       if (v == null) return; // not a confirmed reading yet — leave probe as-is
       final running = v.running;
       if (running == lastKnownRunning) return;
       lastKnownRunning = running;
       container.read(kwaaiRpcClientProvider).setProbingEnabled(running);
-    },
-    fireImmediately: true,
-  );
+    }, fireImmediately: true);
+  }
 
   final tray = TrayController(container: container);
   // Only install the menu-bar icon when the user opts in. The toggle in
