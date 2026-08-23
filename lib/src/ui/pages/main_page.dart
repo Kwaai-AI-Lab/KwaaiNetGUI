@@ -254,11 +254,22 @@ class _MainTopBar extends StatelessWidget {
             ),
           ],
           const Spacer(),
+          // No tooltip here, deliberately. This is the one control that both
+          // carries a tooltip and pushes an opaque route (Settings). Once that
+          // route covers the page, the tooltip's owner sits inside
+          // TickerMode(enabled: false), so the fade-out started when the
+          // pointer left never ticks, and the tooltip's OverlayPortal child
+          // stays mounted offstage. The overlay only relays out onstage
+          // entries' portal children, yet the stuck one re-dirties itself
+          // every frame — so the next window resize trips
+          // `size == theater.size` in overlay.dart (Flutter 3.44). Debug-only,
+          // but it halts the debugger every time. Repro with a failing test:
+          // ../flutter-tooltip-resize-repro. The icon keeps its semantic
+          // label for assistive tech.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: IconButton(
-              tooltip: 'Settings',
-              icon: const Icon(Icons.settings),
+              icon: const Icon(Icons.settings, semanticLabel: 'Settings'),
               onPressed: onOpenSettings,
             ),
           ),
