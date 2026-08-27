@@ -51,3 +51,4 @@ regenerate the gRPC bindings, see the **[development guide](docs/development.md)
 
 - [Development guide](docs/development.md) — build, run, test, project layout
 - [Daemon modes](docs/daemon-modes.md) — how the app finds and runs the node
+- [Peers tab](docs/PEERS.md) — what the reachability pill, PATH values, and table columns mean (rendered by [`peers_tab.dart`](lib/src/ui/pages/peers_tab.dart))
