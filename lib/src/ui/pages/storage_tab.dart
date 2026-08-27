@@ -125,14 +125,15 @@ class _StorageTabState extends ConsumerState<StorageTab> {
       );
     }
 
-    // Filtering happens once, here: the cylinder and the table read the
-    // same list so the two halves can never disagree about what is shown.
+    // Filtering and ordering happen once, here: the cylinder and the
+    // table read the same list so the two halves can never disagree
+    // about what is shown.
     final tier = _tierFilter;
-    final peers = tier == null
-        ? update.peers
-        : update.peers
-              .where((p) => p.trustTier == tier.wire)
-              .toList(growable: false);
+    final peers = orderStoragePeers(
+      tier == null
+          ? update.peers
+          : update.peers.where((p) => p.trustTier == tier.wire),
+    );
 
     final totals = StorageTotals.of(peers);
 
@@ -308,17 +309,17 @@ class StorageTotals {
   int get nodeCount => reachableCount + unreachableCount + pendingCount;
 }
 
-/// A peer's slice of the free zone: how much free space it holds, and
-/// how far into the zone that slice starts.
+/// A peer's slice of one zone: how much of the zone it holds, and how far
+/// into the zone that slice starts.
 ///
-/// Both in GB — the cylinder divides them by the free total to get the
+/// Both in GB — the cylinder divides them by the zone's total to get the
 /// fractions it draws with.
-class FreeBand {
-  const FreeBand({required this.freeGb, required this.offsetGb});
+class CapacityBand {
+  const CapacityBand({required this.amountGb, required this.offsetGb});
 
-  static const none = FreeBand(freeGb: 0, offsetGb: 0);
+  static const none = CapacityBand(amountGb: 0, offsetGb: 0);
 
-  final double freeGb;
+  final double amountGb;
   final double offsetGb;
 }
 
@@ -330,26 +331,77 @@ class FreeBand {
 /// still-probing peers are skipped: they contribute nothing to free
 /// space, so they take up no room in the zone either.
 ///
-/// Returns [FreeBand.none] when nothing is selected, when the selected
+/// Returns [CapacityBand.none] when nothing is selected, when the selected
 /// peer isn't reachable, or when it has no free space to point at.
 ///
 /// Public so `test/storage_staleness_test.dart` can pin the placement —
 /// an offset that ignored ordering would still look plausible on screen.
-FreeBand freeBandFor(List<pb.StoragePeer> peers, String? peerId) {
-  if (peerId == null) return FreeBand.none;
+CapacityBand freeBandFor(List<pb.StoragePeer> peers, String? peerId) =>
+    _bandFor(
+      peers,
+      peerId,
+      pb.StorageReachability.STORAGE_REACHABILITY_REACHABLE,
+      (p) => p.capacityGbFree,
+    );
+
+/// The same, for the unreachable zone.
+///
+/// Selecting an unreachable node should point at it too — it is the one
+/// case where the table says "this capacity exists but you cannot use it"
+/// and the bar could show *which* of it. The figure is the node's
+/// advertised total, because an unreachable node reports no used/free
+/// split; that is the whole of its contribution to the zone.
+CapacityBand unreachableBandFor(List<pb.StoragePeer> peers, String? peerId) =>
+    _bandFor(
+      peers,
+      peerId,
+      pb.StorageReachability.STORAGE_REACHABILITY_UNREACHABLE,
+      (p) => p.capacityGb,
+    );
+
+CapacityBand _bandFor(
+  List<pb.StoragePeer> peers,
+  String? peerId,
+  pb.StorageReachability zone,
+  double Function(pb.StoragePeer) amount,
+) {
+  if (peerId == null) return CapacityBand.none;
   var offset = 0.0;
   for (final p in peers) {
-    if (p.reachability !=
-        pb.StorageReachability.STORAGE_REACHABILITY_REACHABLE) {
-      continue;
-    }
+    if (p.reachability != zone) continue;
     if (p.peerId == peerId) {
-      return FreeBand(freeGb: p.capacityGbFree, offsetGb: offset);
+      return CapacityBand(amountGb: amount(p), offsetGb: offset);
     }
-    offset += p.capacityGbFree;
+    offset += amount(p);
   }
-  return FreeBand.none;
+  return CapacityBand.none;
 }
+
+/// Orders the node list: reachable first, then those still being probed,
+/// then the unreachable. Capacity this daemon can actually use belongs at
+/// the top of the table and at the left of the cylinder.
+///
+/// Ties keep the daemon's own name-then-peer-id order rather than relying
+/// on the sort being stable, so a row only moves when its reachability
+/// does — the probe phase resolving is the one reshuffle the user sees.
+///
+/// Public so `test/storage_order_test.dart` can pin it.
+List<pb.StoragePeer> orderStoragePeers(Iterable<pb.StoragePeer> peers) {
+  final ordered = peers.toList();
+  ordered.sort((a, b) {
+    final byReach = _reachRank(a).compareTo(_reachRank(b));
+    if (byReach != 0) return byReach;
+    final byName = a.publicName.compareTo(b.publicName);
+    return byName != 0 ? byName : a.peerId.compareTo(b.peerId);
+  });
+  return ordered;
+}
+
+int _reachRank(pb.StoragePeer p) => switch (p.reachability) {
+  pb.StorageReachability.STORAGE_REACHABILITY_REACHABLE => 0,
+  pb.StorageReachability.STORAGE_REACHABILITY_UNREACHABLE => 2,
+  _ => 1,
+};
 
 /// Formats a GB figure the way the CLI does: one decimal place, and TB
 /// once the number would otherwise run to four digits.
@@ -558,6 +610,10 @@ class _CapacityCylinder extends StatelessWidget {
         : peers.where((p) => p.peerId == selectedPeerId).firstOrNull;
 
     final band = freeBandFor(peers, selectedPeerId);
+    final downBand = unreachableBandFor(peers, selectedPeerId);
+    final selectedLabel = (selected?.publicName.isEmpty ?? true)
+        ? selected?.peerId
+        : selected?.publicName;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(_cylinderHeight / 2),
@@ -581,14 +637,12 @@ class _CapacityCylinder extends StatelessWidget {
               // The selected node's slice of this zone, and where it
               // starts — both as fractions of the zone itself.
               highlightFraction: totals.freeGb > 0
-                  ? band.freeGb / totals.freeGb
+                  ? band.amountGb / totals.freeGb
                   : 0.0,
               highlightOffset: totals.freeGb > 0
                   ? band.offsetGb / totals.freeGb
                   : 0.0,
-              highlightLabel: selected?.publicName.isEmpty ?? true
-                  ? selected?.peerId
-                  : selected?.publicName,
+              highlightLabel: selectedLabel,
             ),
             _CapacityZone(
               flex: totals.unreachableGb / classified,
@@ -596,6 +650,15 @@ class _CapacityCylinder extends StatelessWidget {
               label: 'unreachable',
               amount: totals.unreachableGb,
               dimmed: selectedPeerId != null,
+              // Selecting an unreachable node highlights its share here,
+              // the same way a reachable one is picked out of free.
+              highlightFraction: totals.unreachableGb > 0
+                  ? downBand.amountGb / totals.unreachableGb
+                  : 0.0,
+              highlightOffset: totals.unreachableGb > 0
+                  ? downBand.offsetGb / totals.unreachableGb
+                  : 0.0,
+              highlightLabel: selectedLabel,
             ),
           ],
         ),

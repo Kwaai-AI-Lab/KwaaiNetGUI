@@ -190,14 +190,14 @@ void main() {
       expect(freeBandFor(peers, 'b').offsetGb, 10);
       expect(freeBandFor(peers, 'c').offsetGb, 30);
 
-      expect(freeBandFor(peers, 'b').freeGb, 20);
+      expect(freeBandFor(peers, 'b').amountGb, 20);
     });
 
     test('the last peer ends exactly at the free total', () {
       // Otherwise the band would overhang the zone it sits in.
       final peers = [peer('a', 10), peer('b', 20), peer('c', 30)];
       final band = freeBandFor(peers, 'c');
-      expect(band.offsetGb + band.freeGb, 60);
+      expect(band.offsetGb + band.amountGb, 60);
     });
 
     test('skips peers that contribute no free space', () {
@@ -223,12 +223,53 @@ void main() {
             reach: pb.StorageReachability.STORAGE_REACHABILITY_UNREACHABLE),
       ];
 
-      expect(freeBandFor(peers, null).freeGb, 0);
-      expect(freeBandFor(peers, 'missing').freeGb, 0);
+      expect(freeBandFor(peers, null).amountGb, 0);
+      expect(freeBandFor(peers, 'missing').amountGb, 0);
       // Selectable in the table, but it has no confirmed free space to
       // point at, so the cylinder highlights nothing.
-      expect(freeBandFor(peers, 'down').freeGb, 0);
+      expect(freeBandFor(peers, 'down').amountGb, 0);
       expect(freeBandFor(peers, 'down').offsetGb, 0);
+    });
+  });
+
+  /// Selecting an unreachable node points at its share of the unreachable
+  /// zone, which is the whole of its advertised capacity — a node that never
+  /// answered reports no used/free split.
+  group('unreachableBandFor', () {
+    pb.StoragePeer peer(
+      String id,
+      double capacity, {
+      pb.StorageReachability reach =
+          pb.StorageReachability.STORAGE_REACHABILITY_UNREACHABLE,
+    }) =>
+        pb.StoragePeer()
+          ..peerId = id
+          ..capacityGb = capacity
+          ..capacityGbFree = 0
+          ..reachability = reach;
+
+    test('offsets by the capacity of the unreachable peers ahead of it', () {
+      final peers = [
+        peer('up', 500,
+            reach: pb.StorageReachability.STORAGE_REACHABILITY_REACHABLE),
+        peer('a', 10),
+        peer('b', 20),
+      ];
+
+      expect(unreachableBandFor(peers, 'a').offsetGb, 0);
+      expect(unreachableBandFor(peers, 'b').offsetGb, 10);
+      expect(unreachableBandFor(peers, 'b').amountGb, 20);
+    });
+
+    test('is empty for a peer that is not in this zone', () {
+      final peers = [
+        peer('up', 10,
+            reach: pb.StorageReachability.STORAGE_REACHABILITY_REACHABLE),
+        peer('a', 20),
+      ];
+
+      expect(unreachableBandFor(peers, 'up').amountGb, 0);
+      expect(unreachableBandFor(peers, null).amountGb, 0);
     });
   });
 
