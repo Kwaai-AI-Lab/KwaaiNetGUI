@@ -9,6 +9,8 @@ import '../../daemon/daemon_state.dart';
 import '../../settings.dart';
 import '../../tray/tray.dart';
 import '../../update/release_checker.dart';
+import '../../update/update_banner_spec.dart';
+import '../../update/update_controller.dart';
 import '../../window/window_focus.dart';
 import '../theme/kwaai_theme.dart';
 import '../widgets/app_shell.dart';
@@ -255,9 +257,9 @@ class _MainTopBar extends StatelessWidget {
 }
 
 /// Pinned info banner shown under the top bar when a newer GUI release is
-/// available. Offers Update (open the release page), Later (hide for this
-/// session), and Skip (suppress this version permanently). Collapses to
-/// nothing when there's no pending update.
+/// available. Its content follows the install state machine — offer, download
+/// progress, ready-to-restart, or failure — via the pure [updateBannerSpec]
+/// mapping. Collapses to nothing when there's no pending update.
 class _UpdateBanner extends ConsumerWidget {
   const _UpdateBanner();
 
@@ -266,42 +268,87 @@ class _UpdateBanner extends ConsumerWidget {
     final pending = ref.watch(updateBannerProvider);
     if (pending == null) return const SizedBox.shrink();
 
-    final notifier = ref.read(updateAvailabilityProvider.notifier);
+    final availability = ref.read(updateAvailabilityProvider.notifier);
+    final installer = ref.read(updateStageProvider.notifier);
+    final stage = ref.watch(updateStageProvider);
+    final spec = updateBannerSpec(
+      stage: stage,
+      version: pending.version,
+      installSupported: installer.installSupported,
+    );
+
+    void run(UpdateBannerAction a) {
+      switch (a) {
+        case UpdateBannerAction.update:
+          // The one branch that keeps the old behaviour alive: with no
+          // swappable install root we still send the user to the release page.
+          if (installer.installSupported) {
+            installer.start(pending);
+          } else {
+            availability.openReleasePage();
+          }
+        case UpdateBannerAction.restart:
+          installer.installAndRestart();
+        case UpdateBannerAction.cancel:
+          installer.cancel();
+        case UpdateBannerAction.retry:
+          installer.retry();
+        case UpdateBannerAction.openReleasePage:
+          availability.openReleasePage();
+        case UpdateBannerAction.later:
+          availability.later();
+        case UpdateBannerAction.skip:
+          availability.skip();
+      }
+    }
+
     final accent = context.kwaai.accentPrimary;
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     return KwaaiStatusBar(
-      severity: KwaaiStatusSeverity.info,
-      message: 'KwaaiNet ${pending.version} is available.',
+      severity: spec.severity,
+      message: spec.message,
+      onDismiss: spec.dismissible ? installer.dismiss : null,
       action: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          TextButton(
-            onPressed: notifier.openReleasePage,
-            style: TextButton.styleFrom(
-              foregroundColor: accent,
-              visualDensity: VisualDensity.compact,
+          if (spec.progress != null || spec.indeterminate) ...[
+            SizedBox(
+              width: 120,
+              child: LinearProgressIndicator(
+                value: spec.progress,
+                minHeight: 4,
+              ),
             ),
-            child: const Text('Update'),
-          ),
-          TextButton(
-            onPressed: notifier.later,
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-              visualDensity: VisualDensity.compact,
+            const SizedBox(width: 8),
+          ],
+          for (final a in spec.actions)
+            TextButton(
+              onPressed: () => run(a),
+              style: TextButton.styleFrom(
+                foregroundColor: _isPrimary(a) ? accent : muted,
+                visualDensity: VisualDensity.compact,
+              ),
+              child: Text(_label(a)),
             ),
-            child: const Text('Later'),
-          ),
-          TextButton(
-            onPressed: notifier.skip,
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-              visualDensity: VisualDensity.compact,
-            ),
-            child: const Text('Skip'),
-          ),
         ],
       ),
     );
   }
+
+  static bool _isPrimary(UpdateBannerAction a) =>
+      a == UpdateBannerAction.update ||
+      a == UpdateBannerAction.restart ||
+      a == UpdateBannerAction.retry;
+
+  static String _label(UpdateBannerAction a) => switch (a) {
+    UpdateBannerAction.update => 'Update',
+    UpdateBannerAction.restart => 'Restart now',
+    UpdateBannerAction.cancel => 'Cancel',
+    UpdateBannerAction.retry => 'Retry',
+    UpdateBannerAction.openReleasePage => 'Open release page',
+    UpdateBannerAction.later => 'Later',
+    UpdateBannerAction.skip => 'Skip',
+  };
 }
 
 /// The chat surface. Gated on whether we have a live gRPC connection

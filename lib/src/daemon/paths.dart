@@ -19,6 +19,10 @@ class KwaainetPaths {
       '$runDir${Platform.pathSeparator}kwaainet.status';
   static String get configFile => '$home${Platform.pathSeparator}config.yaml';
   static String get logsDir => '$home${Platform.pathSeparator}logs';
+
+  /// Downloaded update archives, one dir per version. Must outlive the app
+  /// process, so a temp dir won't do.
+  static String get updatesDir => '$home${Platform.pathSeparator}updates';
 }
 
 /// Locates the bundled `kwaainet` daemon for "built-in" mode.

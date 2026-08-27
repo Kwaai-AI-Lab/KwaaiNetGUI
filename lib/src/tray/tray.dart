@@ -9,6 +9,8 @@ import 'package:window_manager/window_manager.dart';
 import '../daemon/daemon_state.dart';
 import '../daemon/status_watcher.dart';
 import '../update/release_checker.dart';
+import '../update/update_banner_spec.dart';
+import '../update/update_controller.dart';
 import '../window/dock_icon.dart';
 import '../window/shutdown.dart';
 
@@ -41,9 +43,11 @@ class TrayController with TrayListener {
   String? _iconPath;
   bool _enabled = false;
   ReleaseInfo? _pendingUpdate;
+  UpdateStage _updateStage = const UpdateIdle();
   ProviderSubscription<AsyncValue<NodeStatus>>? _statusSub;
   ProviderSubscription<DaemonTransition>? _transitionSub;
   ProviderSubscription<ReleaseInfo?>? _updateSub;
+  ProviderSubscription<UpdateStage>? _updateStageSub;
 
   /// True when the tray icon is currently installed in the menu bar.
   bool get enabled => _enabled;
@@ -92,6 +96,14 @@ class TrayController with TrayListener {
     // durable "Skip" suppresses it).
     _updateSub = _container.listen<ReleaseInfo?>(updateTrayProvider, (_, next) {
       _pendingUpdate = next;
+      _rebuildMenu();
+    }, fireImmediately: true);
+    // The same item also tracks download/ready progress.
+    _updateStageSub = _container.listen<UpdateStage>(updateStageProvider, (
+      _,
+      next,
+    ) {
+      _updateStage = next;
       _rebuildMenu();
     }, fireImmediately: true);
 
@@ -153,7 +165,8 @@ class TrayController with TrayListener {
           if (update != null) ...[
             MenuItem(
               key: 'update',
-              label: '⬆️  Update available: ${update.version}…',
+              label: updateTrayLabel(_updateStage, update.version),
+              disabled: updateTrayItemDisabled(_updateStage),
             ),
             MenuItem.separator(),
           ],
@@ -199,11 +212,17 @@ class TrayController with TrayListener {
     _log('menu click: key=${menuItem.key}');
     switch (menuItem.key) {
       case 'update':
-        // Open the release page — same action the banner's Update uses.
-        // The app can't self-replace a running bundle.
-        await _container
-            .read(updateAvailabilityProvider.notifier)
-            .openReleasePage();
+        // Same action the banner's button takes for the current stage.
+        final installer = _container.read(updateStageProvider.notifier);
+        if (_updateStage is UpdateReady) {
+          await installer.installAndRestart();
+        } else if (installer.installSupported && _updateStage is UpdateIdle) {
+          await installer.start();
+        } else {
+          await _container
+              .read(updateAvailabilityProvider.notifier)
+              .openReleasePage();
+        }
         break;
       case 'start':
         // Goes through the same provider action the settings page uses, so
@@ -243,9 +262,11 @@ class TrayController with TrayListener {
     _statusSub?.close();
     _transitionSub?.close();
     _updateSub?.close();
+    _updateStageSub?.close();
     _statusSub = null;
     _transitionSub = null;
     _updateSub = null;
+    _updateStageSub = null;
     trayManager.removeListener(this);
     await trayManager.destroy();
     _enabled = false;

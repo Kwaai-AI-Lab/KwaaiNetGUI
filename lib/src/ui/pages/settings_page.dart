@@ -11,6 +11,7 @@ import '../../daemon/daemon_state.dart';
 import '../../daemon/features_state.dart';
 import '../../daemon/paths.dart';
 import '../../settings.dart';
+import '../../update/release_checker.dart';
 import '../../tray/tray.dart';
 import '../../window/window_focus.dart';
 import '../theme/kwaai_theme.dart';
@@ -253,7 +254,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     const _NetworkTab(),
                     const _AppearanceTab(),
                     _DeveloperTab(settings: widget.settings),
-                    const _AboutTab(),
+                    _AboutTab(settings: widget.settings),
                   ],
                 ),
               ),
@@ -2230,13 +2231,15 @@ class _ThemeVariantDot extends StatelessWidget {
 
 /// About — logo, version, and a link to the project website. Read-only
 /// page, no draft / Apply plumbing.
-class _AboutTab extends StatelessWidget {
-  const _AboutTab();
+class _AboutTab extends ConsumerWidget {
+  const _AboutTab({required this.settings});
+
+  final Settings settings;
 
   static const _siteUrl = 'https://kwaai.ai';
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
     final accent = context.kwaai.accentPrimary;
@@ -2278,6 +2281,28 @@ class _AboutTab extends StatelessWidget {
                   ),
                 );
               },
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              // The check is otherwise startup-only, with no manual trigger.
+              onPressed: () => ref.invalidate(updateAvailabilityProvider),
+              style: TextButton.styleFrom(
+                foregroundColor: accent,
+                visualDensity: VisualDensity.compact,
+              ),
+              child: const Text('Check for updates'),
+            ),
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: _SwitchRow(
+                label: 'Download updates automatically',
+                value: ref.watch(autoDownloadUpdatesProvider),
+                onChanged: (v) async {
+                  await settings.setAutoDownloadUpdates(v);
+                  ref.read(autoDownloadUpdatesProvider.notifier).state = v;
+                },
+              ),
             ),
             const SizedBox(height: 24),
             InkWell(

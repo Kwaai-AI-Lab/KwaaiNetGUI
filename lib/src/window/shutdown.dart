@@ -22,6 +22,16 @@ class ShuttingDownNotifier extends Notifier<bool> {
   void engage() => state = true;
 }
 
+/// The app-wide [ProviderContainer], so non-widget code (the update
+/// controller) can call [performQuit], which needs the container itself.
+/// Overridden in main.dart; same shape as `settingsProvider`.
+final appContainerProvider = Provider<ProviderContainer>((ref) {
+  throw UnimplementedError(
+    'appContainerProvider must be overridden with the app-wide '
+    'ProviderContainer via ProviderScope.overrides.',
+  );
+});
+
 /// The single, shared "clean quit" routine used by both the window-close
 /// handler and the tray Quit item.
 ///

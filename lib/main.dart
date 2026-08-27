@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:macos_window_utils/macos_window_utils.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'src/chat/kwaai_rpc_client.dart';
@@ -14,11 +15,13 @@ import 'src/daemon/status_watcher.dart';
 import 'src/settings.dart';
 import 'src/tray/tray.dart';
 import 'src/update/release_checker.dart';
+import 'src/update/update_controller.dart';
 import 'src/ui/pages/main_page.dart';
 import 'src/ui/theme/theme_controller.dart';
 import 'src/ui/theme/theme_variants.dart';
 import 'src/window/close_handler.dart';
 import 'src/window/dock_icon.dart';
+import 'src/window/shutdown.dart';
 import 'src/window/shutdown_gate.dart';
 import 'src/window/tooltip_resize_guard.dart';
 import 'src/window/window_focus.dart';
@@ -85,7 +88,10 @@ Future<void> main() async {
   // Riverpod container — created here so the tray (non-widget) can read /
   // invoke provider actions, and shared with the widget tree via
   // UncontrolledProviderScope.
-  final container = ProviderContainer(
+  // late: appContainerProvider's override closure needs the container that is
+  // being constructed here, so it can only resolve lazily on first read.
+  late final ProviderContainer container;
+  container = ProviderContainer(
     overrides: [
       daemonControllerProvider.overrideWithValue(daemon),
       statusWatcherProvider.overrideWithValue(watcher),
@@ -99,6 +105,13 @@ Future<void> main() async {
       // Seed the skipped-version mirror so the update banner suppresses a
       // previously-skipped release on first paint.
       skippedVersionProvider.overrideWith((_) => settings.skippedVersion),
+      // Seed the auto-download mirror so the update controller sees the
+      // user's choice on the first pending release.
+      autoDownloadUpdatesProvider.overrideWith(
+        (_) => settings.autoDownloadUpdates,
+      ),
+      // Lets the update controller reach performQuit for the swap-and-restart.
+      appContainerProvider.overrideWith((ref) => container),
     ],
   );
 
@@ -158,6 +171,14 @@ Future<void> main() async {
   // reader that triggers the fetch). No-op in debug builds — the notifier
   // gates the network call on kReleaseMode.
   container.read(updateAvailabilityProvider);
+  // Read the install half too, so an auto-download starts even when the
+  // window opens hidden to the tray and no banner is ever built.
+  container.read(updateStageProvider);
+  unawaited(
+    PackageInfo.fromPlatform().then(
+      (i) => sweepStaleUpdates(ReleaseChecker.normalizeVersion(i.version)),
+    ),
+  );
 
   runApp(
     UncontrolledProviderScope(
