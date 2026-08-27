@@ -34,7 +34,11 @@ class KwaainetPaths {
 ///      KwaaiNet repo, which is now a *sibling* of this GUI project.
 ///
 /// `KWAAINET_DEBUG_BIN` overrides both.
-String get builtInDebugDaemonPath {
+String get builtInDebugDaemonPath => resolveBuiltInDaemonPath();
+
+/// The body of [builtInDebugDaemonPath]. [exePath] is an injection point for
+/// tests, which need to stand up a fake bundle the running exe isn't in.
+String resolveBuiltInDaemonPath({String? exePath}) {
   final sep = Platform.pathSeparator;
   final exeName = Platform.isWindows ? 'kwaainet.exe' : 'kwaainet';
 
@@ -43,14 +47,17 @@ String get builtInDebugDaemonPath {
   if (override != null && override.isNotEmpty) return override;
 
   // Case 1: bundled next to the GUI executable (production / sandbox install).
-  final exeDir = File(Platform.resolvedExecutable).absolute.parent.path;
+  final selfExe = exePath ?? Platform.resolvedExecutable;
+  final exeDir = File(selfExe).absolute.parent.path;
   for (final neighbour in [
-    '$exeDir$sep$exeName', // …/MacOS/kwaainet
     '$exeDir$sep..${sep}Resources$sep$exeName', // …/Resources/kwaainet
+    '$exeDir$sep$exeName', // …/MacOS/kwaainet (Windows/Linux: beside the exe)
   ]) {
-    if (File(neighbour).existsSync()) {
-      return File(neighbour).absolute.path;
-    }
+    if (!File(neighbour).existsSync()) continue;
+    // Case-insensitive filesystems match "kwaainet" against the GUI's own
+    // executable. Starting that would fork-bomb the app, so never return it.
+    if (FileSystemEntity.identicalSync(neighbour, selfExe)) continue;
+    return File(neighbour).absolute.path;
   }
 
   // Case 2: dev sibling checkout. Find this GUI project's root by walking up
