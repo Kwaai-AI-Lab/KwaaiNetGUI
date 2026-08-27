@@ -12,6 +12,8 @@ import '../../daemon/features_state.dart';
 import '../../daemon/paths.dart';
 import '../../settings.dart';
 import '../../update/release_checker.dart';
+import '../../update/update_banner_spec.dart';
+import '../../update/update_controller.dart';
 import '../../tray/tray.dart';
 import '../../window/window_focus.dart';
 import '../theme/kwaai_theme.dart';
@@ -203,6 +205,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ],
             ),
           ),
+          const SizedBox(height: 12),
+          _UpdatesCard(settings: widget.settings),
         ],
       ),
     );
@@ -254,7 +258,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     const _NetworkTab(),
                     const _AppearanceTab(),
                     _DeveloperTab(settings: widget.settings),
-                    _AboutTab(settings: widget.settings),
+                    const _AboutTab(),
                   ],
                 ),
               ),
@@ -1615,6 +1619,146 @@ class _HealthMonitoringSectionState
 /// Sectional card used to group related feature controls. Uses the
 /// theme's [KwaaiThemeExtension.elevatedSurface] so it reads as one step
 /// above the content card it sits in.
+/// Settings → Status "Updates" card. The whole update lifecycle lives here —
+/// availability, progress, verification, failure — so downloads no longer
+/// interrupt the main window. Update-ready is handled by the pinned bottom
+/// bar, alongside the other things that need a restart.
+class _UpdatesCard extends ConsumerWidget {
+  const _UpdatesCard({required this.settings});
+
+  final Settings settings;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final accent = context.kwaai.accentPrimary;
+    final installer = ref.read(updateStageProvider.notifier);
+    final availability = ref.watch(updateAvailabilityProvider).valueOrNull;
+    final pending = ref.watch(updateTrayProvider);
+    final supported =
+        ref.watch(updateInstallSupportedProvider).valueOrNull ?? false;
+
+    // Null only before the first check resolves.
+    final current = availability?.current;
+    final spec = current == null
+        ? null
+        : updatePanelSpec(
+            stage: ref.watch(updateStageProvider),
+            currentVersion: current,
+            pendingVersion: pending?.version,
+            installSupported: supported,
+            autoDownload: ref.watch(autoDownloadUpdatesProvider),
+          );
+
+    void run(UpdateBannerAction a) {
+      switch (a) {
+        case UpdateBannerAction.update:
+          // No swappable install root — the release page is the way forward.
+          if (supported && pending != null) {
+            installer.start(pending);
+          } else {
+            ref.read(updateAvailabilityProvider.notifier).openReleasePage();
+          }
+        case UpdateBannerAction.cancel:
+          installer.cancel();
+        case UpdateBannerAction.retry:
+          installer.retry();
+        case UpdateBannerAction.openReleasePage:
+          ref.read(updateAvailabilityProvider.notifier).openReleasePage();
+        case UpdateBannerAction.restart:
+        case UpdateBannerAction.later:
+        case UpdateBannerAction.skip:
+          break; // not offered by updatePanelSpec
+      }
+    }
+
+    return _FeatureCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const KwaaiHeading('Updates'),
+          const SizedBox(height: 4),
+          _SwitchRow(
+            label: 'Download updates automatically',
+            value: ref.watch(autoDownloadUpdatesProvider),
+            onChanged: (v) async {
+              await settings.setAutoDownloadUpdates(v);
+              ref.read(autoDownloadUpdatesProvider.notifier).state = v;
+            },
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  spec?.message ?? 'Checking for updates…',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: spec?.severity == KwaaiStatusSeverity.warning
+                        ? context.kwaai.statusTransitioning
+                        : scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              for (final a in spec?.actions ?? const <UpdateBannerAction>[])
+                TextButton(
+                  onPressed: () => run(a),
+                  style: TextButton.styleFrom(
+                    foregroundColor: accent,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: Text(_panelLabel(a)),
+                ),
+              if (spec?.dismissible ?? false)
+                IconButton(
+                  tooltip: 'Dismiss',
+                  icon: const Icon(Icons.close, size: 16),
+                  onPressed: installer.dismiss,
+                  visualDensity: VisualDensity.compact,
+                  style: IconButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(24, 24),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    foregroundColor: scheme.onSurfaceVariant.withValues(
+                      alpha: 0.6,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (spec != null && (spec.progress != null || spec.indeterminate)) ...[
+            const SizedBox(height: 8),
+            LinearProgressIndicator(value: spec.progress, minHeight: 4),
+          ],
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              // The startup check is the only automatic one.
+              onPressed: () => ref.invalidate(updateAvailabilityProvider),
+              style: TextButton.styleFrom(
+                foregroundColor: accent,
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              child: const Text('Check for updates'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _panelLabel(UpdateBannerAction a) => switch (a) {
+    UpdateBannerAction.update => 'Download',
+    UpdateBannerAction.cancel => 'Cancel',
+    UpdateBannerAction.retry => 'Retry',
+    UpdateBannerAction.openReleasePage => 'Open release page',
+    UpdateBannerAction.restart => 'Restart now',
+    UpdateBannerAction.later => 'Later',
+    UpdateBannerAction.skip => 'Skip',
+  };
+}
+
 class _FeatureCard extends StatelessWidget {
   const _FeatureCard({required this.child});
   final Widget child;
@@ -1857,6 +2001,27 @@ class _CapacityFieldState extends State<_CapacityField> {
 
 /// Pinned bar at the bottom of the Settings shell card. Visible only when
 /// the user has applied feature changes that need a service restart.
+/// Which pinned bar the Settings shell shows. Declaration order is priority:
+/// a daemon error or unsaved work outranks an update, which can wait.
+enum SettingsBottomBar { error, restartNeeded, updateReady, apply, none }
+
+/// The bottom bar's priority chain, as a pure decision so the ordering can be
+/// tested without standing up the whole Settings page.
+SettingsBottomBar settingsBottomBar({
+  required bool hasError,
+  required bool needsRestart,
+  required bool serviceRunning,
+  required bool updateReady,
+  required bool dirty,
+}) {
+  if (hasError) return SettingsBottomBar.error;
+  // A restart prompt only means anything while the service is up.
+  if (needsRestart && serviceRunning) return SettingsBottomBar.restartNeeded;
+  if (updateReady) return SettingsBottomBar.updateReady;
+  if (dirty) return SettingsBottomBar.apply;
+  return SettingsBottomBar.none;
+}
+
 /// Bottom status bar of the Settings card. Shows either a daemon error
 /// (red) or a restart-needed prompt (orange) — error takes priority.
 /// Empty when neither applies. Replaces the old `_RestartNeededBar` and
@@ -1912,38 +2077,59 @@ class _RestartNeededBar extends ConsumerWidget {
         ? KwaaiButton(label: 'Apply', onPressed: () => _applyDraft(ref))
         : null;
 
-    // Priority: error → restart-needed (if running) → bare apply.
-    if (err != null) {
-      return KwaaiStatusBar(
-        severity: KwaaiStatusSeverity.error,
-        message: err,
-        action: applyAction,
-        onDismiss: () => ref.read(daemonErrorProvider.notifier).clear(),
-        bottomRadius: bottomRadius,
-      );
+    // An update can wait; an error or unsaved work cannot.
+    final staged = ref.watch(updateStageProvider);
+    switch (settingsBottomBar(
+      hasError: err != null,
+      needsRestart: needsRestart,
+      serviceRunning: running,
+      updateReady: staged is UpdateReady,
+      dirty: dirty,
+    )) {
+      case SettingsBottomBar.error:
+        return KwaaiStatusBar(
+          severity: KwaaiStatusSeverity.error,
+          message: err!,
+          action: applyAction,
+          onDismiss: () => ref.read(daemonErrorProvider.notifier).clear(),
+          bottomRadius: bottomRadius,
+        );
+      case SettingsBottomBar.restartNeeded:
+        return KwaaiStatusBar(
+          severity: KwaaiStatusSeverity.info,
+          message: 'Restart the service to apply your changes.',
+          action:
+              applyAction ??
+              KwaaiButton(
+                label: 'Restart service',
+                onPressed: busy ? null : () => _restart(ref),
+              ),
+          bottomRadius: bottomRadius,
+        );
+      case SettingsBottomBar.updateReady:
+        return KwaaiStatusBar(
+          severity: KwaaiStatusSeverity.info,
+          message: 'KwaaiNet ${(staged as UpdateReady).version} is ready to '
+              'install.',
+          action:
+              applyAction ??
+              KwaaiButton(
+                label: 'Restart now',
+                onPressed: () =>
+                    ref.read(updateStageProvider.notifier).installAndRestart(),
+              ),
+          bottomRadius: bottomRadius,
+        );
+      case SettingsBottomBar.apply:
+        // No status — render a neutral bar so Apply stays pinned at the
+        // bottom of the settings shell whatever tab the user is on.
+        return _BareApplyBar(
+          onApply: () => _applyDraft(ref),
+          bottomRadius: bottomRadius,
+        );
+      case SettingsBottomBar.none:
+        return const SizedBox.shrink();
     }
-    if (needsRestart && running) {
-      return KwaaiStatusBar(
-        severity: KwaaiStatusSeverity.info,
-        message: 'Restart the service to apply your changes.',
-        action:
-            applyAction ??
-            KwaaiButton(
-              label: 'Restart service',
-              onPressed: busy ? null : () => _restart(ref),
-            ),
-        bottomRadius: bottomRadius,
-      );
-    }
-    if (dirty) {
-      // No status — render a neutral bar so Apply stays pinned at the
-      // bottom of the settings shell whatever tab the user is on.
-      return _BareApplyBar(
-        onApply: () => _applyDraft(ref),
-        bottomRadius: bottomRadius,
-      );
-    }
-    return const SizedBox.shrink();
   }
 
   /// Stop the daemon, then start it. The transition provider clears its
@@ -2231,15 +2417,13 @@ class _ThemeVariantDot extends StatelessWidget {
 
 /// About — logo, version, and a link to the project website. Read-only
 /// page, no draft / Apply plumbing.
-class _AboutTab extends ConsumerWidget {
-  const _AboutTab({required this.settings});
-
-  final Settings settings;
+class _AboutTab extends StatelessWidget {
+  const _AboutTab();
 
   static const _siteUrl = 'https://kwaai.ai';
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
     final accent = context.kwaai.accentPrimary;
@@ -2281,28 +2465,6 @@ class _AboutTab extends ConsumerWidget {
                   ),
                 );
               },
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              // The check is otherwise startup-only, with no manual trigger.
-              onPressed: () => ref.invalidate(updateAvailabilityProvider),
-              style: TextButton.styleFrom(
-                foregroundColor: accent,
-                visualDensity: VisualDensity.compact,
-              ),
-              child: const Text('Check for updates'),
-            ),
-            const SizedBox(height: 8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 360),
-              child: _SwitchRow(
-                label: 'Download updates automatically',
-                value: ref.watch(autoDownloadUpdatesProvider),
-                onChanged: (v) async {
-                  await settings.setAutoDownloadUpdates(v);
-                  ref.read(autoDownloadUpdatesProvider.notifier).state = v;
-                },
-              ),
             ),
             const SizedBox(height: 24),
             InkWell(

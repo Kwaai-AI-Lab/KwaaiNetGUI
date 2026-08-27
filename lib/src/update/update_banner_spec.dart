@@ -102,6 +102,61 @@ UpdateBannerSpec updateBannerSpec({
   }
 }
 
+/// The Settings → Status panel's view of the same state machine.
+///
+/// Same shape as [updateBannerSpec], deliberately: one stage→text mapping,
+/// two surfaces. The panel differs in that it is always on screen, so it has
+/// an up-to-date state and no Later/Skip, and it leaves the restart to the
+/// pinned bottom bar.
+UpdateBannerSpec updatePanelSpec({
+  required UpdateStage stage,
+  required String currentVersion,
+  required String? pendingVersion,
+  required bool installSupported,
+  required bool autoDownload,
+}) {
+  switch (stage) {
+    case UpdateDownloading() || UpdateVerifying() || UpdateFailed():
+      return updateBannerSpec(
+        stage: stage,
+        version: pendingVersion ?? currentVersion,
+        installSupported: installSupported,
+      );
+    case UpdateReady(version: final staged):
+      return UpdateBannerSpec(
+        severity: KwaaiStatusSeverity.info,
+        message: 'KwaaiNet $staged is ready to install.',
+        actions: const [],
+      );
+    case UpdateIdle():
+      if (pendingVersion == null) {
+        return UpdateBannerSpec(
+          severity: KwaaiStatusSeverity.info,
+          message: 'KwaaiNet $currentVersion is up to date.',
+          actions: const [],
+        );
+      }
+      // Auto-download would have moved us off idle already, so an offer here
+      // means it is off — or declined, which a non-installable root does
+      // silently. Either way the user needs the manual way forward.
+      return UpdateBannerSpec(
+        severity: KwaaiStatusSeverity.info,
+        message: 'KwaaiNet $pendingVersion is available.',
+        actions: [
+          if (!autoDownload || !installSupported) UpdateBannerAction.update,
+        ],
+      );
+  }
+}
+
+/// Whether the main window's top banner shows anything for [stage].
+///
+/// Download progress belongs to Settings → Updates; the banner is reserved
+/// for what a user who never opens Settings still has to see — that an update
+/// exists, that one is ready, or that one failed.
+bool showUpdateBanner(UpdateStage stage) =>
+    stage is! UpdateDownloading && stage is! UpdateVerifying;
+
 /// Label for the tray's update item, following the same stage.
 String updateTrayLabel(UpdateStage stage, String version) => switch (stage) {
   UpdateDownloading(:final progress) =>

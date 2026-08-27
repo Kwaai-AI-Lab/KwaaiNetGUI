@@ -268,9 +268,11 @@ class _UpdateBanner extends ConsumerWidget {
     final pending = ref.watch(updateBannerProvider);
     if (pending == null) return const SizedBox.shrink();
 
+    final stage = ref.watch(updateStageProvider);
+    if (!showUpdateBanner(stage)) return const SizedBox.shrink();
+
     final availability = ref.read(updateAvailabilityProvider.notifier);
     final installer = ref.read(updateStageProvider.notifier);
-    final stage = ref.watch(updateStageProvider);
     final supported =
         ref.watch(updateInstallSupportedProvider).valueOrNull ?? false;
     final spec = updateBannerSpec(
