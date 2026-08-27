@@ -176,7 +176,10 @@ Future<void> main() async {
   container.read(updateStageProvider);
   unawaited(
     PackageInfo.fromPlatform().then(
-      (i) => sweepStaleUpdates(ReleaseChecker.normalizeVersion(i.version)),
+      (i) => sweepStaleUpdates(
+        ReleaseChecker.normalizeVersion(i.version),
+        root: container.read(installRootProvider),
+      ),
     ),
   );
 

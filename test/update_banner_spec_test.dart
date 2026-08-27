@@ -54,16 +54,46 @@ void main() {
       expect(s.indeterminate, isTrue);
     });
 
-    test('verifying is indeterminate', () {
+    test('verifying is indeterminate and offers no Cancel', () {
       final s = spec(const UpdateVerifying());
       expect(s.message, 'Verifying KwaaiNet 0.3.0…');
       expect(s.indeterminate, isTrue);
       expect(s.progress, isNull);
+      // The unpack is a child process we cannot interrupt cleanly.
+      expect(s.actions, isEmpty);
+    });
+
+    test('ready reports the staged version, not a newer detected one', () {
+      final s = updateBannerSpec(
+        stage: const UpdateReady(
+          version: '0.3.0',
+          stagedPath: '/s/app',
+          stagePath: '/s',
+        ),
+        version: '0.4.0',
+        installSupported: true,
+      );
+      expect(s.message, 'KwaaiNet 0.3.0 is ready to install.');
+      expect(
+        updateTrayLabel(
+          const UpdateReady(
+            version: '0.3.0',
+            stagedPath: '/s/app',
+            stagePath: '/s',
+          ),
+          '0.4.0',
+        ),
+        '⬆️  Restart to update to 0.3.0',
+      );
     });
 
     test('ready offers Restart now / Later, never restarts on its own', () {
       final s = spec(
-        const UpdateReady(stagedPath: '/s/app', stagePath: '/s'),
+        const UpdateReady(
+          version: '0.3.0',
+          stagedPath: '/s/app',
+          stagePath: '/s',
+        ),
       );
       expect(s.message, 'KwaaiNet 0.3.0 is ready to install.');
       expect(s.actions, [
@@ -82,6 +112,12 @@ void main() {
       ]);
       expect(s.dismissible, isTrue);
     });
+
+    test('failed drops Retry when no install is possible', () {
+      // Retrying a download we could never install is a dead end.
+      final s = spec(const UpdateFailed('nope'), supported: false);
+      expect(s.actions, [UpdateBannerAction.openReleasePage]);
+    });
   });
 
   group('tray label', () {
@@ -96,7 +132,11 @@ void main() {
       );
       expect(
         updateTrayLabel(
-          const UpdateReady(stagedPath: '/s/app', stagePath: '/s'),
+          const UpdateReady(
+            version: '0.3.0',
+            stagedPath: '/s/app',
+            stagePath: '/s',
+          ),
           '0.3.0',
         ),
         '⬆️  Restart to update to 0.3.0',
@@ -109,7 +149,11 @@ void main() {
       expect(updateTrayItemDisabled(const UpdateIdle()), isFalse);
       expect(
         updateTrayItemDisabled(
-          const UpdateReady(stagedPath: '/s/app', stagePath: '/s'),
+          const UpdateReady(
+            version: '0.3.0',
+            stagedPath: '/s/app',
+            stagePath: '/s',
+          ),
         ),
         isFalse,
       );

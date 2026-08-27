@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -168,6 +170,63 @@ void main() {
       expect(ReleaseChecker.parseDigest('sha256:${'z' * 64}'), isNull);
       expect(ReleaseChecker.parseDigest(null), isNull);
       expect(ReleaseChecker.parseDigest(123), isNull);
+    });
+  });
+
+  group('adversarial version tags are refused', () {
+    // These all pass isNewer — non-numeric parts parse as 0, so "9.9.9<junk>"
+    // compares as (9,9,0) and beats the running build. Validation, not the
+    // comparison, is what has to stop them.
+    final hostile = [
+      "9.9.9'; rm -rf \$HOME; '",
+      r'9.9.9$(touch /tmp/pwned)',
+      '9.9.9/../../x',
+      '9.9.9`id`',
+      '9.9.9\nrm -rf /',
+      '9.9.9"; rm -rf x; "',
+      '../../etc',
+      '9.9.9;shutdown',
+    ];
+
+    test('isNewer alone does not protect us', () {
+      // Documents why the validator exists, rather than asserting a wish.
+      expect(ReleaseChecker.isNewer("9.9.9'; rm -rf x; '", '0.2.0'), isTrue);
+    });
+
+    test('isValidVersion rejects every one', () {
+      for (final v in hostile) {
+        expect(
+          ReleaseChecker.isValidVersion(v),
+          isFalse,
+          reason: 'accepted hostile version: $v',
+        );
+      }
+    });
+
+    test('fetchLatest fails closed on a hostile tag', () async {
+      for (final v in hostile) {
+        final body = jsonEncode({
+          'tag_name': 'v$v',
+          'html_url': 'https://e.test/r',
+          'assets': const [],
+        });
+        expect(
+          await _checkerReturning(body).fetchLatest(),
+          isNull,
+          reason: 'offered an update for hostile tag: $v',
+        );
+      }
+    });
+
+    test('ordinary versions still pass', () {
+      expect(ReleaseChecker.isValidVersion('0.2.0'), isTrue);
+      expect(ReleaseChecker.isValidVersion('10.20.30'), isTrue);
+      expect(ReleaseChecker.isValidVersion('1.0.0-rc.1'), isTrue);
+      expect(ReleaseChecker.isValidVersion('1.0.0-beta-2'), isTrue);
+      // The shape must be complete: no two-part or four-part versions.
+      expect(ReleaseChecker.isValidVersion('0.2'), isFalse);
+      expect(ReleaseChecker.isValidVersion('0.2.0.1'), isFalse);
+      expect(ReleaseChecker.isValidVersion(''), isFalse);
     });
   });
 

@@ -214,9 +214,12 @@ class TrayController with TrayListener {
       case 'update':
         // Same action the banner's button takes for the current stage.
         final installer = _container.read(updateStageProvider.notifier);
+        final supported = await _container.read(
+          updateInstallSupportedProvider.future,
+        );
         if (_updateStage is UpdateReady) {
           await installer.installAndRestart();
-        } else if (installer.installSupported && _updateStage is UpdateIdle) {
+        } else if (supported && _updateStage is UpdateIdle) {
           await installer.start();
         } else {
           await _container

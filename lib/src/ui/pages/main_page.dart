@@ -271,10 +271,12 @@ class _UpdateBanner extends ConsumerWidget {
     final availability = ref.read(updateAvailabilityProvider.notifier);
     final installer = ref.read(updateStageProvider.notifier);
     final stage = ref.watch(updateStageProvider);
+    final supported =
+        ref.watch(updateInstallSupportedProvider).valueOrNull ?? false;
     final spec = updateBannerSpec(
       stage: stage,
       version: pending.version,
-      installSupported: installer.installSupported,
+      installSupported: supported,
     );
 
     void run(UpdateBannerAction a) {
@@ -282,7 +284,7 @@ class _UpdateBanner extends ConsumerWidget {
         case UpdateBannerAction.update:
           // The one branch that keeps the old behaviour alive: with no
           // swappable install root we still send the user to the release page.
-          if (installer.installSupported) {
+          if (supported) {
             installer.start(pending);
           } else {
             availability.openReleasePage();

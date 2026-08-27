@@ -59,25 +59,32 @@ UpdateBannerSpec updateBannerSpec({
         progress: progress,
         indeterminate: progress == null,
       );
+    // No Cancel: the unpack is a child process we cannot interrupt cleanly,
+    // and deleting its input mid-run is worse than letting it finish.
     case UpdateVerifying():
       return UpdateBannerSpec(
         severity: KwaaiStatusSeverity.info,
         message: 'Verifying KwaaiNet $version…',
-        actions: const [UpdateBannerAction.cancel],
+        actions: const [],
         indeterminate: true,
       );
-    case UpdateReady():
+    // Deliberately the *staged* version, not the newest detected: a newer
+    // release can land while one is already prepared, and a restart would
+    // install the staged one.
+    case UpdateReady(version: final staged):
       return UpdateBannerSpec(
         severity: KwaaiStatusSeverity.info,
-        message: 'KwaaiNet $version is ready to install.',
+        message: 'KwaaiNet $staged is ready to install.',
         actions: const [UpdateBannerAction.restart, UpdateBannerAction.later],
       );
+    // Retry is only offered where an install could actually succeed;
+    // otherwise the release page is the only useful way forward.
     case UpdateFailed(:final message):
       return UpdateBannerSpec(
         severity: KwaaiStatusSeverity.warning,
         message: message,
-        actions: const [
-          UpdateBannerAction.retry,
+        actions: [
+          if (installSupported) UpdateBannerAction.retry,
           UpdateBannerAction.openReleasePage,
         ],
         dismissible: true,
@@ -102,7 +109,7 @@ String updateTrayLabel(UpdateStage stage, String version) => switch (stage) {
         ? '⬇️  Downloading update…'
         : '⬇️  Downloading update… ${(progress * 100).round()}%',
   UpdateVerifying() => '⬇️  Verifying update…',
-  UpdateReady() => '⬆️  Restart to update to $version',
+  UpdateReady(version: final staged) => '⬆️  Restart to update to $staged',
   UpdateFailed() => '⚠️  Update failed — open release page',
   UpdateIdle() => '⬆️  Update available: $version…',
 };

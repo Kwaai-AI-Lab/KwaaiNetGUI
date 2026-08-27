@@ -26,6 +26,15 @@ class UpdateInstallException implements Exception {
 
 String _sep(InstallKind kind) => kind == InstallKind.windowsDir ? '\\' : '/';
 
+/// Quotes [s] for /bin/sh. Single quotes take everything literally, so the
+/// only escape needed is for a quote itself. Install paths are local, but a
+/// directory named "Darren's Apps" would otherwise break the helper's syntax.
+String shQuote(String s) => "'${s.replaceAll("'", r"'\''")}'";
+
+/// Quotes [s] for a PowerShell single-quoted string, where '' is a literal
+/// quote and nothing else expands.
+String psQuote(String s) => "'${s.replaceAll("'", "''")}'";
+
 String _dirname(String path) {
   final i = path.lastIndexOf(RegExp(r'[/\\]'));
   if (i <= 0) return i == 0 ? path.substring(0, 1) : '.';
@@ -131,13 +140,21 @@ Future<Directory> extract(File archive, InstallRoot root, String version) async 
     case InstallKind.linuxDir:
       await _run('tar', ['-xzf', archive.path, '-C', stage.path]);
     case InstallKind.windowsDir:
-      await _run('powershell', [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        'Expand-Archive -Path "${archive.path}" -DestinationPath "$staged" -Force',
-      ]);
+      // Paths travel via the environment, never through the -Command string:
+      // PowerShell expands $(…) inside double quotes, so a hostile path there
+      // would execute during extract, before the user clicks anything.
+      await _run(
+        'powershell',
+        [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          r'Expand-Archive -LiteralPath $env:KW_ARCHIVE '
+              r'-DestinationPath $env:KW_STAGED -Force',
+        ],
+        environment: {'KW_ARCHIVE': archive.path, 'KW_STAGED': staged},
+      );
   }
 
   final dir = Directory(staged);
@@ -147,8 +164,13 @@ Future<Directory> extract(File archive, InstallRoot root, String version) async 
   return dir;
 }
 
-Future<void> _run(String exe, List<String> args, {bool check = true}) async {
-  final r = await Process.run(exe, args);
+Future<void> _run(
+  String exe,
+  List<String> args, {
+  bool check = true,
+  Map<String, String>? environment,
+}) async {
+  final r = await Process.run(exe, args, environment: environment);
   if (check && r.exitCode != 0) {
     throw UpdateInstallException(
       '$exe failed (${r.exitCode}): ${r.stderr.toString().trim()}',
@@ -157,10 +179,11 @@ Future<void> _run(String exe, List<String> args, {bool check = true}) async {
 }
 
 /// The relaunch command the helper runs once the new build is in place.
+/// Already quoted for its target shell — [swapScript] embeds it verbatim.
 String relaunchCommand(InstallRoot root) => switch (root.kind) {
-  InstallKind.macOsApp => 'open -n "${root.path}"',
-  InstallKind.linuxDir => '"${root.path}/kwaainet_gui"',
-  InstallKind.windowsDir => '${root.path}\\kwaainet_gui.exe',
+  InstallKind.macOsApp => 'open -n ${shQuote(root.path)}',
+  InstallKind.linuxDir => shQuote('${root.path}/kwaainet_gui'),
+  InstallKind.windowsDir => psQuote('${root.path}\\kwaainet_gui.exe'),
 };
 
 /// The detached swap helper's text. Pure — no I/O, no `Platform` reads — so
@@ -170,6 +193,10 @@ String relaunchCommand(InstallRoot root) => switch (root.kind) {
 /// exit, renames the live install aside to `.old`, moves the staged build in,
 /// and rolls back from `.old` if that fails. `.old` survives a failure for
 /// manual recovery, the same discipline as kwaai-cli's updater.rs.
+///
+/// Every path is quoted on embed. [version] is separately validated upstream
+/// (`ReleaseChecker.isValidVersion`) since it reaches these paths from a
+/// remote tag; the quoting here is defence in depth, not the primary guard.
 String swapScript({
   required int pid,
   required String target,
@@ -182,22 +209,25 @@ String swapScript({
     return '''
 \$ErrorActionPreference = 'Stop'
 Wait-Process -Id $pid -Timeout 120 -ErrorAction SilentlyContinue
-\$target = '$target'
-\$staged = '$staged'
-\$stage  = '$stage'
+# -ErrorAction above suppresses the timeout error, so the wait alone proves
+# nothing — check liveness explicitly rather than swapping under a live app.
+if (Get-Process -Id $pid -ErrorAction SilentlyContinue) { exit 1 }
+\$target = ${psQuote(target)}
+\$staged = ${psQuote(staged)}
+\$stage  = ${psQuote(stage)}
 \$old    = "\$target.old"
-if (Test-Path \$old) { Remove-Item -LiteralPath \$old -Recurse -Force }
+if (Test-Path -LiteralPath \$old) { Remove-Item -LiteralPath \$old -Recurse -Force }
 Move-Item -LiteralPath \$target -Destination \$old -Force
 try {
   Move-Item -LiteralPath \$staged -Destination \$target -Force
 } catch {
-  if (Test-Path \$target) { Remove-Item -LiteralPath \$target -Recurse -Force }
+  if (Test-Path -LiteralPath \$target) { Remove-Item -LiteralPath \$target -Recurse -Force }
   Move-Item -LiteralPath \$old -Destination \$target -Force
   exit 1
 }
 Remove-Item -LiteralPath \$old -Recurse -Force
-if (Test-Path \$stage) { Remove-Item -LiteralPath \$stage -Recurse -Force }
-Start-Process '$relaunch'
+if (Test-Path -LiteralPath \$stage) { Remove-Item -LiteralPath \$stage -Recurse -Force }
+Start-Process $relaunch
 ''';
   }
 
@@ -207,7 +237,7 @@ Start-Process '$relaunch'
   return '''
 #!/bin/sh
 # Bounded wait (~120 s) for the app to exit; a wedged process must not leave
-# this helper spinning forever.
+# this helper spinning, and must never let it swap under a live app.
 i=0
 while kill -0 $pid 2>/dev/null; do
   i=\$((i+1))
@@ -215,9 +245,9 @@ while kill -0 $pid 2>/dev/null; do
   sleep 0.5
 done
 
-TARGET='$target'
-STAGED='$staged'
-STAGE='$stage'
+TARGET=${shQuote(target)}
+STAGED=${shQuote(staged)}
+STAGE=${shQuote(stage)}
 
 rm -rf "\$TARGET.old"
 mv "\$TARGET" "\$TARGET.old" || exit 1

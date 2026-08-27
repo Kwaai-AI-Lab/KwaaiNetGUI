@@ -112,6 +112,8 @@ class ReleaseChecker {
       if (body is! Map) return null;
       final tag = body['tag_name'];
       if (tag is! String || tag.isEmpty) return null;
+      // Fail closed: an unparseable tag means no update is offered at all.
+      if (!isValidVersion(normalizeVersion(tag))) return null;
       final url = body['html_url'];
       return ReleaseInfo(
         version: normalizeVersion(tag),
@@ -167,6 +169,15 @@ class ReleaseChecker {
     if (Platform.isLinux) return 'linux';
     return '';
   }
+
+  /// A release version we are willing to put in a filesystem path or a shell
+  /// script. The tag is attacker-controlled if the GitHub account is ever
+  /// compromised, so anything outside this shape is refused outright rather
+  /// than escaped: no quotes, no `$`, no path separators, no `..`.
+  static final _versionRe = RegExp(r'^\d+\.\d+\.\d+(-[A-Za-z0-9.-]+)?$');
+
+  /// True when [v] (already normalized) is a version safe to interpolate.
+  static bool isValidVersion(String v) => _versionRe.hasMatch(v);
 
   /// Strips a leading "v" and surrounding whitespace: "v0.1.3" → "0.1.3".
   static String normalizeVersion(String v) {

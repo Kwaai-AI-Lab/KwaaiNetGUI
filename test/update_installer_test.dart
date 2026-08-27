@@ -160,18 +160,28 @@ void main() {
         target: r'C:\Program Files\KwaaiNet',
         staged: r'C:\Program Files\.kwaainet-update-0.3.0\app',
         stage: r'C:\Program Files\.kwaainet-update-0.3.0',
-        relaunch: r'C:\Program Files\KwaaiNet\kwaainet_gui.exe',
+        relaunch: relaunchCommand(
+          const InstallRoot(
+            path: "C:" r"\Program Files\KwaaiNet",
+            kind: InstallKind.windowsDir,
+          ),
+        ),
         kind: InstallKind.windowsDir,
       );
       expect(s, contains('Wait-Process -Id 99 -Timeout 120'));
+      // -ErrorAction SilentlyContinue swallows the timeout, so the wait alone
+      // proves nothing — liveness must be checked explicitly.
+      expect(
+        s,
+        contains(
+          'if (Get-Process -Id 99 -ErrorAction SilentlyContinue) { exit 1 }',
+        ),
+      );
       expect(s, contains(r'Move-Item -LiteralPath $target -Destination $old'));
       expect(s, contains('} catch {'));
       expect(s, contains(r'Move-Item -LiteralPath $old -Destination $target'));
       expect(s, contains('exit 1'));
-      expect(
-        s,
-        contains(r"Start-Process 'C:\Program Files\KwaaiNet\kwaainet_gui.exe'"),
-      );
+      expect(s, contains("Start-Process 'C:" r"\Program Files\KwaaiNet\kwaainet_gui.exe'"));
       // Rollback must precede the success-path cleanup of .old.
       expect(
         s.indexOf('} catch {'),
@@ -180,8 +190,67 @@ void main() {
     });
   });
 
+  group('quoting on embed', () {
+    test('sh: a path with a quote is escaped, not interpolated raw', () {
+      final s = swapScript(
+        pid: 1,
+        target: "/Users/me/Darren's Apps/KwaaiNet.app",
+        staged: "/Users/me/Darren's Apps/.kwaainet-update-0.3.0/KwaaiNet.app",
+        stage: "/Users/me/Darren's Apps/.kwaainet-update-0.3.0",
+        relaunch: 'open -n x',
+        kind: InstallKind.macOsApp,
+      );
+      // '\'' is the sh idiom for a literal quote inside single quotes.
+      expect(s, contains(r"TARGET='/Users/me/Darren'\''s Apps/KwaaiNet.app'"));
+      expect(s, isNot(contains("TARGET='/Users/me/Darren's Apps")));
+    });
+
+    test('sh: shell metacharacters in a path stay inert', () {
+      final s = swapScript(
+        pid: 1,
+        target: r'/tmp/a$(id)/App',
+        staged: '/tmp/x',
+        stage: '/tmp/s',
+        relaunch: ':',
+        kind: InstallKind.linuxDir,
+      );
+      // Single-quoted, so $(id) is literal text to sh.
+      expect(s, contains(r"TARGET='/tmp/a$(id)/App'"));
+    });
+
+    test('PowerShell: a quote is doubled', () {
+      final s = swapScript(
+        pid: 1,
+        target: "C:" r"\Users\Darren's Apps\KwaaiNet",
+        staged: r'C:\s\app',
+        stage: r'C:\s',
+        relaunch: 'x',
+        kind: InstallKind.windowsDir,
+      );
+      expect(s, contains(r"$target = 'C:\Users\Darren''s Apps\KwaaiNet'"));
+    });
+
+    test('relaunchCommand quotes the path it embeds', () {
+      expect(
+        relaunchCommand(
+          const InstallRoot(
+            path: "/Apps/Darren's/KwaaiNet.app",
+            kind: InstallKind.macOsApp,
+          ),
+        ),
+        r"open -n '/Apps/Darren'\''s/KwaaiNet.app'",
+      );
+    });
+
+    test('shQuote / psQuote', () {
+      expect(shQuote('plain'), "'plain'");
+      expect(shQuote("it's"), r"'it'\''s'");
+      expect(psQuote("it's"), "'it''s'");
+    });
+  });
+
   group('relaunchCommand', () {
-    test('per platform', () {
+    test('per platform, always quoted', () {
       expect(
         relaunchCommand(
           const InstallRoot(
@@ -189,22 +258,22 @@ void main() {
             kind: InstallKind.macOsApp,
           ),
         ),
-        'open -n "/Applications/KwaaiNet.app"',
+        "open -n '/Applications/KwaaiNet.app'",
       );
       expect(
         relaunchCommand(
           const InstallRoot(path: '/opt/kwaainet', kind: InstallKind.linuxDir),
         ),
-        '"/opt/kwaainet/kwaainet_gui"',
+        "'/opt/kwaainet/kwaainet_gui'",
       );
       expect(
         relaunchCommand(
           const InstallRoot(
-            path: r'C:\KwaaiNet',
+            path: "C:" r"\KwaaiNet",
             kind: InstallKind.windowsDir,
           ),
         ),
-        r'C:\KwaaiNet\kwaainet_gui.exe',
+        "'C:" r"\KwaaiNet\kwaainet_gui.exe'",
       );
     });
   });

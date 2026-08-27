@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -94,5 +95,35 @@ void main() {
     );
     expect(await dest().exists(), isFalse);
     expect(await part().exists(), isFalse);
+  });
+  test('cancelling the subscription deletes the partial', () async {
+    // The cleanup lives in a finally, not a catch: a cancelled subscription
+    // unwinds the generator without raising, so a catch would leak the .part.
+    final chunks = StreamController<List<int>>();
+    final dl = UpdateDownloader(
+      client: MockClient.streaming((req, _) async {
+        return http.StreamedResponse(chunks.stream, 200, contentLength: 1000);
+      }),
+    );
+
+    final started = Completer<void>();
+    final sub = dl.download(_asset(_digest), dest: dest()).listen((_) {
+      if (!started.isCompleted) started.complete();
+    });
+
+    chunks.add(_bytes);
+    await started.future;
+    expect(await part().exists(), isTrue, reason: 'partial exists mid-flight');
+
+    // Cancellation of an async* generator is delivered at its next yield, so
+    // one more chunk is what lets it unwind — hence cancel() is not awaited
+    // in the controller either.
+    final cancelled = sub.cancel();
+    chunks.add(_bytes);
+    await cancelled.timeout(const Duration(seconds: 5));
+    await chunks.close();
+
+    expect(await part().exists(), isFalse);
+    expect(await dest().exists(), isFalse);
   });
 }
