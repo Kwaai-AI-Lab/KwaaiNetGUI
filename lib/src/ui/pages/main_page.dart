@@ -12,6 +12,7 @@ import '../../update/release_checker.dart';
 import '../../update/update_banner_spec.dart';
 import '../../update/update_controller.dart';
 import '../../window/window_focus.dart';
+import '../../window/window_restore.dart';
 import '../theme/kwaai_theme.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/branded_title.dart';
@@ -70,8 +71,19 @@ class _MainPageState extends ConsumerState<MainPage> {
     );
   }
 
+  /// The tray's left click asks for "the window, at chat" — so drop anything
+  /// pushed over this page (Settings) and select the first tab.
+  void _onOpenAtChat() {
+    if (!mounted) return;
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    setState(() => _selectedTab = 0);
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Registered once and kept across rebuilds; MainPage stays mounted under
+    // a pushed Settings route, so the request still lands there.
+    ref.listen<int>(openAtChatProvider, (_, _) => _onOpenAtChat());
     final tabs = _visibleTabs(ref);
     // Clamp selection in case the user just turned off the tab they
     // were on (e.g. disabled Local chat from Settings).

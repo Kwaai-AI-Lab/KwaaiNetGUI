@@ -26,18 +26,21 @@ void main() {
       expect(s.dismissible, isFalse);
     });
 
-    test('an unsupported install root looks identical — only Update differs', () {
-      // The button's behaviour (browser vs. install) is the widget's branch;
-      // the banner itself must not change shape.
-      expect(
-        spec(const UpdateIdle(), supported: false).actions,
-        spec(const UpdateIdle()).actions,
-      );
-      expect(
-        spec(const UpdateIdle(), supported: false).message,
-        spec(const UpdateIdle()).message,
-      );
-    });
+    test(
+      'an unsupported install root looks identical — only Update differs',
+      () {
+        // The button's behaviour (browser vs. install) is the widget's branch;
+        // the banner itself must not change shape.
+        expect(
+          spec(const UpdateIdle(), supported: false).actions,
+          spec(const UpdateIdle()).actions,
+        );
+        expect(
+          spec(const UpdateIdle(), supported: false).message,
+          spec(const UpdateIdle()).message,
+        );
+      },
+    );
 
     test('downloading shows a percentage and a determinate bar', () {
       final s = spec(const UpdateDownloading(0.42));
@@ -82,6 +85,7 @@ void main() {
             stagePath: '/s',
           ),
           '0.4.0',
+          installSupported: true,
         ),
         '⬆️  Restart to update to 0.3.0',
       );
@@ -96,10 +100,7 @@ void main() {
         ),
       );
       expect(s.message, 'KwaaiNet 0.3.0 is ready to install.');
-      expect(s.actions, [
-        UpdateBannerAction.restart,
-        UpdateBannerAction.later,
-      ]);
+      expect(s.actions, [UpdateBannerAction.restart, UpdateBannerAction.later]);
     });
 
     test('failed is a dismissible warning with a browser fallback', () {
@@ -143,7 +144,11 @@ void main() {
     });
 
     test('idle with a pending release offers Download when auto is off', () {
-      final s = panel(const UpdateIdle(), pending: '0.3.0', autoDownload: false);
+      final s = panel(
+        const UpdateIdle(),
+        pending: '0.3.0',
+        autoDownload: false,
+      );
       expect(s.message, 'KwaaiNet 0.3.0 is available.');
       expect(s.actions, [UpdateBannerAction.update]);
     });
@@ -157,11 +162,7 @@ void main() {
     test('...unless nothing would pick it up, which must not dead-end', () {
       // Auto-download declines silently on an uninstallable root, so without
       // this the user would be left with an offer and no way to act on it.
-      final s = panel(
-        const UpdateIdle(),
-        pending: '0.3.0',
-        supported: false,
-      );
+      final s = panel(const UpdateIdle(), pending: '0.3.0', supported: false);
       expect(s.actions, [UpdateBannerAction.update]);
     });
 
@@ -248,11 +249,21 @@ void main() {
   group('tray label', () {
     test('follows the same stage', () {
       expect(
-        updateTrayLabel(const UpdateIdle(), '0.3.0'),
+        updateTrayLabel(const UpdateIdle(), '0.3.0', installSupported: true),
+        '⬆️  Update to 0.3.0 and restart',
+      );
+      // Without an installable root the click only opens the release page,
+      // so the label must not promise a restart.
+      expect(
+        updateTrayLabel(const UpdateIdle(), '0.3.0', installSupported: false),
         '⬆️  Update available: 0.3.0…',
       );
       expect(
-        updateTrayLabel(const UpdateDownloading(0.42), '0.3.0'),
+        updateTrayLabel(
+          const UpdateDownloading(0.42),
+          '0.3.0',
+          installSupported: true,
+        ),
         '⬇️  Downloading update… 42%',
       );
       expect(
@@ -263,6 +274,7 @@ void main() {
             stagePath: '/s',
           ),
           '0.3.0',
+          installSupported: true,
         ),
         '⬆️  Restart to update to 0.3.0',
       );

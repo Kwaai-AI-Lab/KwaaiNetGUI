@@ -4,15 +4,14 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:tray_manager/tray_manager.dart';
-import 'package:window_manager/window_manager.dart';
 
 import '../daemon/daemon_state.dart';
 import '../daemon/status_watcher.dart';
 import '../update/release_checker.dart';
 import '../update/update_banner_spec.dart';
 import '../update/update_controller.dart';
-import '../window/dock_icon.dart';
 import '../window/shutdown.dart';
+import '../window/window_restore.dart';
 
 enum TrayState { running, stopped, starting, stopping, error }
 
@@ -44,10 +43,12 @@ class TrayController with TrayListener {
   bool _enabled = false;
   ReleaseInfo? _pendingUpdate;
   UpdateStage _updateStage = const UpdateIdle();
+  bool _installSupported = false;
   ProviderSubscription<AsyncValue<NodeStatus>>? _statusSub;
   ProviderSubscription<DaemonTransition>? _transitionSub;
   ProviderSubscription<ReleaseInfo?>? _updateSub;
   ProviderSubscription<UpdateStage>? _updateStageSub;
+  ProviderSubscription<AsyncValue<bool>>? _installSupportedSub;
 
   /// True when the tray icon is currently installed in the menu bar.
   bool get enabled => _enabled;
@@ -106,6 +107,16 @@ class TrayController with TrayListener {
       _updateStage = next;
       _rebuildMenu();
     }, fireImmediately: true);
+    // Decides whether the item offers a real in-place update or falls back to
+    // the release page, so the label never promises a restart we can't do.
+    _installSupportedSub = _container.listen<AsyncValue<bool>>(
+      updateInstallSupportedProvider,
+      (_, next) {
+        _installSupported = next.valueOrNull ?? false;
+        _rebuildMenu();
+      },
+      fireImmediately: true,
+    );
 
     await _rebuildMenu();
   }
@@ -165,7 +176,11 @@ class TrayController with TrayListener {
           if (update != null) ...[
             MenuItem(
               key: 'update',
-              label: updateTrayLabel(_updateStage, update.version),
+              label: updateTrayLabel(
+                _updateStage,
+                update.version,
+                installSupported: _installSupported,
+              ),
               disabled: updateTrayItemDisabled(_updateStage),
             ),
             MenuItem.separator(),
@@ -195,10 +210,13 @@ class TrayController with TrayListener {
     stderr.writeln('[tray] $msg');
   }
 
+  // Left click opens the window; the menu belongs to the right button.
+  // Linux is unaffected either way: AppIndicator delivers no icon events and
+  // shows the context menu itself.
   @override
   void onTrayIconMouseDown() {
-    _log('icon mouseDown → popping menu');
-    trayManager.popUpContextMenu();
+    _log('icon mouseDown → opening window');
+    openMainWindowAtChat(_container);
   }
 
   @override
@@ -212,7 +230,10 @@ class TrayController with TrayListener {
     _log('menu click: key=${menuItem.key}');
     switch (menuItem.key) {
       case 'update':
-        // Same action the banner's button takes for the current stage.
+        // One click does the whole thing — download, stage, restart into the
+        // new build — which is what the label promises. The banner keeps its
+        // two-step flow; this is the surface for a user who never opens the
+        // window.
         final installer = _container.read(updateStageProvider.notifier);
         final supported = await _container.read(
           updateInstallSupportedProvider.future,
@@ -221,6 +242,11 @@ class TrayController with TrayListener {
           await installer.installAndRestart();
         } else if (supported && _updateStage is UpdateIdle) {
           await installer.start();
+          // start() leaves the stage on Ready only when staging succeeded;
+          // a failure surfaces in the menu label instead of restarting.
+          if (_container.read(updateStageProvider) is UpdateReady) {
+            await installer.installAndRestart();
+          }
         } else {
           await _container
               .read(updateAvailabilityProvider.notifier)
@@ -236,17 +262,7 @@ class TrayController with TrayListener {
         await _container.read(daemonTransitionProvider.notifier).stop();
         break;
       case 'show':
-        // The window may be hidden to tray and the Dock icon may be hidden
-        // too (activation policy = .accessory). Restore both.
-        try {
-          await DockIcon.setVisible(true);
-          await windowManager.setSkipTaskbar(false);
-          await windowManager.show();
-          await windowManager.focus();
-          _log('window restored');
-        } catch (e, st) {
-          _log('show window failed: $e\n$st');
-        }
+        await openMainWindowAtChat(_container);
         break;
       case 'quit':
         _log('quit → performQuit');
@@ -266,10 +282,12 @@ class TrayController with TrayListener {
     _transitionSub?.close();
     _updateSub?.close();
     _updateStageSub?.close();
+    _installSupportedSub?.close();
     _statusSub = null;
     _transitionSub = null;
     _updateSub = null;
     _updateStageSub = null;
+    _installSupportedSub = null;
     trayManager.removeListener(this);
     await trayManager.destroy();
     _enabled = false;

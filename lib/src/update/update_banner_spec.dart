@@ -158,7 +158,15 @@ bool showUpdateBanner(UpdateStage stage) =>
     stage is! UpdateDownloading && stage is! UpdateVerifying;
 
 /// Label for the tray's update item, following the same stage.
-String updateTrayLabel(UpdateStage stage, String version) => switch (stage) {
+///
+/// The idle label states the restart because the tray item does the whole
+/// job in one click; without an installable root it can only open the
+/// release page, so it says less.
+String updateTrayLabel(
+  UpdateStage stage,
+  String version, {
+  required bool installSupported,
+}) => switch (stage) {
   UpdateDownloading(:final progress) =>
     progress == null
         ? '⬇️  Downloading update…'
@@ -166,7 +174,10 @@ String updateTrayLabel(UpdateStage stage, String version) => switch (stage) {
   UpdateVerifying() => '⬇️  Verifying update…',
   UpdateReady(version: final staged) => '⬆️  Restart to update to $staged',
   UpdateFailed() => '⚠️  Update failed — open release page',
-  UpdateIdle() => '⬆️  Update available: $version…',
+  UpdateIdle() =>
+    installSupported
+        ? '⬆️  Update to $version and restart'
+        : '⬆️  Update available: $version…',
 };
 
 /// The tray item is inert while work is in flight.
