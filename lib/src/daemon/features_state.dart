@@ -152,6 +152,7 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
         s.publicIp != onDisk.publicIp ||
         !_listsEqual(s.initialPeers, onDisk.initialPeers) ||
         s.forcePrivate != onDisk.forcePrivate ||
+        s.enableUpnp != onDisk.enableUpnp ||
         s.healthEnabled != onDisk.healthEnabled ||
         s.healthEndpoint != onDisk.healthEndpoint;
   }

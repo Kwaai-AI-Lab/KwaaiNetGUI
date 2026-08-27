@@ -36,8 +36,6 @@ const Color kUnselectedFill = Color(0xFFEFEFEF);
 /// whether Apply should be enabled — keeping the dirty computation in
 /// one place avoids per-tab post-frame publishes racing across the
 /// IndexedStack (which builds every tab even when offscreen).
-final _activeTabProvider = StateProvider<int>((_) => 0);
-
 /// Fill color for *selected* controls when the app window is not focused —
 /// the accent tint desaturates to gray, matching native macOS behaviour.
 const Color kSelectedUnfocusedFill = Color(0xFFD4D4D4);
@@ -69,17 +67,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   void _onSelectTab(int i) {
     setState(() => _selectedTab = i);
-    ref.read(_activeTabProvider.notifier).state = i;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    // Seed the active-tab provider so _RestartNeededBar can compute
-    // dirty against the right tab on first paint.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(_activeTabProvider.notifier).state = _selectedTab;
-    });
   }
 
   Widget _buildStatusTab() {
@@ -1277,7 +1264,15 @@ class _ContributeTab extends ConsumerWidget {
 /// Persist the draft to config.yaml + flag restart-needed + refresh the
 /// on-disk snapshot provider. Shared by the Contribute and Network tabs.
 Future<void> _applyDraft(WidgetRef ref) async {
-  await ref.read(featuresDraftProvider.notifier).apply();
+  try {
+    await ref.read(featuresDraftProvider.notifier).apply();
+  } catch (e) {
+    // A failed write must not look like a clean apply: surface it in the
+    // same bar instead of marking restart-needed for a config that never
+    // changed.
+    ref.read(daemonErrorProvider.notifier).set('Could not save config: $e');
+    return;
+  }
   ref.read(restartNeededProvider.notifier).mark();
   ref.invalidate(featuresProvider);
 }
@@ -1333,39 +1328,6 @@ class _NetworkTab extends ConsumerWidget {
         );
       },
     );
-  }
-}
-
-/// Equality check for the initial-peers list. Used by both the Network
-/// tab's dirty calc and `featuresDraftProvider.isDirty`.
-bool _peersEqual(List<String> a, List<String> b) {
-  if (a.length != b.length) return false;
-  for (var i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) return false;
-  }
-  return true;
-}
-
-/// Per-tab dirty check. Only the fields that the given tab actually
-/// edits count — so unsaved edits on Network don't show Apply when the
-/// user is on Contribute (and vice versa).
-bool _tabDirty(int tab, ConfigSnapshot draft, ConfigSnapshot snapshot) {
-  switch (tab) {
-    case 3: // Contribute
-      return draft.model != snapshot.model ||
-          draft.shardingEnabled != snapshot.shardingEnabled ||
-          draft.storageEnabled != snapshot.storageEnabled ||
-          draft.storageCapacityGb != snapshot.storageCapacityGb;
-    case 4: // Network
-      return draft.port != snapshot.port ||
-          draft.publicIp != snapshot.publicIp ||
-          !_peersEqual(draft.initialPeers, snapshot.initialPeers) ||
-          draft.forcePrivate != snapshot.forcePrivate ||
-          draft.enableUpnp != snapshot.enableUpnp ||
-          draft.healthEnabled != snapshot.healthEnabled ||
-          draft.healthEndpoint != snapshot.healthEndpoint;
-    default:
-      return false;
   }
 }
 
@@ -1925,17 +1887,17 @@ class _RestartNeededBar extends ConsumerWidget {
     final transition = ref.watch(daemonTransitionProvider);
     final busy = transition != DaemonTransition.none;
 
-    // Compute dirty here against the currently-active tab + the latest
-    // snapshot + draft. Doing it in the bar (rather than having tabs
-    // publish via a provider) avoids the IndexedStack race where every
-    // tab's post-frame callback would fight to set the dirty bit.
-    final activeTab = ref.watch(_activeTabProvider);
+    // Dirty is the whole draft vs disk, not just the active tab's fields:
+    // Apply must follow the user across tabs, or an unsaved toggle is
+    // silently abandoned the moment they navigate away. (A per-tab check
+    // also kept a hardcoded tab index that drifted when tabs were
+    // inserted, leaving Network unappliable.)
     final snapshot = ref.watch(featuresProvider).valueOrNull;
     final draft = ref.watch(featuresDraftProvider);
     final dirty =
         snapshot != null &&
         draft != null &&
-        _tabDirty(activeTab, draft, snapshot);
+        ref.read(featuresDraftProvider.notifier).isDirty(snapshot);
 
     if (needsRestart && !running) {
       // Restart prompt only makes sense when the service is running —
