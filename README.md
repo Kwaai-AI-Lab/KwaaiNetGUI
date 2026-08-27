@@ -55,6 +55,17 @@ box — no separate install needed. Open the app, and it starts a node for you.
 > - **macOS** — unzip, then **right-click `KwaaiNet.app` → Open** and click
 >   **Open** in the dialog (a plain double-click will be blocked). Or allow it
 >   under System Settings → Privacy & Security → **Open Anyway**.
+>
+>   Unzip to a fresh folder rather than overwriting an older copy in place. An
+>   unsigned app is run from a randomised read-only copy (macOS "app
+>   translocation"), and replacing a bundle underneath that leaves macOS
+>   looking for the previous version's files — it reports
+>   `No such file or directory` and refuses to launch. If that happens, clear
+>   the download flag and open it again:
+>
+>   ```bash
+>   xattr -dr com.apple.quarantine /path/to/KwaaiNet.app
+>   ```
 > - **Windows** — unzip and run `kwaainet_gui.exe`. If SmartScreen appears,
 >   click **More info → Run anyway**.
 > - **Linux** — extract and run `./kwaainet_gui` from the extracted folder.
