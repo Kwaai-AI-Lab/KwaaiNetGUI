@@ -1,9 +1,38 @@
 # KwaaiNet GUI
 
-A desktop app for [KwaaiNet](https://github.com/Kwaai-AI-Lab/KwaaiNet) — the
-distributed inference network. Chat with models running across the network,
-contribute your machine to the mesh, and control the `kwaainet` node from a
-menu-bar tray. Runs on **macOS, Linux, and Windows**.
+**Chat with AI that runs on a network of people's computers — then lend yours
+to the mesh.**
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/chat-darkmode.png">
+    <img src="docs/screenshots/chat.png" alt="KwaaiNet chat window answering a question" width="720">
+  </picture>
+</p>
+
+KwaaiNet GUI is the desktop app for
+[KwaaiNet](https://github.com/Kwaai-AI-Lab/KwaaiNet), a peer-to-peer network
+that serves large language models from ordinary machines instead of a
+datacenter. Each peer hosts a slice of the model; your prompt flows through
+them and the answer streams back. No cloud account, no API key, no GPU farm.
+
+Open the app and you're on the network:
+
+- **Chat immediately.** The app bundles and starts a KwaaiNet node for you,
+  then lives quietly in your menu bar / system tray.
+- **See the mesh working.** A live peer table shows who you're connected to,
+  direct vs. relayed routes, and latency — and a block map shows exactly which
+  peers are serving which slices of the model. Even from behind NAT, with no
+  port forwarding, hole punching and relays keep you reachable.
+- **Contribute when you're ready.** Serve model blocks or distributed storage
+  from your own machine with a couple of clicks — the same app is both client
+  and node.
+
+| Model coverage, block by block | Live peers — even behind NAT |
+| :---: | :---: |
+| ![Sharding tab showing full model coverage across 8 peers](docs/screenshots/settings-sharding.png) | ![Peers tab showing direct and relayed connections with latency](docs/screenshots/settings-peers.png) |
+
+Runs on **macOS, Linux, and Windows**.
 
 ## Download
 
