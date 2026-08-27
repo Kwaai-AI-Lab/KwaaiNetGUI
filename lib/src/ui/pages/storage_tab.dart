@@ -125,14 +125,15 @@ class _StorageTabState extends ConsumerState<StorageTab> {
       );
     }
 
-    // Filtering happens once, here: the cylinder and the table read the
-    // same list so the two halves can never disagree about what is shown.
+    // Filtering and ordering happen once, here: the cylinder and the
+    // table read the same list so the two halves can never disagree
+    // about what is shown.
     final tier = _tierFilter;
-    final peers = tier == null
-        ? update.peers
-        : update.peers
-              .where((p) => p.trustTier == tier.wire)
-              .toList(growable: false);
+    final peers = orderStoragePeers(
+      tier == null
+          ? update.peers
+          : update.peers.where((p) => p.trustTier == tier.wire),
+    );
 
     final totals = StorageTotals.of(peers);
 
@@ -350,6 +351,32 @@ FreeBand freeBandFor(List<pb.StoragePeer> peers, String? peerId) {
   }
   return FreeBand.none;
 }
+
+/// Orders the node list: reachable first, then those still being probed,
+/// then the unreachable. Capacity this daemon can actually use belongs at
+/// the top of the table and at the left of the cylinder.
+///
+/// Ties keep the daemon's own name-then-peer-id order rather than relying
+/// on the sort being stable, so a row only moves when its reachability
+/// does — the probe phase resolving is the one reshuffle the user sees.
+///
+/// Public so `test/storage_order_test.dart` can pin it.
+List<pb.StoragePeer> orderStoragePeers(Iterable<pb.StoragePeer> peers) {
+  final ordered = peers.toList();
+  ordered.sort((a, b) {
+    final byReach = _reachRank(a).compareTo(_reachRank(b));
+    if (byReach != 0) return byReach;
+    final byName = a.publicName.compareTo(b.publicName);
+    return byName != 0 ? byName : a.peerId.compareTo(b.peerId);
+  });
+  return ordered;
+}
+
+int _reachRank(pb.StoragePeer p) => switch (p.reachability) {
+  pb.StorageReachability.STORAGE_REACHABILITY_REACHABLE => 0,
+  pb.StorageReachability.STORAGE_REACHABILITY_UNREACHABLE => 2,
+  _ => 1,
+};
 
 /// Formats a GB figure the way the CLI does: one decimal place, and TB
 /// once the number would otherwise run to four digits.
