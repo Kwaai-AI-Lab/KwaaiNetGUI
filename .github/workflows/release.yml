@@ -38,7 +38,9 @@ jobs:
           - os: macos-latest
             target: macos
             kwaainet_asset: kwaainet-aarch64-apple-darwin.tar.xz
-            bundle_dir: build/macos/Build/Products/Release/KwaaiNet.app/Contents/MacOS
+            # Resources, not MacOS: the app executable there is `KwaaiNet`, and on
+            # case-insensitive APFS installing `kwaainet` beside it overwrites the app.
+            bundle_dir: build/macos/Build/Products/Release/KwaaiNet.app/Contents/Resources
             artifact_path: build/macos/Build/Products/Release/KwaaiNet.app
           - os: windows-latest
             target: windows
