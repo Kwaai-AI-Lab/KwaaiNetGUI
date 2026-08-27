@@ -911,12 +911,18 @@ class _DaemonSourcePickerState extends State<_DaemonSourcePicker> {
   }
 
   Future<void> _set(DaemonMode m) async {
+    if (m == widget.settings.mode) return;
     await widget.settings.setMode(m);
     widget.onChanged();
   }
 
   Future<void> _commitCustomPath(String path) async {
-    await widget.settings.setCustomPath(path.isEmpty ? null : path);
+    // onEditingComplete fires on every focus loss, edited or not — commit
+    // only a genuinely different path so merely tabbing out of the field
+    // doesn't prompt a restart.
+    final next = path.isEmpty ? null : path;
+    if (next == widget.settings.customPath) return;
+    await widget.settings.setCustomPath(next);
     widget.onChanged();
   }
 
@@ -1066,7 +1072,15 @@ class _RadioRow extends StatelessWidget {
     ).colorScheme.onSurface.withValues(alpha: 0.38);
     return InkWell(
       borderRadius: BorderRadius.circular(6),
-      onTap: enabled ? () => group?.onChanged(value) : null,
+      // The row is tappable anywhere, so it has to make the check the
+      // Radio itself makes: re-picking the active option is not a change,
+      // and firing onChanged would flag the setting dirty for nothing.
+      onTap: enabled
+          ? () {
+              if (group == null || group.groupValue == value) return;
+              group.onChanged(value);
+            }
+          : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Row(

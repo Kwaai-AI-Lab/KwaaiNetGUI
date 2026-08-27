@@ -75,8 +75,11 @@ class _KwaaiDropdownState<T> extends State<KwaaiDropdown<T>> {
   }
 
   void _select(T value) {
-    widget.onChanged?.call(value);
     _menuController.close();
+    // Re-picking the current item is not a change — callers use onChanged
+    // to flag a setting dirty.
+    if (value == widget.value) return;
+    widget.onChanged?.call(value);
   }
 
   /// Measured pixel width of the widest item label using the current
