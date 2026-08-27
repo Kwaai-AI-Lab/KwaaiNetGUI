@@ -64,8 +64,37 @@ class ChatTranscriptNotifier
       _sub?.cancel();
       _bumpTimer?.cancel();
     });
+    // Screenshot aid, not a user feature: seed a canned transcript so
+    // marketing captures don't depend on live inference.
+    if (Platform.environment['KWAAINET_SEED_CHAT'] == '1') {
+      return [
+        ChatMessage(
+          role: 'user',
+          text: 'Tell me about the universe. Give me some bullet points.',
+        ),
+        ChatMessage(role: 'assistant', text: _seedAnswer),
+      ];
+    }
     return [];
   }
+
+  static const _seedAnswer = '''
+What a vast and fascinating topic! Here are some bullet points about the universe:
+
+**The Big Picture:**
+
+* The universe is estimated to be around 13.8 billion years old.
+* It is thought to have begun as a single point, known as a singularity, and has been expanding ever since.
+* The universe is still expanding, with galaxies moving away from each other at incredible speeds.
+
+**The Structure of the Universe:**
+
+* The universe is made up of:
+\t+ **Ordinary matter** (about 5% of the universe): stars, planets, galaxies, etc.
+\t+ **Dark matter** (about 27% of the universe): invisible, non-luminous matter that affects the motion of galaxies.
+\t+ **Dark energy** (about 68% of the universe): a mysterious, invisible energy that drives the acceleration of the universe's expansion.
+* The universe is divided into:
+\t+ **Galaxies**: massive, gravitationally bound systems''';
 
   /// Send [prompt] and stream the response into a new assistant message.
   /// Returns when the stream completes.
