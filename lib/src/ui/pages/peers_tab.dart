@@ -172,6 +172,9 @@ class _PeersTabState extends ConsumerState<PeersTab> {
             self: update.hasSelfStatus() ? update.selfStatus : null,
             connectedCount: update.connected.length,
             routingCount: update.routing.length,
+            // Evidence, not capability: a live DCUtR-upgraded connection is
+            // proof a peer got through the NAT to us.
+            holePunched: update.connected.any((c) => c.dcutr),
             stale: stale,
             staleFor: staleFor,
           ),
@@ -312,6 +315,7 @@ class _SelfStatusHeader extends StatelessWidget {
     required this.self,
     required this.connectedCount,
     required this.routingCount,
+    required this.holePunched,
     required this.stale,
     required this.staleFor,
   });
@@ -319,6 +323,9 @@ class _SelfStatusHeader extends StatelessWidget {
   final pb.SelfStatus? self;
   final int connectedCount;
   final int routingCount;
+
+  /// Whether any live connection was upgraded by DCUtR.
+  final bool holePunched;
   final bool stale;
   final Duration? staleFor;
 
@@ -352,7 +359,8 @@ class _SelfStatusHeader extends StatelessWidget {
                 runSpacing: 6,
                 children: [
                   Text('This node', style: theme.textTheme.titleSmall),
-                  if (s != null) _ReachabilityBadge(self: s),
+                  if (s != null)
+                    _ReachabilityBadge(self: s, holePunched: holePunched),
                 ],
               ),
             ),
@@ -416,37 +424,88 @@ class _SelfStatusHeader extends StatelessWidget {
 /// "Unknown" is a real state, not a loading state: the node defers announcing
 /// while it holds, so showing it plainly matters more than hiding it behind a
 /// spinner.
+/// How the rest of the network reaches this node.
+///
+/// Two facts, in that order: whether we can be dialled from outside, and by
+/// what route peers actually get in. "Behind NAT" rather than the wire's
+/// "private", which reads as a privacy setting; AutoNAT cannot tell a NAT
+/// from a firewall, and for this purpose they are the same thing.
+///
+/// The second part reports evidence, never a prediction. Whether a peer can
+/// hole-punch to us is not knowable in advance — nothing in the snapshot says
+/// so, and DCUtR only reports success on a connection that has already been
+/// upgraded — so a held reservation is described as what it is, a reservation,
+/// rather than as relaying being the ceiling. It used to read "relayed", which
+/// claimed the degraded case for a node that simply had no punched connection
+/// live at that moment.
 class _ReachabilityBadge extends StatelessWidget {
-  const _ReachabilityBadge({required this.self});
+  const _ReachabilityBadge({required this.self, required this.holePunched});
 
   final pb.SelfStatus self;
+  final bool holePunched;
 
   @override
   Widget build(BuildContext context) {
     final kwaai = context.kwaai;
+    final public = self.reachability == 'public';
     final (label, color) = switch (self.reachability) {
       'public' => ('Public', kwaai.statusRunning),
-      'private' => ('Private', kwaai.semanticWarning),
+      'private' => ('Behind NAT', kwaai.semanticWarning),
       _ => ('Reachability unknown', kwaai.statusTransitioning),
     };
 
-    final parts = <String>[
-      label,
-      if (self.reachabilitySource.isNotEmpty) 'via ${self.reachabilitySource}',
-      if (self.usingRelay) 'relayed',
-    ];
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(4),
+    final (String? route, String hint) = switch ((
+      public,
+      holePunched,
+      self.usingRelay,
+    )) {
+      (true, _, _) => (
+        self.reachabilitySource.isEmpty
+            ? null
+            : 'via ${self.reachabilitySource}',
+        'Peers can dial this node directly.',
       ),
-      child: Text(
-        parts.join(' · '),
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w600,
+      (false, true, _) => (
+        'hole punched',
+        'Dial-back from outside fails, but a peer has since reached this '
+            'node directly through the NAT — introduced over a relay, then '
+            'upgraded by DCUtR.',
+      ),
+      (false, false, true) => (
+        'relay reserved',
+        'Dial-back from outside fails, so peers reach this node through a '
+            'relay circuit it holds a reservation on. Connections made that '
+            'way may then be upgraded to a direct path by DCUtR — whether '
+            'they are is only known once a peer connects, so this is not a '
+            'claim that relaying is the ceiling.',
+      ),
+      (false, false, false) => (
+        'outbound only',
+        'Not dialable from outside and holding no relay reservation, so '
+            'nothing can reach this node — it can only open connections '
+            'itself.',
+      ),
+    };
+
+    final parts = [label, ?route];
+
+    return Tooltip(
+      message: self.reachability == 'unknown' || self.reachability.isEmpty
+          ? 'No verdict yet: too few peers have reported an address and no '
+                'dial-back has completed. Announcing is deferred until then.'
+          : hint,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          parts.join(' · '),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
@@ -651,15 +710,30 @@ class _TableSectionState extends State<_TableSection> {
   /// routing table, which is exactly the symptom worth noticing.
   bool _showDhtClients = false;
 
+  /// Whether peers we know of but hold no connection to are listed.
+  ///
+  /// Off by default for the same reason: a routing table carries every peer
+  /// this node has ever learned an address for, and most of them are not part
+  /// of what it is doing right now. Hidden, the table answers "who am I
+  /// talking to"; shown, it answers "who could I talk to".
+  bool _showUnconnected = false;
+
   @override
   Widget build(BuildContext context) {
     final allRows = mergePeerRows(widget.connected, widget.routing);
     final clientRows = allRows.where((r) => r.isDhtClient).length;
-    // What the table is actually withholding — zero once they are shown.
-    final hiddenClients = _showDhtClients ? 0 : clientRows;
-    final rows = _showDhtClients
-        ? allRows
-        : allRows.where((r) => !r.isDhtClient).toList();
+    final unconnectedRows = allRows.where((r) => !r.isConnected).length;
+    final rows = allRows
+        .where(
+          (r) =>
+              (_showDhtClients || !r.isDhtClient) &&
+              (_showUnconnected || r.isConnected),
+        )
+        .toList();
+    // What the table is actually withholding — zero once everything is shown.
+    // Counted as a difference rather than summed per filter, which would
+    // double-count a row both of them hide.
+    final hidden = allRows.length - rows.length;
 
     // A selection can survive the filter hiding its row — keep the detail
     // panel honest by resolving against what is actually on screen.
@@ -672,22 +746,28 @@ class _TableSectionState extends State<_TableSection> {
       children: [
         _Caption(
           title: 'PEERS',
-          detail: _summary(rows, hiddenClients),
-          // On the caption row rather than its own band: the toggle changes
-          // what the summary counts, so keeping them together stops it
+          detail: _summary(rows, hidden),
+          // On the caption row rather than its own band: the toggles change
+          // what the summary counts, so keeping them together stops them
           // stealing a row of table height.
-          // Keyed off client rows existing at all, not off how many are
-          // hidden — otherwise checking the box would make the box vanish.
-          trailing: (clientRows > 0 || _showDhtClients)
-              ? _DhtClientToggle(
-                  value: _showDhtClients,
-                  onChanged: (v) => setState(() => _showDhtClients = v),
-                )
-              : null,
+          trailing: _Filters(
+            showDhtClients: _showDhtClients,
+            showUnconnected: _showUnconnected,
+            // Keyed off such rows existing at all, not off how many are
+            // hidden — otherwise checking a box would make it vanish.
+            clientRows: clientRows,
+            unconnectedRows: unconnectedRows,
+            onShowDhtClients: (v) => setState(() => _showDhtClients = v),
+            onShowUnconnected: (v) => setState(() => _showUnconnected = v),
+          ),
         ),
         Expanded(
           child: rows.isEmpty
-              ? const _EmptyRow(text: 'No peers known.')
+              ? _EmptyRow(
+                  text: hidden > 0
+                      ? 'No peers match these filters.'
+                      : 'No peers known.',
+                )
               : _PeerTable(
                   rows: rows,
                   selectedPeerId: widget.selectedPeerId,
@@ -722,14 +802,14 @@ class _TableSectionState extends State<_TableSection> {
     );
   }
 
-  String? _summary(List<PeerRow> rows, int hiddenClients) {
-    if (rows.isEmpty && hiddenClients == 0) return null;
+  String? _summary(List<PeerRow> rows, int hidden) {
+    if (rows.isEmpty && hidden == 0) return null;
     final live = rows.where((r) => r.isConnected).length;
     final dht = rows.where((r) => r.inRoutingTable).length;
     final summary = '$live connected · $dht in routing table';
     // Counts what the table is not showing. The table may legitimately be
     // empty while peers exist, so this has to be reported even then.
-    return hiddenClients > 0 ? '$summary · $hiddenClients hidden' : summary;
+    return hidden > 0 ? '$summary · $hidden hidden' : summary;
   }
 }
 
@@ -798,6 +878,15 @@ class PeerRow {
 
   /// Whether any connection to this peer was upgraded by DCUtR.
   bool get anyDcutr => connections.any((c) => c.dcutr);
+
+  /// Whether this peer both dialled us and was dialled by us.
+  ///
+  /// Worth a glance of its own: it means neither side is depending on the
+  /// other to be reachable. The row's arrow points both ways for it; which
+  /// connection went which way is in the panel below.
+  bool get bothDirections =>
+      connections.any((c) => c.direction == 'inbound') &&
+      connections.any((c) => c.direction == 'outbound');
 
   /// Whether this peer queries the DHT without serving it.
   ///
@@ -972,6 +1061,7 @@ class _PeerTable extends StatelessWidget {
                                 kind: r.primary!.kind,
                                 dcutr: r.anyDcutr,
                                 direction: r.primary!.direction,
+                                bothDirections: r.bothDirections,
                               ),
                       ),
                       DataCell(
@@ -1491,26 +1581,82 @@ class _ProtocolLinesState extends State<_ProtocolLines> {
 /// changed its width between states and made the control move as you clicked
 /// it. The count belongs in the caption summary, where the answer to "are
 /// there peers I'm not seeing?" is visible without touching anything.
-class _DhtClientToggle extends StatelessWidget {
-  const _DhtClientToggle({required this.value, required this.onChanged});
+/// The caption bar's filter checkboxes.
+///
+/// Each appears only once it has something to hide, so a small network is not
+/// asked about categories it does not have — but a box the user has ticked
+/// stays put, or unticking it would make it disappear.
+class _Filters extends StatelessWidget {
+  const _Filters({
+    required this.showDhtClients,
+    required this.showUnconnected,
+    required this.clientRows,
+    required this.unconnectedRows,
+    required this.onShowDhtClients,
+    required this.onShowUnconnected,
+  });
 
+  final bool showDhtClients;
+  final bool showUnconnected;
+  final int clientRows;
+  final int unconnectedRows;
+  final ValueChanged<bool> onShowDhtClients;
+  final ValueChanged<bool> onShowUnconnected;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      if (unconnectedRows > 0 || showUnconnected)
+        _FilterToggle(
+          label: 'Show unconnected',
+          tooltip:
+              'Peers in the DHT routing table this node holds no connection '
+              'to. Known addresses rather than live paths — worth showing '
+              'when you are asking who could be dialled, not who is.',
+          value: showUnconnected,
+          onChanged: onShowUnconnected,
+        ),
+      if ((unconnectedRows > 0 || showUnconnected) &&
+          (clientRows > 0 || showDhtClients))
+        const SizedBox(width: 10),
+      if (clientRows > 0 || showDhtClients)
+        _FilterToggle(
+          label: 'Show DHT clients',
+          tooltip:
+              'Peers that query the DHT without serving it. They are never '
+              'routing hops — typically hivemind/Python processes, or nodes '
+              'reachable only via a relay.',
+          value: showDhtClients,
+          onChanged: onShowDhtClients,
+        ),
+    ],
+  );
+}
+
+class _FilterToggle extends StatelessWidget {
+  const _FilterToggle({
+    required this.label,
+    required this.tooltip,
+    required this.value,
+    required this.onChanged,
+  });
+
+  /// Fixed text. The hidden count used to be appended to it, which changed
+  /// the width between states and shifted the checkbox as you toggled it. The
+  /// count lives in the caption summary instead, where it moves nothing.
+  final String label;
+
+  final String tooltip;
   final bool value;
   final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Fixed label. The hidden count used to be appended here, which changed
-    // the text width between states and shifted the checkbox as you toggled
-    // it. The count lives in the caption summary instead, where it does not
-    // move anything.
-    const label = 'Show DHT clients';
 
     return Tooltip(
-      message:
-          'Peers that query the DHT without serving it. They are never '
-          'routing hops — typically hivemind/Python processes, or nodes '
-          'reachable only via a relay.',
+      message: tooltip,
       // Whole control is the hit target, so the label toggles too — a bare
       // checkbox this small is a fussy thing to hit.
       child: InkWell(
@@ -1577,21 +1723,20 @@ class _Caption extends StatelessWidget {
           // summary to the right edge. The gap is fixed rather than flexible
           // so the control keeps its position as the summary text changes.
           if (trailing != null) ...[const SizedBox(width: 12), trailing!],
-          const Spacer(),
-          if (detail != null) ...[
-            // Flexible, not Expanded: the text takes only the width it needs
-            // so the Spacer above keeps it against the right edge, and it
-            // still shrinks with an ellipsis when the bar is too narrow.
-            Flexible(
-              child: Text(
-                detail!,
-                style: theme.textTheme.bodySmall,
-                softWrap: false,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.right,
-              ),
+          // Expanded, and no Spacer: a Spacer takes flex 1 and a Flexible
+          // text takes another, so the slack was split between them and the
+          // summary sat mid-bar. One flexible child claiming all of it, with
+          // the text aligned inside, puts it on the right edge — and it still
+          // ellipsises when the bar is too narrow.
+          Expanded(
+            child: Text(
+              detail ?? '',
+              style: theme.textTheme.bodySmall,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -1633,13 +1778,23 @@ class _EmptyRow extends StatelessWidget {
 /// "nothing works" and "hole punching is working". The mechanism is DCUtR;
 /// "p2p" is what it means to the reader.
 class _PathCell extends StatelessWidget {
-  const _PathCell({required this.kind, this.dcutr = false, this.direction});
+  const _PathCell({
+    required this.kind,
+    this.dcutr = false,
+    this.direction,
+    this.bothDirections = false,
+  });
 
   final pbenum.PeerConnKind kind;
   final bool dcutr;
 
   /// "inbound" / "outbound", or null when there is no connection to describe.
   final String? direction;
+
+  /// The peer holds connections both ways, so one arrow cannot describe it.
+  /// Only ever set on the collapsed row, which summarises every connection;
+  /// a row in the connections panel is a single path with a single direction.
+  final bool bothDirections;
 
   @override
   Widget build(BuildContext context) {
@@ -1661,7 +1816,11 @@ class _PathCell extends StatelessWidget {
           // while an inbound one is a peer reaching us through a relay we
           // hold a reservation with. Those are different facts about who is
           // behind what, so the arrow points either way here as well.
-          inbound ? Icons.arrow_back : Icons.arrow_forward,
+          bothDirections
+              ? Icons.swap_horiz
+              : inbound
+              ? Icons.arrow_back
+              : Icons.arrow_forward,
           size: 14,
           color: color,
         ),
