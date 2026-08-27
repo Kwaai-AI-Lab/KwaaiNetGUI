@@ -26,6 +26,7 @@ class Settings {
   static const _startOnStartupKey = 'daemon.startOnStartup';
   static const _localChatKey = 'dev.localChatEnabled';
   static const _skippedVersionKey = 'app.skippedVersion';
+  static const _autoDownloadKey = 'app.autoDownloadUpdates';
 
   final SharedPreferences _prefs;
 
@@ -57,6 +58,11 @@ class Settings {
   /// when nothing has been skipped.
   String? get skippedVersion => _prefs.getString(_skippedVersionKey);
 
+  /// When true, a detected update downloads and stages itself in the
+  /// background; the user is only asked to restart. When false nothing is
+  /// fetched until they click Update. Defaults to true.
+  bool get autoDownloadUpdates => _prefs.getBool(_autoDownloadKey) ?? true;
+
   Future<void> setMode(DaemonMode m) async {
     await _prefs.setString(_modeKey, _serialize(m));
   }
@@ -79,6 +85,10 @@ class Settings {
 
   Future<void> setLocalChatEnabled(bool v) async {
     await _prefs.setBool(_localChatKey, v);
+  }
+
+  Future<void> setAutoDownloadUpdates(bool v) async {
+    await _prefs.setBool(_autoDownloadKey, v);
   }
 
   Future<void> setSkippedVersion(String? v) async {
@@ -116,3 +126,9 @@ final localChatEnabledProvider = StateProvider<bool>((_) => false);
 /// provider so the banner disappears on the same frame. Null = nothing
 /// skipped.
 final skippedVersionProvider = StateProvider<String?>((_) => null);
+
+/// Riverpod-visible mirror of [Settings.autoDownloadUpdates]. The update
+/// controller reads this when a pending release appears to decide whether to
+/// start downloading on its own. Seeded by main.dart at startup; the Settings
+/// UI writes through to both.
+final autoDownloadUpdatesProvider = StateProvider<bool>((_) => true);
