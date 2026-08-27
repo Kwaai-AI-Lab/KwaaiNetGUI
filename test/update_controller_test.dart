@@ -16,16 +16,24 @@ const _root = InstallRoot(
   kind: InstallKind.macOsApp,
 );
 
+/// One asset per platform: `start` resolves the asset through
+/// [ReleaseChecker.currentPlatformKey], so a macOS-only release fails with
+/// "no download for this platform" on the Linux CI runner.
 ReleaseInfo _release(String version) => ReleaseInfo(
   version: version,
   htmlUrl: 'https://example.test/r',
   assets: [
-    ReleaseAsset(
-      name: 'kwaainet-gui-macos.zip',
-      url: 'https://example.test/a.zip',
-      sizeBytes: 10,
-      sha256: 'a' * 64,
-    ),
+    for (final name in const [
+      'kwaainet-gui-macos.zip',
+      'kwaainet-gui-windows.zip',
+      'kwaainet-gui-linux.tar.gz',
+    ])
+      ReleaseAsset(
+        name: name,
+        url: 'https://example.test/a.zip',
+        sizeBytes: 10,
+        sha256: 'a' * 64,
+      ),
   ],
 );
 
