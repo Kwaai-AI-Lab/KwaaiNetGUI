@@ -23,6 +23,20 @@ String get _binary =>
     Platform.environment['KWAAINET_BIN'] ??
     '../KwaaiNet/core/target/release/kwaainet';
 
+/// Seal a throwaway state directory before anything starts in it.
+///
+/// A config the daemon creates itself carries the *production* bootstraps, and
+/// this test bed must never touch the real network. An empty `initial_peers`
+/// on a node with `announce_self: false` is the one combination that stays
+/// empty — `run_node` only falls back to the Petals bootstraps for a node that
+/// announces (see the guard in node.rs).
+void sealConfig(Directory home) {
+  File('${home.path}/config.yaml').writeAsStringSync(
+    'initial_peers: []\n'
+    'announce_self: false\n',
+  );
+}
+
 /// Bring up a daemon on its own state directory, the way DaemonController does.
 Future<({int grpcPort, String home})> startDaemon(Directory home) async {
   final grpcPort = await allocateFreePort();
@@ -56,6 +70,18 @@ int? readPid(String home) {
   return f.existsSync() ? int.tryParse(f.readAsStringSync().trim()) : null;
 }
 
+/// PIDs of every running p2pd. `-x` matches the exact process name: macOS
+/// ships its own `wifip2pd`, which a substring match would count as ours.
+Future<List<int>> livingP2pds() async {
+  final r = await Process.run('pgrep', ['-x', 'p2pd']);
+  return r.stdout
+      .toString()
+      .split('\n')
+      .map((l) => int.tryParse(l.trim()))
+      .whereType<int>()
+      .toList();
+}
+
 Future<bool> alive(int pid) async =>
     (await Process.run('kill', ['-0', '$pid'])).exitCode == 0;
 
@@ -75,6 +101,8 @@ void main() {
   setUp(() {
     installed = Directory.systemTemp.createTempSync('kwaai-installed');
     sandbox = Directory.systemTemp.createTempSync('kwaai-sandbox');
+    sealConfig(installed);
+    sealConfig(sandbox);
   });
 
   tearDown(() async {
@@ -117,6 +145,13 @@ void main() {
     expect(File('${a.home}/run/kwaai.sock').existsSync(), isTrue);
     expect(File('${b.home}/run/kwaai.sock').existsSync(), isTrue);
 
+    // Whatever p2pd processes exist before the stop must survive it.
+    // kill_orphaned_p2pd() used to SIGKILL every p2pd on the machine
+    // regardless of which instance was stopping. The native p2p stack runs
+    // no p2pd child at all, so on that path this set is legitimately empty
+    // and the check is vacuous — it is the Go-daemon path it guards.
+    final p2pdBefore = await livingP2pds();
+
     // The headline: stopping the sandbox must leave the other one running.
     await stopDaemon(b.home);
     expect(await waitFor(() async => !await alive(pidB)), isTrue);
@@ -126,13 +161,13 @@ void main() {
       reason: "stopping one instance killed the other's daemon",
     );
 
-    // ...and its p2pd child, which kill_orphaned_p2pd() used to SIGKILL
-    // machine-wide regardless of which instance was stopping.
-    final p2pd = await Process.run('pgrep', ['-f', 'p2pd']);
-    expect(
-      p2pd.stdout.toString().trim(),
-      isNotEmpty,
-      reason: "the surviving daemon's p2pd was killed too",
-    );
+    for (final pid in p2pdBefore) {
+      expect(
+        await alive(pid),
+        isTrue,
+        reason: 'p2pd $pid was killed by another instance stopping',
+      );
+    }
+    printOnFailure('p2pd processes observed: $p2pdBefore');
   }, timeout: const Timeout(Duration(minutes: 3)));
 }
