@@ -6,11 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:macos_window_utils/macos_window_utils.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'src/chat/kwaai_rpc_client.dart';
 import 'src/daemon/daemon_controller.dart';
 import 'src/daemon/daemon_state.dart';
+import 'src/daemon/paths.dart';
 import 'src/daemon/status_watcher.dart';
 import 'src/settings.dart';
 import 'src/tray/tray.dart';
@@ -80,6 +82,13 @@ Future<void> main() async {
     await WindowManipulator.hideTitle();
   }
 
+  // Both builds share a bundle id, so they share SharedPreferences too —
+  // flipping the debug GUI's daemon mode would change the released GUI's.
+  // Must precede the first getInstance(), which Settings.load() performs.
+  if (KwaainetPaths.isSandboxed) {
+    SharedPreferences.setPrefix('flutter.sandbox.');
+  }
+
   final settings = await Settings.load();
   final theme = await ThemeController.load();
   final daemon = DaemonController(settings);
@@ -135,10 +144,15 @@ Future<void> main() async {
     container.listen<AsyncValue<NodeStatus>>(daemonStatusProvider, (_, next) {
       final v = next.valueOrNull;
       if (v == null) return; // not a confirmed reading yet — leave probe as-is
+      final client = container.read(kwaaiRpcClientProvider);
+      // The daemon reports the port it actually bound. Follow it before
+      // touching the probe, so a daemon that came back on a different port
+      // is dialled at the new one rather than reported unreachable.
+      client.tcpPort = v.grpcPort ?? kDefaultGrpcPort;
       final running = v.running;
       if (running == lastKnownRunning) return;
       lastKnownRunning = running;
-      container.read(kwaaiRpcClientProvider).setProbingEnabled(running);
+      client.setProbingEnabled(running);
     }, fireImmediately: true);
   }
 

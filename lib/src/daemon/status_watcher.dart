@@ -9,6 +9,15 @@ void _log(String msg) {
   stderr.writeln('[status-watcher] $msg');
 }
 
+/// Parse `run/kwaainet.grpc`. Null for anything that isn't a usable port, so
+/// a truncated or half-written file falls back to the default rather than
+/// sending the client at port 0.
+int? parseGrpcPortFile(String raw) {
+  final n = int.tryParse(raw.trim());
+  if (n == null || n <= 0 || n > 65535) return null;
+  return n;
+}
+
 class NodeStatus {
   NodeStatus({
     required this.running,
@@ -20,6 +29,7 @@ class NodeStatus {
     this.connections,
     this.threads,
     this.startedAt,
+    this.grpcPort,
     this.source = 'pid',
   });
 
@@ -33,11 +43,29 @@ class NodeStatus {
   final int? threads;
   final int? startedAt;
 
+  /// The gRPC TCP port the running daemon bound, from `run/kwaainet.grpc`.
+  /// Null when the daemon has not written it yet, or is too old to.
+  final int? grpcPort;
+
   /// Where the data came from: 'pid' (live PID probe only), 'status'
   /// (kwaainet.status JSON), or 'none' (nothing running).
   final String source;
 
   static NodeStatus stopped() => NodeStatus(running: false, source: 'none');
+
+  NodeStatus withGrpcPort(int? port) => NodeStatus(
+    running: running,
+    pid: pid,
+    uptimeSecs: uptimeSecs,
+    cpuPercent: cpuPercent,
+    memoryMb: memoryMb,
+    memoryPercent: memoryPercent,
+    connections: connections,
+    threads: threads,
+    startedAt: startedAt,
+    grpcPort: port,
+    source: source,
+  );
 
   static NodeStatus? fromJson(Map<String, dynamic> j) {
     try {
@@ -103,6 +131,11 @@ class StatusWatcher {
       return;
     }
 
+    // Read alongside the pid, so the port is only ever published for a daemon
+    // we have just confirmed alive — a stale file from a killed daemon names
+    // a port that is free for anything to take.
+    final grpcPort = _readGrpcPort();
+
     final fromFile = _readStatusFile();
     if (fromFile != null && fromFile.running) {
       if (!_lastRunning) {
@@ -111,16 +144,31 @@ class StatusWatcher {
         );
         _lastRunning = true;
       }
-      _controller.add(fromFile);
+      _controller.add(fromFile.withGrpcPort(grpcPort));
       return;
     }
 
-    final fallback = NodeStatus(running: true, pid: pid, source: 'pid');
+    final fallback = NodeStatus(
+      running: true,
+      pid: pid,
+      grpcPort: grpcPort,
+      source: 'pid',
+    );
     if (!_lastRunning) {
       _log('daemon running (pid $pid) — no status JSON yet, using PID-only');
       _lastRunning = true;
     }
     _controller.add(fallback);
+  }
+
+  int? _readGrpcPort() {
+    final f = File(KwaainetPaths.grpcPortFile);
+    if (!f.existsSync()) return null;
+    try {
+      return parseGrpcPortFile(f.readAsStringSync());
+    } catch (_) {
+      return null;
+    }
   }
 
   NodeStatus? _readStatusFile() {

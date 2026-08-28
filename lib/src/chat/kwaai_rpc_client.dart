@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:grpc/grpc.dart';
 
@@ -20,20 +22,32 @@ const int kDefaultGrpcPort = 8093;
 /// Environment variable naming the port to reach the daemon on.
 const String kGrpcPortEnvVar = 'KWAAINET_GRPC_PORT';
 
-/// TCP port to reach the daemon on, honouring [kGrpcPortEnvVar].
-///
-/// The default is the only port a locally-run daemon uses, so this exists for
-/// the case where the daemon *isn't* local: kwaaiai-env's NAT test topology
-/// publishes each containerised node's gRPC on its own host port, and pointing
-/// the GUI at one is how you inspect that node's swarm state.
-int get grpcPort => parseGrpcPort(Platform.environment[kGrpcPortEnvVar]);
+/// Longest usable Unix socket path. macOS caps `sun_path` at 104 bytes
+/// including the terminator; Linux is 108. Take the smaller.
+const int kMaxUnixSocketPathBytes = 103;
 
-/// Whether an explicit port was requested.
+/// TCP port naming a daemon this app does *not* manage, from
+/// [kGrpcPortEnvVar]. Null when no override is set.
+///
+/// This is only for the case where the daemon isn't local: kwaaiai-env's NAT
+/// test topology publishes each containerised node's gRPC on its own host
+/// port, and pointing the GUI at one is how you inspect that node's swarm
+/// state. The port of a daemon *this* app started is instance state, not an
+/// environment constant — see [NodeStatus.grpcPort].
+int? get envGrpcPort => grpcPortOverridden
+    ? parseGrpcPort(Platform.environment[kGrpcPortEnvVar])
+    : null;
+
+/// Whether the daemon we talk to is one this app does not manage.
 ///
 /// Load-bearing on POSIX, where the client prefers the Unix socket and only
 /// falls back to TCP: a local daemon's socket would otherwise always win and
 /// the port override would silently do nothing. Setting the port means "talk
 /// to *that* daemon", so it has to skip the socket.
+///
+/// Deliberately NOT true merely because a locally-spawned daemon is on a
+/// non-default port. Every caller is asking "is this daemon foreign?", and a
+/// sandboxed instance's own daemon is not.
 bool get grpcPortOverridden =>
     isGrpcPortOverridden(Platform.environment[kGrpcPortEnvVar]);
 
@@ -251,10 +265,12 @@ class KwaaiRpcClient {
     // is precisely what the override exists to bypass.
     if ((Platform.isMacOS || Platform.isLinux) && !grpcPortOverridden) {
       final sockPath = unixSocketPath;
-      // Async exists() — moves the stat off the synchronous critical
-      // path so the UI isolate doesn't pay even microseconds of FS
-      // latency per probe tick.
-      if (await File(sockPath).exists()) {
+      // sun_path is 104 bytes on macOS. A deep checkout can push a sandboxed
+      // socket past it, and the daemon's bind then fails — say so, rather than
+      // letting the TCP fallback look like "the daemon isn't up yet".
+      if (utf8.encode(sockPath).length > kMaxUnixSocketPathBytes) {
+        _log('socket path too long for this platform, using TCP: $sockPath');
+      } else if (await File(sockPath).exists()) {
         _connectionPath = 'unix://$sockPath';
         _log('opening Unix socket: $sockPath');
         return ClientChannel(
@@ -264,10 +280,11 @@ class KwaaiRpcClient {
             credentials: ChannelCredentials.insecure(),
           ),
         );
+      } else {
+        _log('Unix socket not found, falling back to TCP');
       }
-      _log('Unix socket not found, falling back to TCP');
     }
-    final port = grpcPort;
+    final port = _tcpPort;
     _connectionPath = 'tcp://127.0.0.1:$port';
     _log('opening TCP: 127.0.0.1:$port');
     return ClientChannel(
@@ -464,6 +481,12 @@ class KwaaiRpcClient {
     }
   }
 
+  /// The transport the current channel uses, or null when there is none.
+  /// Exposed so tests can assert that changing [tcpPort] drops the channel —
+  /// without that, the probe keeps dialling a port the daemon has left.
+  @visibleForTesting
+  String? get debugConnectionPath => _connectionPath;
+
   Future<void> _resetChannel({bool silent = false}) async {
     final ch = _channel;
     final path = _connectionPath;
@@ -481,6 +504,25 @@ class KwaaiRpcClient {
         await ch.shutdown();
       } catch (_) {}
     }
+  }
+
+  /// Seeded from [envGrpcPort] so a foreign daemon named on the environment
+  /// is still dialled where it lives — nothing updates this port in that case,
+  /// because the status stream describes a daemon on this host and that one
+  /// is somewhere else.
+  int _tcpPort = envGrpcPort ?? kDefaultGrpcPort;
+
+  /// The TCP port to dial when the Unix socket isn't used.
+  ///
+  /// Instance state, not a constant: a daemon this app spawned takes a port we
+  /// allocated, and it changes across a restart. Resetting the channel is the
+  /// point — without it the probe keeps pinging the dead port forever, because
+  /// [_probe] short-circuits on the channel it already has.
+  set tcpPort(int value) {
+    if (value == _tcpPort) return;
+    _log('gRPC TCP port $_tcpPort → $value, resetting channel');
+    _tcpPort = value;
+    unawaited(_resetChannel(silent: true));
   }
 
   /// Best-effort Unix socket path matching the daemon's bind location

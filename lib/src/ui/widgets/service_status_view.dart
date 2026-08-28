@@ -56,13 +56,13 @@ class ServiceStatusView extends StatelessWidget {
 /// be started from the Status tab, while one named by [kGrpcPortEnvVar] lives
 /// elsewhere and this app cannot start it.
 String unavailableHeadline() => grpcPortOverridden
-    ? 'Cannot reach the daemon on port $grpcPort'
+    ? 'Cannot reach the daemon on port $envGrpcPort'
     : 'Daemon is not running';
 
 /// Advice to pair with [unavailableHeadline].
 ///
 /// [localHint] should complete "Start it from the Status tab to …".
 String unavailableHint(String localHint) => grpcPortOverridden
-    ? 'Check that the daemon is listening on 127.0.0.1:$grpcPort — '
+    ? 'Check that the daemon is listening on 127.0.0.1:$envGrpcPort — '
           '$kGrpcPortEnvVar points this app at it.'
     : 'Start it from the Status tab to $localHint.';

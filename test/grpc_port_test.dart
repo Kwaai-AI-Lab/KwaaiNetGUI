@@ -11,11 +11,13 @@ import 'package:kwaainet_gui/src/chat/kwaai_rpc_client.dart';
 /// port and skips the Unix socket when it is set — is covered by
 /// `test/manual/grpc_port_live_test.dart` against a real daemon.
 void main() {
-  group('grpcPort', () {
-    test('defaults to the daemon\'s own port when unset', () {
+  group('envGrpcPort', () {
+    test('is null when no override is set', () {
       // The env var is not set in the test runner, so this is the real path a
-      // normal desktop launch takes.
-      expect(grpcPort, kDefaultGrpcPort);
+      // normal desktop launch takes: no foreign daemon named, so the port
+      // comes from the running daemon instead (NodeStatus.grpcPort).
+      expect(envGrpcPort, isNull);
+      expect(grpcPortOverridden, isFalse);
       expect(kDefaultGrpcPort, 8093);
     });
   });

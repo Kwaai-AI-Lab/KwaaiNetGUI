@@ -32,6 +32,11 @@ devtools_options.yaml
 .pub-cache/
 .pub/
 /build/
+
+# Project-local daemon sandbox (see lib/src/daemon/paths.dart). Holds the dev
+# daemon's identity.key, config.yaml, run/ and logs/. No leading slash — the
+# key must be ignored wherever it lands, not only at the repo root.
+.kwaainet-dev/
 /coverage/
 
 # Symbolication related

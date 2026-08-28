@@ -79,7 +79,8 @@ class UpdateDownloader {
           'Download failed (HTTP ${resp.statusCode}).',
         );
       }
-      final total = resp.contentLength ?? (asset.sizeBytes > 0 ? asset.sizeBytes : null);
+      final total =
+          resp.contentLength ?? (asset.sizeBytes > 0 ? asset.sizeBytes : null);
 
       await for (final chunk in resp.stream) {
         sink.add(chunk);

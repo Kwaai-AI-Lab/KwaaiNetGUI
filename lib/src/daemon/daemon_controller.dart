@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../settings.dart';
+import 'daemon_env.dart';
 import 'paths.dart';
+import 'port_allocator.dart';
 
 void _log(String msg) {
   stderr.writeln('[daemon-controller] $msg');
@@ -23,6 +25,19 @@ class DaemonController {
   DaemonController(this._settings);
 
   final Settings _settings;
+
+  /// Environment for a `kwaainet` child. [grpcPort] / [p2pPort] are for
+  /// `start` only; every other child just needs to be told which daemon.
+  Map<String, String> _childEnv({int? grpcPort, int? p2pPort}) {
+    final home = KwaainetPaths.home;
+    return daemonChildEnvironment(
+      base: Platform.environment,
+      home: home,
+      p2pdSocket: p2pdSocketFor(home, sandboxed: KwaainetPaths.isSandboxed),
+      grpcPort: grpcPort,
+      p2pPort: p2pPort,
+    );
+  }
 
   /// Resolve the binary for [mode], defaulting to the currently-selected
   /// mode. The settings UI passes an explicit mode so it can show each
@@ -101,7 +116,7 @@ class DaemonController {
     try {
       final proc = await Process.run(path, [
         '--version',
-      ]).timeout(const Duration(seconds: 5));
+      ], environment: _childEnv()).timeout(const Duration(seconds: 5));
       if (proc.exitCode != 0) {
         _log('--version exited ${proc.exitCode} for $path');
         return null;
@@ -193,17 +208,26 @@ class DaemonController {
     }
     Directory(KwaainetPaths.runDir).createSync(recursive: true);
 
+    // A port of our own, so a second GUI's daemon is a separate daemon
+    // rather than one this app silently shares. The daemon aborts if it
+    // cannot have this exact port, which is what makes the gap between
+    // releasing it here and the child binding it recoverable.
+    final grpcPort = await allocateFreePort();
+
+    // KWAAINET_PORT is a *serde* default on the daemon side: it applies on
+    // the launch that creates config.yaml and is inert thereafter. So pick a
+    // p2p port only for a sandbox that has no config yet, and let the file be
+    // the store from then on.
+    int? p2pPort;
+    if (KwaainetPaths.isSandboxed &&
+        !File(KwaainetPaths.configFile).existsSync()) {
+      p2pPort = await allocateFreePort(address: InternetAddress.anyIPv4);
+      _log('fresh sandbox config — seeding p2p port $p2pPort');
+    }
+
     try {
-      _log('spawning: ${res.path} start --daemon');
-      // Suppress the daemon's in-process auto-updater. The GUI will own
-      // notifying the user about new versions (forthcoming) — without
-      // this the daemon silently swaps its own binary for the latest
-      // upstream release ~5 minutes into a session and exits to
-      // restart, which loses any locally-built feature work (e.g. a
-      // newly-added rpc crate not yet in any release). See the
-      // KWAAINET_NO_AUTO_UPDATE guard in kwaainet's node.rs.
-      final env = Map<String, String>.from(Platform.environment)
-        ..['KWAAINET_NO_AUTO_UPDATE'] = '1';
+      _log('spawning: ${res.path} start --daemon (gRPC $grpcPort)');
+      final env = _childEnv(grpcPort: grpcPort, p2pPort: p2pPort);
       final p = await Process.start(res.path, [
         'start',
         '--daemon',
@@ -249,7 +273,9 @@ class DaemonController {
     }
     _log('running: ${res.path} stop');
     try {
-      final r = await Process.run(res.path, ['stop']);
+      // Without the environment this reads ~/.kwaainet and stops whatever is
+      // there — which is how quitting one GUI killed the other's daemon.
+      final r = await Process.run(res.path, ['stop'], environment: _childEnv());
       if (r.exitCode != 0) {
         _log('kwaainet stop exit ${r.exitCode}: ${r.stderr}');
       }

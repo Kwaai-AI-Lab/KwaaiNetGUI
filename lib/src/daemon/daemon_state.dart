@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../chat/kwaai_rpc_client.dart';
 import '../settings.dart';
 import 'daemon_controller.dart';
+import 'paths.dart';
 import 'status_watcher.dart';
 
 void _log(String msg) {
@@ -149,18 +150,54 @@ class DaemonTransitionNotifier extends Notifier<DaemonTransition> {
     return DaemonTransition.none;
   }
 
+  /// How long a spawned daemon gets to report the gRPC port it bound before
+  /// we assume the port we handed it was taken in the gap between our
+  /// releasing it and its binding it. Generous: the child re-execs and brings
+  /// up tokio before it binds.
+  static const _grpcBindDeadline = Duration(seconds: 15);
+
   Future<void> start() async {
     _log('start() called');
     _lastError = null;
     ref.read(daemonErrorProvider.notifier).clear();
     state = DaemonTransition.starting;
-    final r = await ref.read(daemonControllerProvider).start();
+
+    var r = await ref.read(daemonControllerProvider).start();
+
+    // Only a daemon we just spawned has a port we chose. An external no-op or
+    // an attach to a daemon already running has nothing to wait for.
+    if (r.kind == DaemonStartKind.spawned && !await _awaitGrpcBind()) {
+      _log('daemon did not report a gRPC port — retrying on a fresh one');
+      await ref.read(daemonControllerProvider).stop();
+      r = await ref.read(daemonControllerProvider).start();
+      if (r.kind == DaemonStartKind.spawned && !await _awaitGrpcBind()) {
+        _lastError =
+            'Daemon started but never bound its gRPC port. Check the log: '
+            '${KwaainetPaths.logsDir}.';
+        ref.read(daemonErrorProvider.notifier).set(_lastError);
+        state = DaemonTransition.none;
+        return;
+      }
+    }
+
     if (!r.ok) {
       _log('start failed: ${r.error}');
       _lastError = r.error ?? 'start failed';
       ref.read(daemonErrorProvider.notifier).set(_lastError);
       state = DaemonTransition.none;
     }
+  }
+
+  /// Wait for the daemon to write `run/kwaainet.grpc`. Its presence means the
+  /// listener is up — the daemon writes it only after a successful bind, and
+  /// exits rather than carry on without a port it was given.
+  Future<bool> _awaitGrpcBind() async {
+    final deadline = DateTime.now().add(_grpcBindDeadline);
+    while (DateTime.now().isBefore(deadline)) {
+      if (File(KwaainetPaths.grpcPortFile).existsSync()) return true;
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+    return false;
   }
 
   Future<void> stop() async {

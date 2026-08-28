@@ -1,28 +1,110 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
+
+/// Directory name of the project-local sandbox. See [resolveProjectSandbox].
+const String kSandboxDirName = '.kwaainet-dev';
 
 class KwaainetPaths {
-  static String get home {
-    final override = Platform.environment['KWAAINET_HOME'];
-    if (override != null && override.isNotEmpty) return override;
-    final base =
-        Platform.environment['HOME'] ??
-        Platform.environment['USERPROFILE'] ??
-        '.';
-    return '$base${Platform.pathSeparator}.kwaainet';
-  }
+  /// The daemon state directory this app instance owns.
+  ///
+  /// Cached: it is read on the 2 s status poll and the 3 s RPC probe, and
+  /// resolving it walks directories. Nothing it depends on can change while
+  /// the process lives.
+  static String? _homeCache;
+
+  static String get home => _homeCache ??= resolveKwaainetHome(
+    envHome: Platform.environment['KWAAINET_HOME'],
+    exePath: Platform.resolvedExecutable,
+    userHome: _userHomeBase,
+  );
+
+  /// `~/.kwaainet`, ignoring any sandbox. Only for state that belongs to the
+  /// *user* rather than to this app instance — see [updatesDir].
+  static String get userHome =>
+      '$_userHomeBase${Platform.pathSeparator}.kwaainet';
+
+  static String get _userHomeBase =>
+      Platform.environment['HOME'] ??
+      Platform.environment['USERPROFILE'] ??
+      '.';
+
+  /// True when [home] is a project-local sandbox rather than `~/.kwaainet`.
+  static bool get isSandboxed => home != userHome;
 
   static String get runDir => '$home${Platform.pathSeparator}run';
   static String get pidFile => '$runDir${Platform.pathSeparator}kwaainet.pid';
   static String get statusFile =>
       '$runDir${Platform.pathSeparator}kwaainet.status';
+
+  /// The port the running daemon bound, written by it once the gRPC listener
+  /// is up and removed on shutdown. Only meaningful while the pid is alive.
+  static String get grpcPortFile =>
+      '$runDir${Platform.pathSeparator}kwaainet.grpc';
+
   static String get configFile => '$home${Platform.pathSeparator}config.yaml';
   static String get logsDir => '$home${Platform.pathSeparator}logs';
 
   /// Downloaded update archives, one dir per version. Must outlive the app
   /// process, so a temp dir won't do.
-  static String get updatesDir => '$home${Platform.pathSeparator}updates';
+  ///
+  /// Deliberately [userHome], not [home]: this is the *GUI's* self-update
+  /// staging area, not daemon state. Under a sandbox it would drop
+  /// hundred-megabyte archives into the working tree, and `sweepStaleUpdates`
+  /// would stop cleaning the real one.
+  static String get updatesDir => '$userHome${Platform.pathSeparator}updates';
+
+  @visibleForTesting
+  static void debugResetHomeCache() => _homeCache = null;
+}
+
+/// Resolve the daemon state directory: `KWAAINET_HOME`, else a project-local
+/// sandbox when this executable is a build artifact of a KwaaiNetGUI checkout,
+/// else `~/.kwaainet`.
+///
+/// The sandbox is what lets a GUI run from source alongside an installed one
+/// without the two sharing a daemon, an identity key or a pid file.
+String resolveKwaainetHome({
+  required String? envHome,
+  required String exePath,
+  required String userHome,
+}) {
+  if (envHome != null && envHome.isNotEmpty) return envHome;
+  return resolveProjectSandbox(exePath) ??
+      '$userHome${Platform.pathSeparator}.kwaainet';
+}
+
+/// The project-local sandbox for [exePath], or null if it isn't a dev build.
+///
+/// Three gates, each load-bearing:
+///   1. **[exePath] only, never `Directory.current`** — an installed release
+///      launched from a terminal inside some unrelated Flutter checkout would
+///      otherwise relocate its identity and config into that checkout.
+///   2. **The exe must live under `<root>/build/`** — "has an ancestor with a
+///      pubspec.yaml" also matches an app someone copied into a checkout.
+///      This is also why the gate isn't `kDebugMode`: `build-local.sh`
+///      produces a *Release* bundle under `build/` and runs it in place,
+///      which is a dev artifact and should be sandboxed.
+///   3. **That pubspec must be ours** — defence in depth.
+String? resolveProjectSandbox(String exePath) {
+  final sep = Platform.pathSeparator;
+  final exe = File(exePath).absolute.path;
+  final root = pubspecRoot(File(exe).parent.path);
+  if (root == null) return null;
+  if (!exe.startsWith('$root${sep}build$sep')) return null;
+
+  final pubspec = File('$root${sep}pubspec.yaml');
+  try {
+    if (!RegExp(
+      r'^name:\s*kwaainet_gui\s*$',
+      multiLine: true,
+    ).hasMatch(pubspec.readAsStringSync())) {
+      return null;
+    }
+  } on FileSystemException {
+    return null;
+  }
+  return '$root$sep$kSandboxDirName';
 }
 
 /// Locates the bundled `kwaainet` daemon for "built-in" mode.
@@ -35,6 +117,16 @@ class KwaainetPaths {
 ///
 /// `KWAAINET_DEBUG_BIN` overrides both.
 String get builtInDebugDaemonPath => resolveBuiltInDaemonPath();
+
+/// Walk up from [start] to the first directory holding a `pubspec.yaml`.
+/// Self-limiting — no magic depth. Null once the filesystem root is reached.
+String? pubspecRoot(String start) {
+  final sep = Platform.pathSeparator;
+  for (var dir = Directory(start); ; dir = dir.parent) {
+    if (File('${dir.path}${sep}pubspec.yaml').existsSync()) return dir.path;
+    if (dir.parent.path == dir.path) return null;
+  }
+}
 
 /// The body of [builtInDebugDaemonPath]. [exePath] is an injection point for
 /// tests, which need to stand up a fake bundle the running exe isn't in.
@@ -64,14 +156,7 @@ String resolveBuiltInDaemonPath({String? exePath}) {
   // to the directory that holds pubspec.yaml (self-limiting — no magic
   // depth), then look for the KwaaiNet repo beside it.
   final sibling = ['..', 'KwaaiNet', 'core', 'target', 'debug', exeName];
-  String? projectRoot(String start) {
-    for (var dir = Directory(start); ; dir = dir.parent) {
-      if (File('${dir.path}${sep}pubspec.yaml').existsSync()) return dir.path;
-      if (dir.parent.path == dir.path) return null; // hit filesystem root
-    }
-  }
-
-  final root = projectRoot(exeDir) ?? projectRoot(Directory.current.path);
+  final root = pubspecRoot(exeDir) ?? pubspecRoot(Directory.current.path);
   if (root != null) {
     final candidate = [root, ...sibling].join(sep);
     if (File(candidate).existsSync()) return File(candidate).absolute.path;

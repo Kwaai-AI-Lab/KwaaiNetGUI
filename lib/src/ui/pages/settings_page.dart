@@ -653,12 +653,12 @@ class _StatusHeader extends ConsumerWidget {
             // all describe this host's process, not the one on that port.
             bitWidgets.add(bitText(running ? 'Running' : 'Unreachable'));
             sep();
-            bitWidgets.add(bitText('port $grpcPort'));
+            bitWidgets.add(bitText('port $envGrpcPort'));
             bitWidgets.add(const SizedBox(width: 4));
             bitWidgets.add(
               Tooltip(
                 message:
-                    '$kGrpcPortEnvVar=$grpcPort — this app is talking to a '
+                    '$kGrpcPortEnvVar=$envGrpcPort — this app is talking to a '
                     'daemon on that port, not one it manages locally.',
                 child: Icon(
                   Icons.lan_outlined,
@@ -1015,7 +1015,26 @@ class _DaemonSourcePickerState extends State<_DaemonSourcePicker> {
             label: 'Service managed externally',
           ),
           const _PathRow(child: _ExternalModeHelp()),
+          if (KwaainetPaths.isSandboxed) const _PathRow(child: _SandboxNote()),
         ],
+      ),
+    );
+  }
+}
+
+/// Shown only when this instance runs against a project-local sandbox rather
+/// than `~/.kwaainet`. Without it, two GUIs look identical, behave
+/// differently, and nothing on screen says why.
+class _SandboxNote extends StatelessWidget {
+  const _SandboxNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'Dev sandbox: this app has its own node identity, config and ports '
+      'under ${KwaainetPaths.home} — separate from an installed KwaaiNet.',
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
       ),
     );
   }
@@ -1762,7 +1781,8 @@ class _UpdatesCard extends ConsumerWidget {
                 ),
             ],
           ),
-          if (spec != null && (spec.progress != null || spec.indeterminate)) ...[
+          if (spec != null &&
+              (spec.progress != null || spec.indeterminate)) ...[
             const SizedBox(height: 8),
             LinearProgressIndicator(value: spec.progress, minHeight: 4),
           ],
@@ -2146,7 +2166,8 @@ class _RestartNeededBar extends ConsumerWidget {
       case SettingsBottomBar.updateReady:
         return KwaaiStatusBar(
           severity: KwaaiStatusSeverity.info,
-          message: 'KwaaiNet ${(staged as UpdateReady).version} is ready to '
+          message:
+              'KwaaiNet ${(staged as UpdateReady).version} is ready to '
               'install.',
           action:
               applyAction ??

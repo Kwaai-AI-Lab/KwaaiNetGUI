@@ -123,7 +123,11 @@ String stagedPayloadPath(InstallRoot root, String stagePath) {
 /// Unpacks [archive] into a fresh stage dir beside [root] and returns the
 /// payload directory. Never `package:archive` — it drops the symlinks and
 /// exec bits inside a macOS .app, which is why CI packages with `ditto`.
-Future<Directory> extract(File archive, InstallRoot root, String version) async {
+Future<Directory> extract(
+  File archive,
+  InstallRoot root,
+  String version,
+) async {
   final stage = Directory(stagePathFor(root, version));
   if (await stage.exists()) await stage.delete(recursive: true);
   await stage.create(recursive: true);
@@ -134,7 +138,11 @@ Future<Directory> extract(File archive, InstallRoot root, String version) async 
       await _run('ditto', ['-x', '-k', archive.path, stage.path]);
       // Strip quarantine then re-seal the ad-hoc signature, mirroring the Rust
       // node updater — otherwise macOS calls the moved bundle "damaged".
-      await _run('xattr', ['-dr', 'com.apple.quarantine', staged], check: false);
+      await _run('xattr', [
+        '-dr',
+        'com.apple.quarantine',
+        staged,
+      ], check: false);
       await _run('codesign', ['--force', '--deep', '--sign', '-', staged]);
       await _run('codesign', ['--verify', '--deep', staged]);
     case InstallKind.linuxDir:
@@ -159,7 +167,9 @@ Future<Directory> extract(File archive, InstallRoot root, String version) async 
 
   final dir = Directory(staged);
   if (!await dir.exists()) {
-    throw UpdateInstallException('The update archive had an unexpected layout.');
+    throw UpdateInstallException(
+      'The update archive had an unexpected layout.',
+    );
   }
   return dir;
 }
