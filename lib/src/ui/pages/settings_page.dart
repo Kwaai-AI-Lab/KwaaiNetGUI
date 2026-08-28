@@ -592,15 +592,29 @@ class _StatusHeader extends ConsumerWidget {
     // "Running" the moment the first probe lands.
     final statusAsync = ref.watch(daemonStatusProvider);
     final status = statusAsync.valueOrNull;
-    final unknown = transition == DaemonTransition.none && status == null;
+    // An explicit port names a daemon this app does not manage — in the NAT
+    // test topology, a container with no PID on this host — so the local
+    // status file describes some other process, or none. Reachability is the
+    // only honest signal there, the same swap daemonAvailableProvider makes
+    // for the data tabs. `connecting` is only ever the initial state (a
+    // failed probe publishes `disconnected`), so reading it as "unknown"
+    // cannot flicker.
+    final conn = grpcPortOverridden
+        ? ref.watch(kwaaiRpcConnectionProvider).valueOrNull
+        : null;
+    final unknown =
+        transition == DaemonTransition.none &&
+        (grpcPortOverridden
+            ? conn == null || conn == RpcConnection.connecting
+            : status == null);
+    final running = grpcPortOverridden
+        ? conn == RpcConnection.connected
+        : status?.running ?? false;
     // Version of the *running* daemon, over gRPC. Shown as soon as the daemon
     // answers — including part-way through a start, which is exactly when the
     // selected binary-location row hands the display back over. Hidden once
     // stopped, where those rows carry the versions instead.
-    final stopped =
-        transition == DaemonTransition.none &&
-        status != null &&
-        !status.running;
+    final stopped = transition == DaemonTransition.none && !unknown && !running;
     final version = stopped
         ? null
         : ref.watch(daemonVersionProvider).valueOrNull;
@@ -626,17 +640,18 @@ class _StatusHeader extends ConsumerWidget {
           color = context.kwaai.statusTransitioning;
           bitWidgets.add(bitText('Stopping…'));
         case DaemonTransition.none:
-          color = status!.running
+          color = running
               ? context.kwaai.statusRunning
               : context.kwaai.statusStopped;
 
           void sep() => bitWidgets.add(bitText('  •  '));
 
-          bitWidgets.add(bitText(status.running ? 'Running' : 'Stopped'));
-          // An explicit port means the daemon is somewhere else, so the local
-          // pid describes a different process — or nothing at all. Name the
-          // port instead: that is what this app is actually talking to.
           if (grpcPortOverridden) {
+            // "Stopped" would be a claim about a daemon we cannot see, so the
+            // failure reads as unreachable instead. Nothing else from the
+            // status file belongs here either: pid, uptime, memory and CPU
+            // all describe this host's process, not the one on that port.
+            bitWidgets.add(bitText(running ? 'Running' : 'Unreachable'));
             sep();
             bitWidgets.add(bitText('port $grpcPort'));
             bitWidgets.add(const SizedBox(width: 4));
@@ -644,8 +659,7 @@ class _StatusHeader extends ConsumerWidget {
               Tooltip(
                 message:
                     '$kGrpcPortEnvVar=$grpcPort — this app is talking to a '
-                    'daemon on that port, not the one it manages locally. '
-                    'Start/Stop below still act on the local daemon.',
+                    'daemon on that port, not one it manages locally.',
                 child: Icon(
                   Icons.lan_outlined,
                   size: 16,
@@ -653,42 +667,44 @@ class _StatusHeader extends ConsumerWidget {
                 ),
               ),
             );
-          } else if (status.running && status.pid != null) {
-            sep();
-            bitWidgets.add(bitText('pid ${status.pid}'));
-            // Info icon sits immediately after the pid bit, before
-            // the next separator — quick visual cue that the stats
-            // below come from a PID-only probe.
-            if (status.source == 'pid') {
-              bitWidgets.add(const SizedBox(width: 4));
-              bitWidgets.add(
-                Tooltip(
-                  message:
-                      'Status from PID probe only — full stats appear once daemon writes kwaainet.status',
-                  child: Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: cs.onSurfaceVariant,
+          } else {
+            final s = status!;
+            bitWidgets.add(bitText(running ? 'Running' : 'Stopped'));
+            if (running && s.pid != null) {
+              sep();
+              bitWidgets.add(bitText('pid ${s.pid}'));
+              // Info icon sits immediately after the pid bit, before
+              // the next separator — quick visual cue that the stats
+              // below come from a PID-only probe.
+              if (s.source == 'pid') {
+                bitWidgets.add(const SizedBox(width: 4));
+                bitWidgets.add(
+                  Tooltip(
+                    message:
+                        'Status from PID probe only — full stats appear once daemon writes kwaainet.status',
+                    child: Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: cs.onSurfaceVariant,
+                    ),
                   ),
-                ),
+                );
+              }
+            }
+            if (s.uptimeSecs != null) {
+              sep();
+              bitWidgets.add(bitText('up ${_fmtDuration(s.uptimeSecs!)}'));
+            }
+            if (s.memoryMb != null) {
+              sep();
+              bitWidgets.add(bitText('${s.memoryMb!.toStringAsFixed(0)} MB'));
+            }
+            if (s.cpuPercent != null) {
+              sep();
+              bitWidgets.add(
+                bitText('${s.cpuPercent!.toStringAsFixed(1)}% CPU'),
               );
             }
-          }
-          if (status.uptimeSecs != null) {
-            sep();
-            bitWidgets.add(bitText('up ${_fmtDuration(status.uptimeSecs!)}'));
-          }
-          if (status.memoryMb != null) {
-            sep();
-            bitWidgets.add(
-              bitText('${status.memoryMb!.toStringAsFixed(0)} MB'),
-            );
-          }
-          if (status.cpuPercent != null) {
-            sep();
-            bitWidgets.add(
-              bitText('${status.cpuPercent!.toStringAsFixed(1)}% CPU'),
-            );
           }
       }
     }
@@ -944,13 +960,11 @@ class _DaemonSourcePickerState extends State<_DaemonSourcePicker> {
 
   @override
   Widget build(BuildContext context) {
-    // The stored choice, not the effective one: while the env override pins
-    // external mode, the radio should still show what the user actually
-    // picked, so the setting they return to is not silently rewritten.
+    // The effective mode, so the override reads as the plain "managed
+    // externally" selection it makes the app behave as. The stored pref is
+    // still not rewritten — it applies again the moment the variable is gone.
     final forced = Settings.externalDaemonForced;
-    final mode = forced
-        ? widget.settings.storedMode
-        : widget.settings.mode;
+    final mode = widget.settings.mode;
     final systemBinaryFound = widget.daemon.findSystemBinary() != null;
     return RadioGroup<DaemonMode>(
       groupValue: mode,
@@ -1001,8 +1015,6 @@ class _DaemonSourcePickerState extends State<_DaemonSourcePicker> {
             label: 'Service managed externally',
           ),
           const _PathRow(child: _ExternalModeHelp()),
-          // Without this, the pinned picker just looks unresponsive.
-          if (forced) const _PathRow(child: _ExternalModeForcedNote()),
         ],
       ),
     );
@@ -1023,26 +1035,6 @@ class _ExternalModeHelp extends StatelessWidget {
       'terminal); the GUI only observes the gRPC channel.',
       style: Theme.of(context).textTheme.bodySmall?.copyWith(
         color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-    );
-  }
-}
-
-/// Shown under the picker when `KWAAINET_EXTERNAL_DAEMON` is set, which pins
-/// external mode and makes the radios inert. Names the variable so the reader
-/// knows what to unset, and says the stored choice is intact — otherwise a
-/// frozen picker looks like a bug rather than a deliberate override.
-class _ExternalModeForcedNote extends StatelessWidget {
-  const _ExternalModeForcedNote();
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      'Pinned by ${Settings.externalDaemonEnvVar} in this app\'s environment, '
-      'so this setting is read-only for this run. Your saved choice is '
-      'unchanged and applies again without that variable.',
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: context.kwaai.semanticInfo,
       ),
     );
   }

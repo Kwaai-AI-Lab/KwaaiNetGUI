@@ -55,7 +55,6 @@ class Settings {
 
   /// Env override that forces [DaemonMode.external] regardless of what is
   /// stored on disk. Set it to pin the app to "don't manage the daemon".
-  /// Public so the settings UI can name it in the note it shows.
   static const externalDaemonEnvVar = 'KWAAINET_EXTERNAL_DAEMON';
 
   /// True when [externalDaemonEnvVar] pins external mode.
@@ -74,11 +73,6 @@ class Settings {
   /// data tabs stream from the container.
   DaemonMode get mode =>
       externalDaemonForced ? DaemonMode.external : _storedMode;
-
-  /// The mode as persisted, ignoring [externalDaemonEnvVar]. The settings UI reads
-  /// this so the picker still shows — and can still edit — the user's real
-  /// stored choice while the override is in force.
-  DaemonMode get storedMode => _storedMode;
 
   DaemonMode get _storedMode => _parse(_prefs.getString(_modeKey));
   String? get customPath => _prefs.getString(_pathKey);
