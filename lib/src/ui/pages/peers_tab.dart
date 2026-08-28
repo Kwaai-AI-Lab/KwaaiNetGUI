@@ -11,7 +11,6 @@ import '../../chat/session_client.dart';
 import '../../daemon/daemon_state.dart';
 import '../../daemon/peers_state.dart';
 import '../../p2p/protocols.dart';
-import '../../p2p/transport.dart';
 import '../theme/kwaai_theme.dart';
 import '../widgets/filter_toggle.dart';
 import '../widgets/service_status_view.dart';
@@ -1064,10 +1063,6 @@ class _PeerTable extends StatelessWidget {
                                 dcutr: r.anyDcutr,
                                 direction: r.primary!.direction,
                                 bothDirections: r.bothDirections,
-                                transport: transportOf(
-                                  addr: r.primary!.addr,
-                                  via: r.primary!.via,
-                                ),
                               ),
                       ),
                       DataCell(
@@ -1399,15 +1394,14 @@ class _PeerConnections extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Wide enough for the longest path label plus its arrow
-                    // and a transport suffix — "direct quic" measures ~127.
+                    // Wide enough for "DCUtR" and its icon, which need more
+                    // room than the 74px label column beside them.
                     SizedBox(
-                      width: 140,
+                      width: 88,
                       child: _PathCell(
                         kind: c.kind,
                         dcutr: c.dcutr,
                         direction: c.direction,
-                        transport: transportOf(addr: c.addr, via: c.via),
                       ),
                     ),
                     SizedBox(
@@ -1726,16 +1720,10 @@ class _PathCell extends StatelessWidget {
     this.dcutr = false,
     this.direction,
     this.bothDirections = false,
-    this.transport,
   });
 
   final pbenum.PeerConnKind kind;
   final bool dcutr;
-
-  /// "tcp" / "quic", or null when the address names neither. Shown muted
-  /// beside the path: now that a node listens on both, which one carried a
-  /// path is the difference between a working QUIC punch and a TCP one.
-  final String? transport;
 
   /// "inbound" / "outbound", or null when there is no connection to describe.
   final String? direction;
@@ -1778,17 +1766,6 @@ class _PathCell extends StatelessWidget {
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color),
         ),
-        if (transport != null) ...[
-          const SizedBox(width: 5),
-          Text(
-            transport!,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(
-                context,
-              ).textTheme.bodySmall?.color?.withValues(alpha: 0.6),
-            ),
-          ),
-        ],
       ],
     );
   }
