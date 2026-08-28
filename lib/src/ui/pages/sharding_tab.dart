@@ -8,6 +8,7 @@ import '../../chat/generated/kwaai.pb.dart' as pb;
 import '../../daemon/block_coverage_state.dart';
 import '../../daemon/daemon_state.dart';
 import '../theme/kwaai_theme.dart';
+import '../widgets/filter_toggle.dart';
 import '../widgets/kwaai_dropdown.dart';
 import '../widgets/service_status_view.dart';
 
@@ -77,6 +78,11 @@ class _ShardingTabState extends ConsumerState<ShardingTab> {
   /// and the table. Null = no filter (the default: show everything).
   _TrustTier? _tierFilter;
 
+  /// Whether peers announcing no shard are listed and counted. Off by
+  /// default: counting them colours their announced block and claims
+  /// coverage the network cannot serve.
+  bool _showEmptyPeers = false;
+
   /// Target edge length of a grid cell, in logical pixels. Drives the
   /// grid/table split: the grid claims exactly the height its blocks need
   /// at this size and the table gets everything left over.
@@ -139,15 +145,21 @@ class _ShardingTabState extends ConsumerState<ShardingTab> {
       );
     }
 
-    // Trust filtering happens once, here: everything downstream (grid
+    // Peer filtering happens once, here: everything downstream (grid
     // colours, coverage counts, the table) reads the same peer list so
     // the two halves can never disagree about what is being shown.
     final tier = _tierFilter;
-    final peers = tier == null
-        ? update.peers
-        : update.peers
-              .where((p) => p.trustTier == tier.wire)
-              .toList(growable: false);
+    final peers = update.peers
+        .where(
+          (p) =>
+              (tier == null || p.trustTier == tier.wire) &&
+              (_showEmptyPeers || !isEmptyPeer(p)),
+        )
+        .toList(growable: false);
+    // Counted over every peer, not over the hidden ones: the toggle is
+    // offered whenever such peers exist at all, so ticking it cannot make
+    // the control itself disappear.
+    final emptyPeers = update.peers.where(isEmptyPeer).length;
     final counts = _peerCounts(peers, update.totalBlocks);
     final covered = counts.where((c) => c > 0).length;
 
@@ -201,6 +213,9 @@ class _ShardingTabState extends ConsumerState<ShardingTab> {
                   peers: tablePeers,
                   selectedBlock: block,
                   selectedPeerId: _selectedPeerId,
+                  emptyPeers: emptyPeers,
+                  showEmptyPeers: _showEmptyPeers,
+                  onShowEmptyPeers: _setShowEmptyPeers,
                   onSelectPeer: _togglePeer,
                   onClearBlock: () => setState(() => _selectedBlock = null),
                 )
@@ -213,6 +228,9 @@ class _ShardingTabState extends ConsumerState<ShardingTab> {
                   onSelectBlock: _toggleBlock,
                   tablePeers: tablePeers,
                   selectedPeerId: _selectedPeerId,
+                  emptyPeers: emptyPeers,
+                  showEmptyPeers: _showEmptyPeers,
+                  onShowEmptyPeers: _setShowEmptyPeers,
                   onSelectPeer: _togglePeer,
                   onClearBlock: () => setState(() => _selectedBlock = null),
                 ),
@@ -232,6 +250,8 @@ class _ShardingTabState extends ConsumerState<ShardingTab> {
   void _togglePeer(String peerId) => setState(() {
     _selectedPeerId = _selectedPeerId == peerId ? null : peerId;
   });
+
+  void _setShowEmptyPeers(bool show) => setState(() => _showEmptyPeers = show);
 }
 
 /// The daemon's trust tiers, in ascending order — mirrors `TrustTier` in
@@ -275,6 +295,14 @@ String describeStaleness(Duration? d) {
   final hours = d.inHours;
   return hours < 24 ? '${hours}h' : '${d.inDays}d';
 }
+
+/// Whether a peer's announcement covers no shard.
+///
+/// A node that never loaded one still announces its nominal range so it
+/// appears on the map — one block wide, `[0, 1)` by default. A real
+/// assignment is snapped to 4, 8, 16 or 32 blocks (`VALID_BLOCK_COUNTS` in
+/// kwaai-cli's `shard_cmd.rs`), so nothing serving announces this narrow.
+bool isEmptyPeer(pb.BlockPeer p) => p.endBlock <= p.startBlock + 1;
 
 /// Block indices served by [peerId], for grid highlighting. A peer can
 /// appear more than once in the DHT (separate announced ranges), so this
@@ -553,6 +581,9 @@ class _GridAndTable extends StatelessWidget {
     required this.onSelectBlock,
     required this.tablePeers,
     required this.selectedPeerId,
+    required this.emptyPeers,
+    required this.showEmptyPeers,
+    required this.onShowEmptyPeers,
     required this.onSelectPeer,
     required this.onClearBlock,
   });
@@ -565,6 +596,9 @@ class _GridAndTable extends StatelessWidget {
   final ValueChanged<int> onSelectBlock;
   final List<pb.BlockPeer> tablePeers;
   final String? selectedPeerId;
+  final int emptyPeers;
+  final bool showEmptyPeers;
+  final ValueChanged<bool> onShowEmptyPeers;
   final ValueChanged<String> onSelectPeer;
   final VoidCallback onClearBlock;
 
@@ -639,6 +673,9 @@ class _GridAndTable extends StatelessWidget {
                 peers: tablePeers,
                 selectedBlock: selectedBlock,
                 selectedPeerId: selectedPeerId,
+                emptyPeers: emptyPeers,
+                showEmptyPeers: showEmptyPeers,
+                onShowEmptyPeers: onShowEmptyPeers,
                 onSelectPeer: onSelectPeer,
                 onClearBlock: onClearBlock,
                 topBorder: true,
@@ -739,6 +776,9 @@ class _TableSection extends StatelessWidget {
     required this.peers,
     required this.selectedBlock,
     required this.selectedPeerId,
+    required this.emptyPeers,
+    required this.showEmptyPeers,
+    required this.onShowEmptyPeers,
     required this.onSelectPeer,
     required this.onClearBlock,
     this.topBorder = false,
@@ -747,6 +787,12 @@ class _TableSection extends StatelessWidget {
   final List<pb.BlockPeer> peers;
   final int? selectedBlock;
   final String? selectedPeerId;
+
+  /// Every such peer, hidden or not — see the toggle's guard below.
+  final int emptyPeers;
+
+  final bool showEmptyPeers;
+  final ValueChanged<bool> onShowEmptyPeers;
   final ValueChanged<String> onSelectPeer;
   final VoidCallback onClearBlock;
   final bool topBorder;
@@ -755,6 +801,15 @@ class _TableSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final kwaai = context.kwaai;
     final block = selectedBlock;
+    // Hiding rows is defensible; hiding the fact that rows are hidden is
+    // not — the count sits in the summary, where it moves no control. Only
+    // on the unfiltered list, the one it exactly describes.
+    final hidden = showEmptyPeers || block != null ? 0 : emptyPeers;
+    final caption =
+        (block == null
+            ? 'All peers — ${peers.length}'
+            : 'Block $block — ${peers.length} peer(s)') +
+        (hidden > 0 ? ' · $hidden empty hidden' : '');
     return Container(
       decoration: BoxDecoration(
         color: topBorder ? kwaai.elevatedSurface : null,
@@ -783,15 +838,28 @@ class _TableSection extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    block == null
-                        ? 'All peers — ${peers.length}'
-                        : 'Block $block — ${peers.length} peer(s)',
+                    caption,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                // Keyed off such peers existing at all, not off how many
+                // are hidden — otherwise checking the box would make it
+                // vanish.
+                if (emptyPeers > 0 || showEmptyPeers) ...[
+                  FilterToggle(
+                    label: 'Show empty peers',
+                    tooltip:
+                        'Peers announcing no shard — they are in the DHT '
+                        'but serve no block. Counted, they would colour a '
+                        'block the network cannot actually serve.',
+                    value: showEmptyPeers,
+                    onChanged: onShowEmptyPeers,
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 if (block != null) _ShowAllButton(onPressed: onClearBlock),
               ],
             ),

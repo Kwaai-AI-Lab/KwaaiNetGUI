@@ -12,6 +12,7 @@ import '../../daemon/daemon_state.dart';
 import '../../daemon/peers_state.dart';
 import '../../p2p/protocols.dart';
 import '../theme/kwaai_theme.dart';
+import '../widgets/filter_toggle.dart';
 import '../widgets/service_status_view.dart';
 
 /// How long without an update before the view is marked stale.
@@ -1575,12 +1576,6 @@ class _ProtocolLinesState extends State<_ProtocolLines> {
   }
 }
 
-/// Toggle for listing client-mode peers, with the count it is suppressing.
-///
-/// The label is deliberately fixed. It once carried the hidden count, which
-/// changed its width between states and made the control move as you clicked
-/// it. The count belongs in the caption summary, where the answer to "are
-/// there peers I'm not seeing?" is visible without touching anything.
 /// The caption bar's filter checkboxes.
 ///
 /// Each appears only once it has something to hide, so a small network is not
@@ -1608,7 +1603,7 @@ class _Filters extends StatelessWidget {
     mainAxisSize: MainAxisSize.min,
     children: [
       if (unconnectedRows > 0 || showUnconnected)
-        _FilterToggle(
+        FilterToggle(
           label: 'Show unconnected',
           tooltip:
               'Peers in the DHT routing table this node holds no connection '
@@ -1621,7 +1616,7 @@ class _Filters extends StatelessWidget {
           (clientRows > 0 || showDhtClients))
         const SizedBox(width: 10),
       if (clientRows > 0 || showDhtClients)
-        _FilterToggle(
+        FilterToggle(
           label: 'Show DHT clients',
           tooltip:
               'Peers that query the DHT without serving it. They are never '
@@ -1632,64 +1627,6 @@ class _Filters extends StatelessWidget {
         ),
     ],
   );
-}
-
-class _FilterToggle extends StatelessWidget {
-  const _FilterToggle({
-    required this.label,
-    required this.tooltip,
-    required this.value,
-    required this.onChanged,
-  });
-
-  /// Fixed text. The hidden count used to be appended to it, which changed
-  /// the width between states and shifted the checkbox as you toggled it. The
-  /// count lives in the caption summary instead, where it moves nothing.
-  final String label;
-
-  final String tooltip;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Tooltip(
-      message: tooltip,
-      // Whole control is the hit target, so the label toggles too — a bare
-      // checkbox this small is a fussy thing to hit.
-      child: InkWell(
-        onTap: () => onChanged(!value),
-        borderRadius: BorderRadius.circular(4),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Scaled down to sit on the caption bar without setting its
-              // height: an unscaled checkbox is taller than the bar's text.
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: Transform.scale(
-                  scale: 0.75,
-                  child: Checkbox(
-                    value: value,
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    onChanged: (v) => onChanged(v ?? false),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(label, style: theme.textTheme.labelSmall),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _Caption extends StatelessWidget {
