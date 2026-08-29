@@ -351,12 +351,8 @@ ThemeData buildKwaaiTheme(ThemeVariantKey variant, Brightness brightness) {
       selectionHandleColor: ext.accentPrimary,
       selectionColor: ext.accentPrimary.withValues(alpha: 0.3),
     ),
-    // A tooltip still on screen when an opaque route is pushed over it trips
-    // two framework assertions on the next window resize (overlay.dart 2895
-    // `size == theater.size`, object.dart 4323 `debugNeedsLayout`). The
-    // theater skips laying out the obstructed entry, so the overlay child
-    // keeps its pre-resize size. Neither trigger is reachable if no tooltip
-    // ever opens. See kTooltipsDisabled.
+    // Debug-only: an offstage tooltip trips two framework assertions on the
+    // next resize. https://github.com/flutter/flutter/issues/192030
     tooltipTheme: kTooltipsDisabled
         ? const TooltipThemeData(
             waitDuration: Duration(days: 365),

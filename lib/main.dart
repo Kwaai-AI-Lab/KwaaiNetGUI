@@ -25,7 +25,6 @@ import 'src/window/close_handler.dart';
 import 'src/window/dock_icon.dart';
 import 'src/window/shutdown.dart';
 import 'src/window/shutdown_gate.dart';
-import 'src/window/tooltip_resize_guard.dart';
 import 'src/window/window_focus.dart';
 
 /// Mirror framework and isolate-level errors to stderr.
@@ -232,41 +231,39 @@ class KwaainetGuiApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TooltipResizeGuard(
-      child: WindowFocusScope(
-        notifier: windowFocus,
-        child: ThemeScope(
-          controller: theme,
-          child: AnimatedBuilder(
-            animation: theme,
-            builder: (context, _) {
-              final state = theme.state;
-              final lightTheme = buildKwaaiTheme(
-                state.lightVariant,
-                Brightness.light,
-              );
-              final darkTheme = buildKwaaiTheme(
-                state.darkVariant,
-                Brightness.dark,
-              );
-              final themeMode = switch (state.mode) {
-                AppThemeMode.auto => ThemeMode.system,
-                AppThemeMode.light => ThemeMode.light,
-                AppThemeMode.dark => ThemeMode.dark,
-              };
-              return MaterialApp(
-                title: 'KwaaiNet',
-                theme: lightTheme,
-                darkTheme: darkTheme,
-                themeMode: themeMode,
-                // Wrap every route so a quit replaces the whole window (main
-                // page or settings) with the "Stopping service…" screen.
-                builder: (context, child) =>
-                    ShutdownGate(child: child ?? const SizedBox.shrink()),
-                home: MainPage(daemon: daemon, settings: settings, tray: tray),
-              );
-            },
-          ),
+    return WindowFocusScope(
+      notifier: windowFocus,
+      child: ThemeScope(
+        controller: theme,
+        child: AnimatedBuilder(
+          animation: theme,
+          builder: (context, _) {
+            final state = theme.state;
+            final lightTheme = buildKwaaiTheme(
+              state.lightVariant,
+              Brightness.light,
+            );
+            final darkTheme = buildKwaaiTheme(
+              state.darkVariant,
+              Brightness.dark,
+            );
+            final themeMode = switch (state.mode) {
+              AppThemeMode.auto => ThemeMode.system,
+              AppThemeMode.light => ThemeMode.light,
+              AppThemeMode.dark => ThemeMode.dark,
+            };
+            return MaterialApp(
+              title: 'KwaaiNet',
+              theme: lightTheme,
+              darkTheme: darkTheme,
+              themeMode: themeMode,
+              // Wrap every route so a quit replaces the whole window (main
+              // page or settings) with the "Stopping service…" screen.
+              builder: (context, child) =>
+                  ShutdownGate(child: child ?? const SizedBox.shrink()),
+              home: MainPage(daemon: daemon, settings: settings, tray: tray),
+            );
+          },
         ),
       ),
     );
