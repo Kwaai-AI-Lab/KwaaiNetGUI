@@ -33,8 +33,7 @@ extension on TrayState {
 /// actions through them so the main UI sees the same Starting…/Stopping…
 /// state as the tray.
 class TrayController with TrayListener {
-  TrayController({required ProviderContainer container})
-    : _container = container;
+  TrayController({required this._container});
 
   final ProviderContainer _container;
   TrayState _state = TrayState.stopped;
