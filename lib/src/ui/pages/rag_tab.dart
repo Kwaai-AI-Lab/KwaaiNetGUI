@@ -340,19 +340,16 @@ class RagKbPicker extends ConsumerWidget {
 ///
 /// Returns nothing: on success the status provider is invalidated and the
 /// new KB selected, so the caller's tree updates on its own.
-Future<void> _newKbDialog(BuildContext context, WidgetRef ref) async {
-  final controller = TextEditingController();
-  await showDialog<void>(
+Future<void> _newKbDialog(BuildContext context, WidgetRef ref) {
+  return showDialog<void>(
     context: context,
-    builder: (ctx) => _NewKbDialog(controller: controller, ref: ref),
+    builder: (ctx) => _NewKbDialog(ref: ref),
   );
-  controller.dispose();
 }
 
 class _NewKbDialog extends StatefulWidget {
-  const _NewKbDialog({required this.controller, required this.ref});
+  const _NewKbDialog({required this.ref});
 
-  final TextEditingController controller;
   final WidgetRef ref;
 
   @override
@@ -360,11 +357,20 @@ class _NewKbDialog extends StatefulWidget {
 }
 
 class _NewKbDialogState extends State<_NewKbDialog> {
+  // Owned here, not by the caller: showDialog's future resolves at pop,
+  // while the field is still on screen for the route's exit transition.
+  final _controller = TextEditingController();
   String? _error;
   bool _busy = false;
 
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   Future<void> _create() async {
-    final name = widget.controller.text.trim();
+    final name = _controller.text.trim();
     final invalid = validateKbName(name);
     if (invalid != null) {
       setState(() => _error = invalid);
@@ -403,7 +409,7 @@ class _NewKbDialogState extends State<_NewKbDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             KwaaiTextField(
-              controller: widget.controller,
+              controller: _controller,
               hintText: 'e.g. handbook',
               enabled: !_busy,
               onSubmitted: (_) => _busy ? null : _create(),
