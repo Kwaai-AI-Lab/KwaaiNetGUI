@@ -185,6 +185,9 @@ class _PeersTabState extends ConsumerState<PeersTab> {
           child: _TableSection(
             connected: update.connected,
             routing: update.routing,
+            localProtocols: update.hasSelfStatus()
+                ? update.selfStatus.localProtocols
+                : const [],
             selectedPeerId: _selectedPeerId,
             onSelectPeer: _togglePeer,
             onConnect: _connectPeer,
@@ -683,6 +686,7 @@ class _TableSection extends StatefulWidget {
   const _TableSection({
     required this.connected,
     required this.routing,
+    required this.localProtocols,
     required this.selectedPeerId,
     required this.onSelectPeer,
     required this.onConnect,
@@ -690,6 +694,10 @@ class _TableSection extends StatefulWidget {
 
   final List<pb.ConnectedPeer> connected;
   final List<pb.RoutingPeer> routing;
+
+  /// What this node itself advertises — the protocol filter offers our own
+  /// KwaaiNet protocols, not the union of everything seen on the network.
+  final List<String> localProtocols;
   final String? selectedPeerId;
   final void Function(String peerId) onSelectPeer;
   final Future<bool> Function(String peerId) onConnect;
@@ -719,6 +727,13 @@ class _TableSectionState extends State<_TableSection> {
   /// talking to"; shown, it answers "who could I talk to".
   bool _showUnconnected = false;
 
+  /// Protocol families the table is narrowed to. Empty means no narrowing —
+  /// the default shows every peer whatever it advertises.
+  ///
+  /// Families rather than full ids, so a peer running a different version of
+  /// a protocol we advertise still matches.
+  final Set<String> _protocolFilter = {};
+
   @override
   Widget build(BuildContext context) {
     final allRows = mergePeerRows(widget.connected, widget.routing);
@@ -728,7 +743,8 @@ class _TableSectionState extends State<_TableSection> {
         .where(
           (r) =>
               (_showDhtClients || !r.isDhtClient) &&
-              (_showUnconnected || r.isConnected),
+              (_showUnconnected || r.isConnected) &&
+              (_protocolFilter.isEmpty || r.advertisesAny(_protocolFilter)),
         )
         .toList();
     // What the table is actually withholding — zero once everything is shown.
@@ -760,6 +776,12 @@ class _TableSectionState extends State<_TableSection> {
             unconnectedRows: unconnectedRows,
             onShowDhtClients: (v) => setState(() => _showDhtClients = v),
             onShowUnconnected: (v) => setState(() => _showUnconnected = v),
+            protocolChoices: kwaaiProtocolFamilies(widget.localProtocols),
+            selectedProtocols: _protocolFilter,
+            onToggleProtocol: (family, on) => setState(() {
+              on ? _protocolFilter.add(family) : _protocolFilter.remove(family);
+            }),
+            onClearProtocols: () => setState(_protocolFilter.clear),
           ),
         ),
         Expanded(
@@ -902,6 +924,17 @@ class PeerRow {
   /// A client-mode peer still advertises circuit relay hop, and one of our own
   /// nodes runs kad in client mode whenever it is only reachable via a relay.
   bool get isDhtClient => primary?.dhtRole == pbenum.DhtRole.DHT_ROLE_CLIENT;
+
+  /// Whether this peer advertises any of [families] (protocol ids compared by
+  /// family, so versions do not have to agree).
+  ///
+  /// Checked across every connection rather than just [primary]: identify is
+  /// per peer, but there is no guarantee which connection's snapshot carries
+  /// it. Routing-only peers have no identify to read and never match — a
+  /// protocol filter deliberately shows only peers *known* to serve it.
+  bool advertisesAny(Set<String> families) => connections.any(
+    (c) => c.protocols.any((p) => families.contains(protocolFamily(p))),
+  );
 }
 
 /// Merge the two peer sets into one row per peer, in display order.
@@ -1589,6 +1622,10 @@ class _Filters extends StatelessWidget {
     required this.unconnectedRows,
     required this.onShowDhtClients,
     required this.onShowUnconnected,
+    required this.protocolChoices,
+    required this.selectedProtocols,
+    required this.onToggleProtocol,
+    required this.onClearProtocols,
   });
 
   final bool showDhtClients;
@@ -1598,10 +1635,17 @@ class _Filters extends StatelessWidget {
   final ValueChanged<bool> onShowDhtClients;
   final ValueChanged<bool> onShowUnconnected;
 
+  /// KwaaiNet protocol family → an advertised id carrying it, from what this
+  /// node itself serves.
+  final Map<String, String> protocolChoices;
+
+  final Set<String> selectedProtocols;
+  final void Function(String family, bool selected) onToggleProtocol;
+  final VoidCallback onClearProtocols;
+
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
+  Widget build(BuildContext context) {
+    final toggles = <Widget>[
       if (unconnectedRows > 0 || showUnconnected)
         FilterToggle(
           label: 'Show unconnected',
@@ -1612,9 +1656,6 @@ class _Filters extends StatelessWidget {
           value: showUnconnected,
           onChanged: onShowUnconnected,
         ),
-      if ((unconnectedRows > 0 || showUnconnected) &&
-          (clientRows > 0 || showDhtClients))
-        const SizedBox(width: 10),
       if (clientRows > 0 || showDhtClients)
         FilterToggle(
           label: 'Show DHT clients',
@@ -1625,8 +1666,139 @@ class _Filters extends StatelessWidget {
           value: showDhtClients,
           onChanged: onShowDhtClients,
         ),
-    ],
-  );
+      // Same appear-when-useful rule as the checkboxes: offered once this
+      // node advertises a KwaaiNet protocol, and held open while a selection
+      // is active even if the node stops advertising it.
+      if (protocolChoices.isNotEmpty || selectedProtocols.isNotEmpty)
+        _ProtocolFilter(
+          choices: protocolChoices,
+          selected: selectedProtocols,
+          onToggle: onToggleProtocol,
+          onClear: onClearProtocols,
+        ),
+    ];
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < toggles.length; i++) ...[
+          if (i > 0) const SizedBox(width: 10),
+          toggles[i],
+        ],
+      ],
+    );
+  }
+}
+
+/// Drop-down narrowing the table to peers advertising selected KwaaiNet
+/// protocols.
+///
+/// Only our own `/kwaai/…` protocols are offered — the libp2p machinery
+/// (identify, kad, relay, …) is advertised by every peer, so filtering on it
+/// would select everything while tripling the list's length. The choices come
+/// from what *this node* serves: that is the set the operator is comparing the
+/// network against, and it needs no knowledge of what exists elsewhere.
+///
+/// Nothing checked means no filtering. With boxes checked, a peer stays listed
+/// if it advertises **any** checked family — the faceted-filter convention,
+/// and the useful one: "who serves storage or inference" is a real question,
+/// "who serves both" rarely is. Matching is by family ([protocolFamily]), so a
+/// peer on a different version still counts.
+class _ProtocolFilter extends StatelessWidget {
+  const _ProtocolFilter({
+    required this.choices,
+    required this.selected,
+    required this.onToggle,
+    required this.onClear,
+  });
+
+  /// Family → an advertised full id, kept for [describeProtocol] — its
+  /// wildcard keys match versioned ids, not families.
+  final Map<String, String> choices;
+
+  final Set<String> selected;
+  final void Function(String family, bool selected) onToggle;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final kwaai = context.kwaai;
+    final active = selected.isNotEmpty;
+    // A ticked family this node no longer advertises stays listed — removing
+    // it would strand a filter the user can see the effect of but not undo.
+    final families = {...choices.keys, ...selected}.toList()..sort();
+
+    final monoStyle = theme.textTheme.bodySmall?.copyWith(
+      fontFamily: 'Menlo',
+      fontFamilyFallback: const ['Consolas', 'monospace'],
+    );
+    final descStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+    );
+    final color = active ? kwaai.accentPrimary : theme.textTheme.labelSmall?.color;
+
+    return MenuAnchor(
+      menuChildren: [
+        if (active)
+          MenuItemButton(
+            onPressed: onClear,
+            child: Text('Show all peers', style: theme.textTheme.bodySmall),
+          ),
+        for (final family in families)
+          CheckboxMenuButton(
+            value: selected.contains(family),
+            // The menu stays open on toggle — picking two protocols should
+            // not cost two round trips through the drop-down.
+            closeOnActivate: false,
+            onChanged: (v) => onToggle(family, v ?? false),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 340),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(family, style: monoStyle),
+                  // Same gloss the connections panel shows, minus ids that
+                  // only describe themselves.
+                  if (choices[family] case final id?
+                      when describeProtocol(id) != id)
+                    Text(
+                      describeProtocol(id),
+                      style: descStyle,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                ],
+              ),
+            ),
+          ),
+      ],
+      builder: (context, controller, _) => Tooltip(
+        message:
+            'Show only peers advertising any of the checked KwaaiNet '
+            'protocols. Nothing checked shows every peer. Only peers with a '
+            'completed identify can match — routing-only entries never do.',
+        child: InkWell(
+          onTap: () => controller.isOpen ? controller.close() : controller.open(),
+          borderRadius: BorderRadius.circular(4),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  active ? 'Protocols (${selected.length})' : 'Protocols',
+                  style: theme.textTheme.labelSmall?.copyWith(color: color),
+                ),
+                Icon(Icons.arrow_drop_down, size: 16, color: color),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _Caption extends StatelessWidget {
