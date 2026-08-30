@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kwaainet_gui/src/chat/generated/kwaai.pb.dart' as pb;
+import 'package:kwaainet_gui/src/chat/kwaai_rpc_client.dart';
 import 'package:kwaainet_gui/src/chat/session_client.dart';
 import 'package:kwaainet_gui/src/daemon/rag_state.dart';
 import 'package:kwaainet_gui/src/ui/pages/rag_tab.dart';
@@ -12,6 +13,33 @@ import 'package:kwaainet_gui/src/ui/pages/rag_tab.dart';
 /// a screenshot: which KB gets selected, whether a daemon error is fatal or
 /// merely a failed operation, and which files are worth sending at all.
 pb.RagKb _kb(String name) => pb.RagKb()..name = name;
+
+/// Stands in for the RPC layer in queue tests. The real client's
+/// constructor starts a connection probe loop, which has no place in a
+/// unit test — the enqueue tests only exercise stamping and ordering, so
+/// every ingest simply fails. Anything else the queue might call is a
+/// hard error via [noSuchMethod].
+class _NoDaemonRpcClient implements KwaaiRpcClient {
+  @override
+  Future<RagIngestOperation> ragIngest({
+    required String path,
+    String kb = '',
+    String docName = '',
+  }) async => throw UnimplementedError('no daemon in unit tests');
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// A container whose RPC layer is [_NoDaemonRpcClient], disposed with the
+/// test.
+ProviderContainer _queueContainer() {
+  final container = ProviderContainer(
+    overrides: [kwaaiRpcClientProvider.overrideWithValue(_NoDaemonRpcClient())],
+  );
+  addTearDown(container.dispose);
+  return container;
+}
 
 void main() {
   group('selectKb', () {
@@ -217,8 +245,7 @@ void main() {
       // running returned early and left the original loop to pick the new
       // jobs up with *its* KB, so files dropped after switching the
       // dropdown were ingested into the previously selected KB.
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
+      final container = _queueContainer();
       final queue = container.read(ragIngestQueueProvider.notifier);
 
       queue.enqueue(const ['/docs/a.md'], kb: 'alpha');
@@ -230,8 +257,7 @@ void main() {
     });
 
     test('ignores an empty enqueue', () {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
+      final container = _queueContainer();
       final queue = container.read(ragIngestQueueProvider.notifier);
 
       queue.enqueue(const [], kb: 'alpha');

@@ -193,6 +193,9 @@ class RagIngestQueue extends StateNotifier<List<RagIngestJob>> {
   }
 
   void _update(String path, RagIngestJob Function(RagIngestJob) f) {
+    // The drain loop outlives an autoDispose teardown (leaving the tab,
+    // toggling RAG off mid-ingest); late progress just has nowhere to go.
+    if (!mounted) return;
     state = [
       for (final j in state)
         if (j.path == path) f(j) else j,
@@ -203,12 +206,13 @@ class RagIngestQueue extends StateNotifier<List<RagIngestJob>> {
     if (_draining) return;
     _draining = true;
     try {
-      while (true) {
+      while (mounted) {
         final next = state
             .where((j) => j.status == RagJobStatus.queued)
             .firstOrNull;
         if (next == null) break;
         await _run(next);
+        if (!mounted) break;
         // Each file changes the KB's document list, so refresh as we go
         // rather than only at the end — a long queue should show its
         // documents appearing.
