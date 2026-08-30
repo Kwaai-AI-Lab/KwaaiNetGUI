@@ -21,6 +21,8 @@ import 'src/update/update_controller.dart';
 import 'src/ui/pages/main_page.dart';
 import 'src/ui/theme/theme_controller.dart';
 import 'src/ui/theme/theme_variants.dart';
+import 'src/ui/widgets/app_shell.dart';
+import 'src/ui/widgets/bootstrap_down_banner.dart';
 import 'src/window/close_handler.dart';
 import 'src/window/dock_icon.dart';
 import 'src/window/shutdown.dart';
@@ -259,8 +261,26 @@ class KwaainetGuiApp extends StatelessWidget {
               themeMode: themeMode,
               // Wrap every route so a quit replaces the whole window (main
               // page or settings) with the "Stopping service…" screen.
-              builder: (context, child) =>
-                  ShutdownGate(child: child ?? const SizedBox.shrink()),
+              builder: (context, child) => ShutdownGate(
+                child: Column(
+                  children: [
+                    Expanded(child: child ?? const SizedBox.shrink()),
+                    // One instance above the Navigator: the same bar spans
+                    // the window's full width and persists across the main
+                    // and settings routes. Material supplies the text style
+                    // and the background the routes' Scaffolds would — up
+                    // here there is neither.
+                    Material(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      child: const BootstrapDownBanner(
+                        bottomRadius: BorderRadius.vertical(
+                          bottom: Radius.circular(kWindowRadius),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               home: MainPage(daemon: daemon, settings: settings, tray: tray),
             );
           },

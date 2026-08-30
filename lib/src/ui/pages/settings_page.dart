@@ -2060,6 +2060,8 @@ class _CapacityFieldState extends State<_CapacityField> {
 /// the user has applied feature changes that need a service restart.
 /// Which pinned bar the Settings shell shows. Declaration order is priority:
 /// a daemon error or unsaved work outranks an update, which can wait.
+/// (Bootstrap connectivity is deliberately absent: that banner is app-level,
+/// mounted above the Navigator, so it persists across routes.)
 enum SettingsBottomBar { error, restartNeeded, updateReady, apply, none }
 
 /// The bottom bar's priority chain, as a pure decision so the ordering can be
