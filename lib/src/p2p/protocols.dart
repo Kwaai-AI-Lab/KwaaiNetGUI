@@ -64,10 +64,6 @@ const protocolDescriptions = <String, String>{
   'DHTProtocol.rpc_find': 'Hivemind DHT — serves record lookups',
 };
 
-/// Namespace of KwaaiNet's own protocols, as distinct from the libp2p
-/// machinery (identify, kad, relay, …) that every node advertises.
-const kwaaiProtocolPrefix = '/kwaai/';
-
 /// A protocol id without its trailing version segment, so ids that differ only
 /// by version compare equal: `/kwaai/inference/1.0.0` and `…/2.0.0` are both
 /// `/kwaai/inference`. An id whose last segment is not a version (`/libp2p/dcutr`)
@@ -75,21 +71,23 @@ const kwaaiProtocolPrefix = '/kwaai/';
 String protocolFamily(String id) {
   final cut = id.lastIndexOf('/');
   if (cut <= 0) return id;
-  final version = RegExp(r'^\d+(\.\d+)*$');
-  return version.hasMatch(id.substring(cut + 1)) ? id.substring(0, cut) : id;
+  return _version.hasMatch(id.substring(cut + 1)) ? id.substring(0, cut) : id;
 }
 
-/// The KwaaiNet protocols among [advertised], one entry per family, sorted.
+final _version = RegExp(r'^\d+(\.\d+)*$');
+
+/// The protocols in [advertised], one entry per family, sorted — a discovered
+/// list, not a curated one: whatever ids the caller has actually seen, however
+/// many sources it concatenated them from.
 ///
 /// Maps each family to the first advertised id carrying it, so a caller can
 /// still reach the versioned form — [describeProtocol]'s wildcard keys match
 /// full ids, not families.
 ///
 /// Public for `test/peers_protocol_filter_test.dart`.
-Map<String, String> kwaaiProtocolFamilies(Iterable<String> advertised) {
+Map<String, String> protocolFamilies(Iterable<String> advertised) {
   final byFamily = <String, String>{};
   for (final id in advertised) {
-    if (!id.startsWith(kwaaiProtocolPrefix)) continue;
     byFamily.putIfAbsent(protocolFamily(id), () => id);
   }
   return Map.fromEntries(

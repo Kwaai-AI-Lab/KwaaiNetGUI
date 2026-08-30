@@ -78,18 +78,23 @@ void main() {
     });
   });
 
-  group('kwaaiProtocolFamilies', () {
-    test('keeps only /kwaai/ ids, one per family, sorted', () {
-      final families = kwaaiProtocolFamilies(const [
+  group('protocolFamilies', () {
+    test('is discovered, not curated: everything seen, one per family, '
+        'sorted', () {
+      final families = protocolFamilies(const [
         '/ipfs/id/1.0.0',
         '/kwaai/p2p/hello/1.0.0',
         '/kwaai/inference/1.0.0',
         '/kwaai/inference/2.0.0',
         '/libp2p/dcutr',
+        'DHTProtocol.rpc_find',
       ]);
       expect(families.keys.toList(), [
+        '/ipfs/id',
         '/kwaai/inference',
         '/kwaai/p2p/hello',
+        '/libp2p/dcutr',
+        'DHTProtocol.rpc_find',
       ]);
       // The mapped id is a full versioned form, usable with describeProtocol.
       expect(families['/kwaai/inference'], '/kwaai/inference/1.0.0');
@@ -163,15 +168,24 @@ void main() {
       expect(_textWith('hidden'), findsNothing);
     });
 
-    testWidgets('absent when this node advertises no KwaaiNet protocol', (
-      tester,
-    ) async {
+    testWidgets('discovers peer-advertised protocols this node does not '
+        'serve', (tester) async {
+      // The node serves nothing of interest itself; the list must still
+      // offer what its peers advertise — the union, not just "Serving".
       await tester.pumpWidget(
-        _host(_update(localProtocols: ['/ipfs/id/1.0.0', '/ipfs/kad/1.0.0'])),
+        _host(_update(localProtocols: ['/ipfs/id/1.0.0'])),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Protocols'), findsNothing);
+      await tester.tap(find.text('Protocols'));
+      await tester.pumpAndSettle();
+
+      // From the peers: kad from both, inference from one.
+      expect(find.text('/ipfs/kad'), findsOneWidget);
+      expect(find.text('/kwaai/inference'), findsOneWidget);
+      // Once per family even though both peers advertise it and versions
+      // differ across sources.
+      expect(find.text('/kwaai/p2p/hello'), findsOneWidget);
     });
   });
 }

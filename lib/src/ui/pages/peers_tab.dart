@@ -696,8 +696,10 @@ class _TableSection extends StatefulWidget {
   final List<pb.ConnectedPeer> connected;
   final List<pb.RoutingPeer> routing;
 
-  /// What this node itself advertises — the protocol filter offers our own
-  /// KwaaiNet protocols, not the union of everything seen on the network.
+  /// What this node itself advertises. The protocol filter offers the union
+  /// of this and everything the connected peers advertise — one discovered
+  /// list, so a capability only the network has (a hivemind peer's
+  /// DHTProtocol handlers, say) is still filterable.
   final List<String> localProtocols;
   final String? selectedPeerId;
   final void Function(String peerId) onSelectPeer;
@@ -777,7 +779,15 @@ class _TableSectionState extends State<_TableSection> {
             unconnectedRows: unconnectedRows,
             onShowDhtClients: (v) => setState(() => _showDhtClients = v),
             onShowUnconnected: (v) => setState(() => _showUnconnected = v),
-            protocolChoices: kwaaiProtocolFamilies(widget.localProtocols),
+            // Discovered, not curated: what we serve plus whatever the
+            // connected peers advertise, in one list. A closure so the union
+            // is only computed when the drop-down opens — this build runs on
+            // every snapshot, and peers joining or leaving should not cost a
+            // sweep over every peer's protocol list each time.
+            discoverProtocols: () => protocolFamilies([
+              ...widget.localProtocols,
+              for (final c in widget.connected) ...c.protocols,
+            ]),
             selectedProtocols: _protocolFilter,
             onToggleProtocol: (family, on) => setState(() {
               on ? _protocolFilter.add(family) : _protocolFilter.remove(family);
@@ -1623,7 +1633,7 @@ class _Filters extends StatelessWidget {
     required this.unconnectedRows,
     required this.onShowDhtClients,
     required this.onShowUnconnected,
-    required this.protocolChoices,
+    required this.discoverProtocols,
     required this.selectedProtocols,
     required this.onToggleProtocol,
     required this.onClearProtocols,
@@ -1636,9 +1646,10 @@ class _Filters extends StatelessWidget {
   final ValueChanged<bool> onShowDhtClients;
   final ValueChanged<bool> onShowUnconnected;
 
-  /// KwaaiNet protocol family → an advertised id carrying it, from what this
-  /// node itself serves.
-  final Map<String, String> protocolChoices;
+  /// Discovers the filterable protocols — family → an advertised id carrying
+  /// it. A callback rather than a value: it is only invoked when the
+  /// drop-down opens, so the per-snapshot rebuild never pays for it.
+  final Map<String, String> Function() discoverProtocols;
 
   final Set<String> selectedProtocols;
   final void Function(String family, bool selected) onToggleProtocol;
@@ -1667,16 +1678,15 @@ class _Filters extends StatelessWidget {
           value: showDhtClients,
           onChanged: onShowDhtClients,
         ),
-      // Same appear-when-useful rule as the checkboxes: offered once this
-      // node advertises a KwaaiNet protocol, and held open while a selection
-      // is active even if the node stops advertising it.
-      if (protocolChoices.isNotEmpty || selectedProtocols.isNotEmpty)
-        _ProtocolFilter(
-          choices: protocolChoices,
-          selected: selectedProtocols,
-          onToggle: onToggleProtocol,
-          onClear: onClearProtocols,
-        ),
+      // Always offered, unlike the appear-when-useful checkboxes: whether
+      // there is anything to filter on is only knowable by running the
+      // discovery this control exists to defer.
+      _ProtocolFilter(
+        discover: discoverProtocols,
+        selected: selectedProtocols,
+        onToggle: onToggleProtocol,
+        onClear: onClearProtocols,
+      ),
     ];
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1690,14 +1700,18 @@ class _Filters extends StatelessWidget {
   }
 }
 
-/// Drop-down narrowing the table to peers advertising selected KwaaiNet
-/// protocols.
+/// Drop-down narrowing the table to peers advertising selected protocols.
 ///
-/// Only our own `/kwaai/…` protocols are offered — the libp2p machinery
-/// (identify, kad, relay, …) is advertised by every peer, so filtering on it
-/// would select everything while tripling the list's length. The choices come
-/// from what *this node* serves: that is the set the operator is comparing the
-/// network against, and it needs no knowledge of what exists elsewhere.
+/// One discovered list, not a curated one: the union of what this node serves
+/// (the header's "Serving" line) and every protocol its connected peers
+/// advertise. A capability only the network has — a hivemind peer's
+/// `DHTProtocol.*` handlers, kad on a build that does not serve it — is
+/// therefore still filterable, and nothing is hidden by a namespace rule.
+///
+/// Discovery runs when the drop-down *opens*, never on the snapshot rebuilds
+/// that arrive every few seconds — that is the point of taking a callback. The
+/// union is a few hundred string operations, so it runs synchronously on the
+/// tap; if peer counts ever make it heavy, this is the seam to move it behind.
 ///
 /// Nothing checked means no filtering. With boxes checked, a peer stays listed
 /// if it advertises **any** checked family — the faceted-filter convention,
@@ -1712,15 +1726,15 @@ class _Filters extends StatelessWidget {
 /// the rows one line tall.
 class _ProtocolFilter extends StatefulWidget {
   const _ProtocolFilter({
-    required this.choices,
+    required this.discover,
     required this.selected,
     required this.onToggle,
     required this.onClear,
   });
 
-  /// Family → an advertised full id, kept for [describeProtocol] — its
-  /// wildcard keys match versioned ids, not families.
-  final Map<String, String> choices;
+  /// Discovers family → an advertised full id (kept for [describeProtocol] —
+  /// its wildcard keys match versioned ids, not families). Called on open.
+  final Map<String, String> Function() discover;
 
   final Set<String> selected;
   final void Function(String family, bool selected) onToggle;
@@ -1735,15 +1749,24 @@ class _ProtocolFilterState extends State<_ProtocolFilter> {
   /// in the overlay, where the builder's controller is out of reach.
   final _menu = MenuController();
 
+  /// What the last open discovered. Only read while the menu is up, so it can
+  /// go stale between opens without anyone seeing it.
+  Map<String, String> _choices = const {};
+
+  void _open() {
+    setState(() => _choices = widget.discover());
+    _menu.open();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final kwaai = context.kwaai;
     final active = widget.selected.isNotEmpty;
-    // A ticked family this node no longer advertises stays listed — removing
-    // it would strand a filter the user can see the effect of but not undo.
-    final families = {...widget.choices.keys, ...widget.selected}.toList()
-      ..sort();
+    // A ticked family that has since vanished from discovery stays listed —
+    // removing it would strand a filter the user can see the effect of but
+    // not undo.
+    final families = {..._choices.keys, ...widget.selected}.toList()..sort();
 
     final color = active
         ? kwaai.accentPrimary
@@ -1768,6 +1791,13 @@ class _ProtocolFilterState extends State<_ProtocolFilter> {
                     }
                   : null,
             ),
+            // Discovery can come up empty — no self status yet and no
+            // identified peers. Say so rather than opening a bare menu.
+            if (families.isEmpty)
+              const _ProtocolMenuRow(
+                label: 'No protocols discovered yet',
+                onTap: null,
+              ),
             for (final family in families)
               _ProtocolMenuRow(
                 label: family,
@@ -1775,7 +1805,7 @@ class _ProtocolFilterState extends State<_ProtocolFilter> {
                 checked: widget.selected.contains(family),
                 // Same gloss the connections panel shows, minus ids that only
                 // describe themselves.
-                tooltip: switch (widget.choices[family]) {
+                tooltip: switch (_choices[family]) {
                   final id? when describeProtocol(id) != id =>
                     describeProtocol(id),
                   _ => null,
@@ -1792,11 +1822,13 @@ class _ProtocolFilterState extends State<_ProtocolFilter> {
       ],
       builder: (context, controller, _) => Tooltip(
         message:
-            'Show only peers advertising any of the checked KwaaiNet '
-            'protocols. Nothing checked shows every peer. Only peers with a '
-            'completed identify can match — routing-only entries never do.',
+            'Show only peers advertising any of the checked protocols. The '
+            'list is discovered when opened: what this node serves plus '
+            'everything its peers advertise. Nothing checked shows every '
+            'peer. Only peers with a completed identify can match — '
+            'routing-only entries never do.',
         child: InkWell(
-          onTap: () => controller.isOpen ? controller.close() : controller.open(),
+          onTap: () => controller.isOpen ? controller.close() : _open(),
           borderRadius: BorderRadius.circular(4),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -1957,7 +1989,20 @@ class _Caption extends StatelessWidget {
           // Sits immediately after the title, with the Spacer pushing the
           // summary to the right edge. The gap is fixed rather than flexible
           // so the control keeps its position as the summary text changes.
-          if (trailing != null) ...[const SizedBox(width: 12), trailing!],
+          //
+          // Flexible with an internal horizontal scroll, not bare: the filter
+          // controls are always present now, and on a narrow window they are
+          // wider than the bar. Scrolling within their slot keeps every
+          // control reachable where an overflow would just clip them.
+          if (trailing != null) ...[
+            const SizedBox(width: 12),
+            Flexible(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: trailing!,
+              ),
+            ),
+          ],
           // Expanded, and no Spacer: a Spacer takes flex 1 and a Flexible
           // text takes another, so the slack was split between them and the
           // summary sat mid-bar. One flexible child claiming all of it, with
