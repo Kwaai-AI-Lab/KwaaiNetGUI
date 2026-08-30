@@ -108,6 +108,25 @@ void main() {
       expect(_textWith('BBHELLO1'), findsOneWidget);
     });
 
+    testWidgets('offers a disabled Show all peers while nothing is selected', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_host(_update()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Protocols'));
+      await tester.pumpAndSettle();
+
+      // Present but inert: tapping it must not close the menu or change
+      // anything — there is no selection to clear.
+      expect(find.text('Show all peers'), findsOneWidget);
+      await tester.tap(find.text('Show all peers'));
+      await tester.pumpAndSettle();
+      expect(find.text('Show all peers'), findsOneWidget);
+      expect(_textWith('AAINFER1'), findsOneWidget);
+      expect(_textWith('BBHELLO1'), findsOneWidget);
+    });
+
     testWidgets('narrows to peers advertising a checked family, across '
         'versions', (tester) async {
       await tester.pumpWidget(_host(_update()));

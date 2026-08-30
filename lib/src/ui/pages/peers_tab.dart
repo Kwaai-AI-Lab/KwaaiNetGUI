@@ -1757,14 +1757,17 @@ class _ProtocolFilterState extends State<_ProtocolFilter> {
       menuChildren: [
         KwaaiMenuSurface(
           children: [
-            if (active)
-              _ProtocolMenuRow(
-                label: 'Show all peers',
-                onTap: () {
-                  _menu.close();
-                  widget.onClear();
-                },
-              ),
+            // Always present so the menu keeps its shape; disabled rather
+            // than hidden while there is nothing to clear.
+            _ProtocolMenuRow(
+              label: 'Show all peers',
+              onTap: active
+                  ? () {
+                      _menu.close();
+                      widget.onClear();
+                    }
+                  : null,
+            ),
             for (final family in families)
               _ProtocolMenuRow(
                 label: family,
@@ -1830,7 +1833,9 @@ class _ProtocolMenuRow extends StatefulWidget {
   });
 
   final String label;
-  final VoidCallback onTap;
+
+  /// Null disables the row: muted label, no hover pill, taps ignored.
+  final VoidCallback? onTap;
 
   /// Checkbox state, or null for a plain action row ("Show all peers") whose
   /// leading slot stays empty so its label still aligns with the ids.
@@ -1852,7 +1857,12 @@ class _ProtocolMenuRowState extends State<_ProtocolMenuRow> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final kwaai = context.kwaai;
-    final fg = _hovered ? Colors.white : theme.colorScheme.onSurface;
+    final enabled = widget.onTap != null;
+    final fg = !enabled
+        ? theme.disabledColor
+        : _hovered
+        ? Colors.white
+        : theme.colorScheme.onSurface;
     final style = theme.textTheme.bodySmall?.copyWith(
       height: 1.0,
       color: fg,
@@ -1873,7 +1883,9 @@ class _ProtocolMenuRowState extends State<_ProtocolMenuRow> {
           child: Container(
             width: double.infinity,
             decoration: BoxDecoration(
-              color: _hovered ? kwaai.accentPrimary : Colors.transparent,
+              color: enabled && _hovered
+                  ? kwaai.accentPrimary
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(6),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
