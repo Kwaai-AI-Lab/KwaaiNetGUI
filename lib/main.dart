@@ -112,6 +112,7 @@ Future<void> main() async {
       // the main page's tab bar reflects the user's last choice on
       // first paint.
       localChatEnabledProvider.overrideWith((_) => settings.localChatEnabled),
+      ragEnabledProvider.overrideWith((_) => settings.ragEnabled),
       // Seed the skipped-version mirror so the update banner suppresses a
       // previously-skipped release on first paint.
       skippedVersionProvider.overrideWith((_) => settings.skippedVersion),

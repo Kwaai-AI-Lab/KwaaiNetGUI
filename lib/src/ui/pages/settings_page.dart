@@ -257,6 +257,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     const _ContributeTab(),
                     const _NetworkTab(),
                     const _AppearanceTab(),
+                    _ExperimentalTab(settings: widget.settings),
                     _DeveloperTab(settings: widget.settings),
                     const _AboutTab(),
                   ],
@@ -378,6 +379,7 @@ const _settingsNavEntries = <_SettingsNavEntry>[
   ),
   _SettingsNavEntry(Icons.lan_outlined, Icons.lan, 'Network'),
   _SettingsNavEntry(Icons.palette_outlined, Icons.palette, 'Appearance'),
+  _SettingsNavEntry(Icons.science_outlined, Icons.science, 'Experimental'),
   _SettingsNavEntry(Icons.bug_report_outlined, Icons.bug_report, 'Developer'),
   _SettingsNavEntry(Icons.info_outline, Icons.info, 'About'),
 ];
@@ -2348,6 +2350,54 @@ class _BareApplyBar extends StatelessWidget {
       child: Align(
         alignment: Alignment.centerRight,
         child: KwaaiButton(label: 'Apply', onPressed: onApply),
+      ),
+    );
+  }
+}
+
+/// Experimental tab — feature gates for functionality that ships in the
+/// app but is still settling. Currently just RAG.
+class _ExperimentalTab extends ConsumerWidget {
+  const _ExperimentalTab({required this.settings});
+
+  final Settings settings;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ragOn = ref.watch(ragEnabledProvider);
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _FeatureCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const KwaaiHeading('RAG'),
+                const SizedBox(height: 4),
+                _SwitchRow(
+                  label: 'Enable RAG tab on main window',
+                  value: ragOn,
+                  onChanged: (v) async {
+                    await settings.setRagEnabled(v);
+                    ref.read(ragEnabledProvider.notifier).state = v;
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Retrieval-augmented generation: create knowledge '
+                  'bases, ingest documents, and ground chat answers in '
+                  'retrieved passages. Experimental — the storage format '
+                  'and daemon API may still change between releases.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

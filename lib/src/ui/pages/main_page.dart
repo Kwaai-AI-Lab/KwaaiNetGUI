@@ -50,9 +50,10 @@ class _MainPageState extends ConsumerState<MainPage> {
   /// when developer/etc. toggles are on.
   List<_TabSpec> _visibleTabs(WidgetRef ref) {
     final localChatOn = ref.watch(localChatEnabledProvider);
+    final ragOn = ref.watch(ragEnabledProvider);
     return [
       const _TabSpec(label: 'Chat', path: ChatPath.shardRun),
-      const _TabSpec(label: 'RAG'),
+      if (ragOn) const _TabSpec(label: 'RAG'),
       if (localChatOn)
         const _TabSpec(label: 'Local chat', path: ChatPath.generateLocal),
     ];

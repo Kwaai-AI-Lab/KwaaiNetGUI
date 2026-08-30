@@ -44,6 +44,7 @@ class Settings {
   static const _keepInTrayKey = 'window.keepInTrayOnClose';
   static const _startOnStartupKey = 'daemon.startOnStartup';
   static const _localChatKey = 'dev.localChatEnabled';
+  static const _ragKey = 'experimental.ragEnabled';
   static const _skippedVersionKey = 'app.skippedVersion';
   static const _autoDownloadKey = 'app.autoDownloadUpdates';
 
@@ -92,6 +93,11 @@ class Settings {
   /// fallback when you want to bypass the shard mesh.
   bool get localChatEnabled => _prefs.getBool(_localChatKey) ?? false;
 
+  /// Experimental feature gate — when true, the main page shows the RAG
+  /// tab (knowledge bases, document ingest, retrieval). Off by default
+  /// while the feature is still settling.
+  bool get ragEnabled => _prefs.getBool(_ragKey) ?? false;
+
   /// The app release version the user chose to "Skip" from the update
   /// banner (e.g. "0.1.3", normalized without a leading "v"). The banner
   /// stays hidden until a release strictly newer than this ships. Null
@@ -127,6 +133,10 @@ class Settings {
     await _prefs.setBool(_localChatKey, v);
   }
 
+  Future<void> setRagEnabled(bool v) async {
+    await _prefs.setBool(_ragKey, v);
+  }
+
   Future<void> setAutoDownloadUpdates(bool v) async {
     await _prefs.setBool(_autoDownloadKey, v);
   }
@@ -158,6 +168,11 @@ final settingsProvider = Provider<Settings>((ref) {
 /// writes through to Settings.setLocalChatEnabled() and updates this
 /// provider so subscribers see the change immediately.
 final localChatEnabledProvider = StateProvider<bool>((_) => false);
+
+/// Riverpod-visible mirror of [Settings.ragEnabled], same shape as
+/// [localChatEnabledProvider]: seeded by main.dart, written through by
+/// the Settings UI's Experimental tab, watched by the main page's tab bar.
+final ragEnabledProvider = StateProvider<bool>((_) => false);
 
 /// Riverpod-visible mirror of [Settings.skippedVersion]. The update
 /// banner / tray watch this so a "Skip" takes effect immediately without
