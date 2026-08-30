@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:gpt_markdown/custom_widgets/markdown_config.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -91,8 +90,14 @@ class KwaaiMarkdownBody extends StatelessWidget {
               ...MarkdownComponent.inlineComponents,
             ],
       onLinkTap: (url, title) => _openLink(url),
-      highlightBuilder: (context, inlineCode, style) =>
-          _InlineCode(code: inlineCode, style: style),
+      // Style rather than a widget builder: an InlineSpan stays on the text
+      // baseline and is selectable, which the old highlightBuilder was not.
+      inlineCodeStyle: InlineCodeStyle(
+        fontFamily: 'monospace',
+        fontSizeFactor: 0.92,
+        backgroundColor: scheme.onSurface.withValues(alpha: 0.08),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      ),
       codeBuilder: (context, name, code, closed) =>
           _CodeBlock(language: name, code: code),
       // Tables are left to the package default, which already wraps them
@@ -109,33 +114,6 @@ class KwaaiMarkdownBody extends StatelessWidget {
     if (uri == null) return;
     if (uri.scheme != 'http' && uri.scheme != 'https') return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
-}
-
-/// `inline code` — tinted chip that stays on the text baseline.
-class _InlineCode extends StatelessWidget {
-  const _InlineCode({required this.code, required this.style});
-
-  final String code;
-  final TextStyle style;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-      decoration: BoxDecoration(
-        color: scheme.onSurface.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        code,
-        style: style.copyWith(
-          fontFamily: 'monospace',
-          fontSize: (style.fontSize ?? 14) * 0.92,
-        ),
-      ),
-    );
   }
 }
 
@@ -177,9 +155,8 @@ class _CodeBlock extends StatelessWidget {
               children: [
                 Text(
                   language.isEmpty ? '' : language,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+                  style: Theme.of(context).textTheme.labelSmall
+                      ?.copyWith(color: scheme.onSurfaceVariant),
                 ),
                 const Spacer(),
                 _CopyButton(code: code),
