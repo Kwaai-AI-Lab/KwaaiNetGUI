@@ -2,6 +2,68 @@ import 'package:flutter/material.dart';
 
 import '../theme/kwaai_theme.dart';
 
+/// The popup chrome [KwaaiDropdown] paints, shared so other menus (the peers
+/// tab's protocol filter) read as the same family of control rather than a
+/// stock Material menu: the theme's menu background, a wide soft shadow, a
+/// hairline border on a 14px radius.
+///
+/// [alignment] is the one per-caller decision: [KwaaiDropdown] anchors
+/// topStart so the selected row can sit over the trigger, while a plain
+/// filter menu opens below its trigger.
+MenuStyle kwaaiMenuStyle(
+  BuildContext context, {
+  AlignmentGeometry alignment = AlignmentDirectional.topStart,
+}) {
+  final scheme = Theme.of(context).colorScheme;
+  return MenuStyle(
+    alignment: alignment,
+    backgroundColor: WidgetStatePropertyAll(context.kwaai.menuBackground),
+    // Wider, softer drop shadow — Material elevation 12 casts a more
+    // diffuse halo than 4–6. The shadow alpha is kept low so the
+    // overall effect stays delicate, like macOS NSMenu.
+    elevation: const WidgetStatePropertyAll(12),
+    shadowColor: WidgetStatePropertyAll(Colors.black.withValues(alpha: 0.18)),
+    // No outer padding — [KwaaiMenuSurface] provides its own breathing room.
+    padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: scheme.outline.withValues(alpha: 0.25)),
+      ),
+    ),
+  );
+}
+
+/// The inside of a [kwaaiMenuStyle] menu: the 1px white inner highlight macOS
+/// NSMenu paints just inside its border, wrapped in [IntrinsicWidth] so the
+/// menu shrinks to its widest row rather than the trigger's width.
+class KwaaiMenuSurface extends StatelessWidget {
+  const KwaaiMenuSurface({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final innerHighlight = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.6);
+    return IntrinsicWidth(
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: innerHighlight, width: 1),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: children,
+        ),
+      ),
+    );
+  }
+}
+
 /// One choice in a [KwaaiDropdown].
 class KwaaiDropdownItem<T> {
   const KwaaiDropdownItem({required this.value, required this.label});
@@ -143,65 +205,21 @@ class _KwaaiDropdownState<T> extends State<KwaaiDropdown<T>> {
         ? 0.0
         : -(_selectedIndex * rowHeight);
 
-    // Menu surface — uses the theme's menuBackground. The border is a
-    // very soft hairline; macOS NSMenu also paints a 1px white inner
-    // highlight just inside the border — we approximate that with a
-    // Container border on the inner column.
-    final menuBg = context.kwaai.menuBackground;
-    final menuBorder = scheme.outline.withValues(alpha: 0.25);
-    final menuInnerHighlight = Theme.of(context).brightness == Brightness.dark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.white.withValues(alpha: 0.6);
-
     return MenuAnchor(
       controller: _menuController,
       childFocusNode: _focusNode,
       alignmentOffset: Offset(0, selectedRowOffset),
-      style: MenuStyle(
-        alignment: AlignmentDirectional.topStart,
-        backgroundColor: WidgetStatePropertyAll(menuBg),
-        // Wider, softer drop shadow — Material elevation 12 casts a more
-        // diffuse halo than 4–6. The shadow alpha is kept low so the
-        // overall effect stays delicate, like macOS NSMenu.
-        elevation: const WidgetStatePropertyAll(12),
-        shadowColor: WidgetStatePropertyAll(
-          Colors.black.withValues(alpha: 0.18),
-        ),
-        // No outer padding — the inner-highlight Container provides its
-        // own breathing room.
-        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
-        shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: menuBorder),
-          ),
-        ),
-      ),
-      // Wrap items in an inner Container that paints the white inner
-      // highlight (macOS NSMenu has a 1px white edge just inside the
-      // border), then in IntrinsicWidth so the menu shrinks to the
-      // widest row.
+      style: kwaaiMenuStyle(context),
       menuChildren: [
-        IntrinsicWidth(
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(13),
-              border: Border.all(color: menuInnerHighlight, width: 1),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final item in widget.items)
-                  _MenuRow<T>(
-                    label: item.label,
-                    selected: item.value == widget.value,
-                    onTap: () => _select(item.value),
-                  ),
-              ],
-            ),
-          ),
+        KwaaiMenuSurface(
+          children: [
+            for (final item in widget.items)
+              _MenuRow<T>(
+                label: item.label,
+                selected: item.value == widget.value,
+                onTap: () => _select(item.value),
+              ),
+          ],
         ),
       ],
       builder: (context, controller, _) {

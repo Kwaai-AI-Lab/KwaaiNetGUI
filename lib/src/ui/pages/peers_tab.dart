@@ -13,6 +13,7 @@ import '../../daemon/peers_state.dart';
 import '../../p2p/protocols.dart';
 import '../theme/kwaai_theme.dart';
 import '../widgets/filter_toggle.dart';
+import '../widgets/kwaai_dropdown.dart';
 import '../widgets/service_status_view.dart';
 
 /// How long without an update before the view is marked stale.
@@ -1703,7 +1704,13 @@ class _Filters extends StatelessWidget {
 /// and the useful one: "who serves storage or inference" is a real question,
 /// "who serves both" rarely is. Matching is by family ([protocolFamily]), so a
 /// peer on a different version still counts.
-class _ProtocolFilter extends StatelessWidget {
+///
+/// The popup wears [kwaaiMenuStyle] so it reads as the same control as the
+/// app's other drop-downs rather than a stock Material menu — same surface,
+/// same tight rows. Toggling a row keeps the menu open; each protocol's gloss
+/// rides its row as a tooltip rather than a second line, which is what keeps
+/// the rows one line tall.
+class _ProtocolFilter extends StatefulWidget {
   const _ProtocolFilter({
     required this.choices,
     required this.selected,
@@ -1720,59 +1727,65 @@ class _ProtocolFilter extends StatelessWidget {
   final VoidCallback onClear;
 
   @override
+  State<_ProtocolFilter> createState() => _ProtocolFilterState();
+}
+
+class _ProtocolFilterState extends State<_ProtocolFilter> {
+  /// Owned rather than taken from the builder: the "Show all peers" row lives
+  /// in the overlay, where the builder's controller is out of reach.
+  final _menu = MenuController();
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final kwaai = context.kwaai;
-    final active = selected.isNotEmpty;
+    final active = widget.selected.isNotEmpty;
     // A ticked family this node no longer advertises stays listed — removing
     // it would strand a filter the user can see the effect of but not undo.
-    final families = {...choices.keys, ...selected}.toList()..sort();
+    final families = {...widget.choices.keys, ...widget.selected}.toList()
+      ..sort();
 
-    final monoStyle = theme.textTheme.bodySmall?.copyWith(
-      fontFamily: 'Menlo',
-      fontFamilyFallback: const ['Consolas', 'monospace'],
-    );
-    final descStyle = theme.textTheme.bodySmall?.copyWith(
-      color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
-    );
-    final color = active ? kwaai.accentPrimary : theme.textTheme.labelSmall?.color;
+    final color = active
+        ? kwaai.accentPrimary
+        : theme.textTheme.labelSmall?.color;
 
     return MenuAnchor(
+      controller: _menu,
+      // Below the trigger, unlike KwaaiDropdown's selected-row-over-trigger
+      // anchoring — this menu has no "current value" row to line up.
+      style: kwaaiMenuStyle(context, alignment: AlignmentDirectional.bottomStart),
       menuChildren: [
-        if (active)
-          MenuItemButton(
-            onPressed: onClear,
-            child: Text('Show all peers', style: theme.textTheme.bodySmall),
-          ),
-        for (final family in families)
-          CheckboxMenuButton(
-            value: selected.contains(family),
-            // The menu stays open on toggle — picking two protocols should
-            // not cost two round trips through the drop-down.
-            closeOnActivate: false,
-            onChanged: (v) => onToggle(family, v ?? false),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 340),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(family, style: monoStyle),
-                  // Same gloss the connections panel shows, minus ids that
-                  // only describe themselves.
-                  if (choices[family] case final id?
-                      when describeProtocol(id) != id)
-                    Text(
-                      describeProtocol(id),
-                      style: descStyle,
-                      softWrap: false,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                ],
+        KwaaiMenuSurface(
+          children: [
+            if (active)
+              _ProtocolMenuRow(
+                label: 'Show all peers',
+                onTap: () {
+                  _menu.close();
+                  widget.onClear();
+                },
               ),
-            ),
-          ),
+            for (final family in families)
+              _ProtocolMenuRow(
+                label: family,
+                mono: true,
+                checked: widget.selected.contains(family),
+                // Same gloss the connections panel shows, minus ids that only
+                // describe themselves.
+                tooltip: switch (widget.choices[family]) {
+                  final id? when describeProtocol(id) != id =>
+                    describeProtocol(id),
+                  _ => null,
+                },
+                // Not closing here is the point — picking two protocols
+                // should not cost two round trips through the drop-down.
+                onTap: () => widget.onToggle(
+                  family,
+                  !widget.selected.contains(family),
+                ),
+              ),
+          ],
+        ),
       ],
       builder: (context, controller, _) => Tooltip(
         message:
@@ -1788,7 +1801,9 @@ class _ProtocolFilter extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  active ? 'Protocols (${selected.length})' : 'Protocols',
+                  active
+                      ? 'Protocols (${widget.selected.length})'
+                      : 'Protocols',
                   style: theme.textTheme.labelSmall?.copyWith(color: color),
                 ),
                 Icon(Icons.arrow_drop_down, size: 16, color: color),
@@ -1798,6 +1813,105 @@ class _ProtocolFilter extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// One row of the protocol filter menu, shaped like [KwaaiDropdown]'s rows —
+/// tight single-line padding, an accent hover pill with a left/right gutter —
+/// but multi-select: a checkbox mark in the leading slot, and tapping does not
+/// close the menu.
+class _ProtocolMenuRow extends StatefulWidget {
+  const _ProtocolMenuRow({
+    required this.label,
+    required this.onTap,
+    this.checked,
+    this.mono = false,
+    this.tooltip,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  /// Checkbox state, or null for a plain action row ("Show all peers") whose
+  /// leading slot stays empty so its label still aligns with the ids.
+  final bool? checked;
+
+  /// Monospace label — protocol ids are things you grep for.
+  final bool mono;
+
+  final String? tooltip;
+
+  @override
+  State<_ProtocolMenuRow> createState() => _ProtocolMenuRowState();
+}
+
+class _ProtocolMenuRowState extends State<_ProtocolMenuRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final kwaai = context.kwaai;
+    final fg = _hovered ? Colors.white : theme.colorScheme.onSurface;
+    final style = theme.textTheme.bodySmall?.copyWith(
+      height: 1.0,
+      color: fg,
+      fontFamily: widget.mono ? 'Menlo' : null,
+      fontFamilyFallback: widget.mono
+          ? const ['Consolas', 'monospace']
+          : null,
+    );
+
+    final row = MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: _hovered ? kwaai.accentPrimary : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: Row(
+              children: [
+                // Fixed-width slot keeps labels aligned across rows, checkbox
+                // or not. An icon rather than a Material Checkbox: it follows
+                // the hover pill's foreground for free, and costs no ink
+                // controller in an often-rebuilt overlay.
+                SizedBox(
+                  width: 16,
+                  child: switch (widget.checked) {
+                    null => null,
+                    true => Icon(
+                      Icons.check_box,
+                      size: 14,
+                      color: _hovered ? fg : kwaai.accentPrimary,
+                    ),
+                    false => Icon(
+                      Icons.check_box_outline_blank,
+                      size: 14,
+                      color: _hovered
+                          ? fg
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                    ),
+                  },
+                ),
+                const SizedBox(width: 4),
+                Text(widget.label, style: style),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (widget.tooltip == null) return row;
+    return Tooltip(message: widget.tooltip!, child: row);
   }
 }
 
