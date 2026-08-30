@@ -40,6 +40,7 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
       s.initialPeers;
       s.forcePrivate;
       s.enableUpnp;
+      s.enableQuic;
       s.healthEnabled;
       s.healthEndpoint;
       return true;
@@ -81,6 +82,7 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
       initialPeers: s.initialPeers,
       forcePrivate: s.forcePrivate,
       enableUpnp: s.enableUpnp,
+      enableQuic: s.enableQuic,
       healthEnabled: s.healthEnabled,
       healthEndpoint: s.healthEndpoint,
     );
@@ -99,6 +101,7 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
       initialPeers: s.initialPeers,
       forcePrivate: s.forcePrivate,
       enableUpnp: s.enableUpnp,
+      enableQuic: s.enableQuic,
       healthEnabled: s.healthEnabled,
       healthEndpoint: s.healthEndpoint,
     );
@@ -128,6 +131,12 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
     state = s.copyWith(enableUpnp: v);
   }
 
+  void setEnableQuic(bool v) {
+    final s = state;
+    if (s == null) return;
+    state = s.copyWith(enableQuic: v);
+  }
+
   void setHealthEnabled(bool v) {
     final s = state;
     if (s == null) return;
@@ -153,6 +162,7 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
         !_listsEqual(s.initialPeers, onDisk.initialPeers) ||
         s.forcePrivate != onDisk.forcePrivate ||
         s.enableUpnp != onDisk.enableUpnp ||
+        s.enableQuic != onDisk.enableQuic ||
         s.healthEnabled != onDisk.healthEnabled ||
         s.healthEndpoint != onDisk.healthEndpoint;
   }
