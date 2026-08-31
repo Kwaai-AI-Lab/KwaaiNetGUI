@@ -22,6 +22,7 @@ class ConfigSnapshot {
     required this.initialPeers,
     required this.forcePrivate,
     required this.enableUpnp,
+    required this.enableQuic,
     required this.healthEnabled,
     required this.healthEndpoint,
   });
@@ -64,6 +65,13 @@ class ConfigSnapshot {
   /// node asking the router to open a port at all.
   final bool enableUpnp;
 
+  /// `enable_quic` — listen on and dial QUIC as well as TCP.
+  ///
+  /// Defaults true on the daemon side. Off is for networks that block or
+  /// throttle UDP; the transport is bound at startup, so changing it needs
+  /// a restart.
+  final bool enableQuic;
+
   /// `health_monitoring.enabled`.
   final bool healthEnabled;
 
@@ -80,6 +88,7 @@ class ConfigSnapshot {
     List<String>? initialPeers,
     bool? forcePrivate,
     bool? enableUpnp,
+    bool? enableQuic,
     bool? healthEnabled,
     String? healthEndpoint,
   }) {
@@ -93,6 +102,7 @@ class ConfigSnapshot {
       initialPeers: initialPeers ?? this.initialPeers,
       forcePrivate: forcePrivate ?? this.forcePrivate,
       enableUpnp: enableUpnp ?? this.enableUpnp,
+      enableQuic: enableQuic ?? this.enableQuic,
       healthEnabled: healthEnabled ?? this.healthEnabled,
       healthEndpoint: healthEndpoint ?? this.healthEndpoint,
     );
@@ -117,6 +127,7 @@ class ConfigFile {
     // Mirrors the daemon's own default, so a config that has never set the
     // key reads the same here as it behaves there.
     enableUpnp: true,
+    enableQuic: true,
     healthEnabled: true,
     healthEndpoint: '',
   );
@@ -156,6 +167,7 @@ class ConfigFile {
           : <String>[];
       final forcePrivate = (doc['force_private'] as bool?) ?? false;
       final enableUpnp = (doc['enable_upnp'] as bool?) ?? true;
+      final enableQuic = (doc['enable_quic'] as bool?) ?? true;
       final health = doc['health_monitoring'];
       final healthEnabled = health is YamlMap
           ? (health['enabled'] as bool? ?? true)
@@ -173,6 +185,7 @@ class ConfigFile {
         initialPeers: initialPeers,
         forcePrivate: forcePrivate,
         enableUpnp: enableUpnp,
+        enableQuic: enableQuic,
         healthEnabled: healthEnabled,
         healthEndpoint: healthEndpoint,
       );
@@ -205,6 +218,7 @@ class ConfigFile {
     _setScalar(editor, ['initial_peers'], updated.initialPeers);
     _setScalar(editor, ['force_private'], updated.forcePrivate);
     _setScalar(editor, ['enable_upnp'], updated.enableUpnp);
+    _setScalar(editor, ['enable_quic'], updated.enableQuic);
     _setScalar(editor, ['health_monitoring', 'enabled'], updated.healthEnabled);
     _setScalar(editor, [
       'health_monitoring',

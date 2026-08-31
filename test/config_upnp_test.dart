@@ -6,19 +6,21 @@ import 'package:kwaainet_gui/src/daemon/config_file.dart';
 /// in turn decides whether it is publicly reachable or falls back to relays.
 /// Carrying it wrongly through an edit would silently flip that, so the
 /// copyWith semantics are worth pinning.
-ConfigSnapshot _snapshot({bool enableUpnp = true}) => ConfigSnapshot(
-  model: '',
-  shardingEnabled: true,
-  storageEnabled: true,
-  storageCapacityGb: null,
-  port: null,
-  publicIp: '',
-  initialPeers: const [],
-  forcePrivate: false,
-  enableUpnp: enableUpnp,
-  healthEnabled: true,
-  healthEndpoint: '',
-);
+ConfigSnapshot _snapshot({bool enableUpnp = true, bool enableQuic = true}) =>
+    ConfigSnapshot(
+      model: '',
+      shardingEnabled: true,
+      storageEnabled: true,
+      storageCapacityGb: null,
+      port: null,
+      publicIp: '',
+      initialPeers: const [],
+      forcePrivate: false,
+      enableUpnp: enableUpnp,
+      enableQuic: enableQuic,
+      healthEnabled: true,
+      healthEndpoint: '',
+    );
 
 void main() {
   group('enableUpnp', () {
@@ -40,6 +42,24 @@ void main() {
       expect(_snapshot().copyWith(enableUpnp: false).enableUpnp, isFalse);
       expect(
         _snapshot(enableUpnp: false).copyWith(enableUpnp: true).enableUpnp,
+        isTrue,
+      );
+    });
+  });
+
+  group('enableQuic', () {
+    // Same copyWith trap as enableUpnp: a dropped field would silently
+    // re-enable QUIC on a network the user turned it off for.
+    test('survives an unrelated edit', () {
+      final off = _snapshot(enableQuic: false);
+      expect(off.copyWith(port: 9000).enableQuic, isFalse);
+      expect(off.copyWith(enableUpnp: false).enableQuic, isFalse);
+    });
+
+    test('can be toggled explicitly in both directions', () {
+      expect(_snapshot().copyWith(enableQuic: false).enableQuic, isFalse);
+      expect(
+        _snapshot(enableQuic: false).copyWith(enableQuic: true).enableQuic,
         isTrue,
       );
     });

@@ -1418,6 +1418,13 @@ class _ReachabilitySection extends ConsumerWidget {
           value: draft.enableUpnp,
           onChanged: notifier.setEnableUpnp,
         ),
+        _SwitchRow(
+          // Off is for networks that block or throttle UDP; the node then
+          // listens and dials over TCP only.
+          label: 'Enable QUIC transport',
+          value: draft.enableQuic,
+          onChanged: notifier.setEnableQuic,
+        ),
       ],
     );
   }
