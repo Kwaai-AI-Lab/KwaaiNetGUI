@@ -188,19 +188,29 @@ class InferencePhase extends $pb.ProtobufEnum {
   static const InferencePhase INFERENCE_PHASE_CHAIN_PINNED =
       InferencePhase._(5, _omitEnumNames ? '' : 'INFERENCE_PHASE_CHAIN_PINNED');
 
-  /// Best-effort dial of a chain member before generation starts.
-  /// Sets: peer_id, peer_name, ok, and (since PEER_DIAL_START was
-  /// added) duration_ms.
+  /// A best-effort dial of a chain member is about to be attempted,
+  /// answered later by a PEER_DIAL for the same peer. Announced up
+  /// front because the dial can take tens of seconds to time out,
+  /// during which a result-only event would leave a client unable to
+  /// say who is being waited on. Sets: peer_id, peer_name, is_self.
+  static const InferencePhase INFERENCE_PHASE_PEER_DIAL_START =
+      InferencePhase._(
+          13, _omitEnumNames ? '' : 'INFERENCE_PHASE_PEER_DIAL_START');
+
+  /// The dial's result. Sets: peer_id, peer_name, ok, and (since
+  /// PEER_DIAL_START was added) duration_ms.
   static const InferencePhase INFERENCE_PHASE_PEER_DIAL =
       InferencePhase._(6, _omitEnumNames ? '' : 'INFERENCE_PHASE_PEER_DIAL');
 
-  /// A hop is being dispatched. Sets: peer_id, peer_name, block_start,
-  /// block_end, is_self, token_index, is_prefill, candidate_index.
+  /// A hop is being dispatched: the coordinator is sending this
+  /// token's activations to the peer serving [block_start, block_end).
+  /// Sets: peer_id, peer_name, block_start, block_end, is_self,
+  /// token_index, is_prefill, candidate_index.
   static const InferencePhase INFERENCE_PHASE_HOP_START =
       InferencePhase._(7, _omitEnumNames ? '' : 'INFERENCE_PHASE_HOP_START');
 
-  /// A hop returned activations or logits. Sets everything HOP_START
-  /// does, plus duration_ms.
+  /// The hop returned its activations (or, from the last hop, logits).
+  /// Sets everything HOP_START does, plus duration_ms.
   static const InferencePhase INFERENCE_PHASE_HOP_OK =
       InferencePhase._(8, _omitEnumNames ? '' : 'INFERENCE_PHASE_HOP_OK');
 
@@ -217,8 +227,10 @@ class InferencePhase extends $pb.ProtobufEnum {
   static const InferencePhase INFERENCE_PHASE_PATH_REBUILD = InferencePhase._(
       10, _omitEnumNames ? '' : 'INFERENCE_PHASE_PATH_REBUILD');
 
-  /// A token was sampled. Sets: token_index, is_prefill, duration_ms
-  /// (wall time for this token's whole forward pass).
+  /// A token was sampled from the logits the last hop returned —
+  /// generation is autoregressive, so every token costs one full pass
+  /// through the chain, and this closes that pass. Sets: token_index,
+  /// is_prefill, duration_ms (wall time for the whole pass).
   static const InferencePhase INFERENCE_PHASE_TOKEN_SAMPLED = InferencePhase._(
       11, _omitEnumNames ? '' : 'INFERENCE_PHASE_TOKEN_SAMPLED');
 
@@ -227,15 +239,6 @@ class InferencePhase extends $pb.ProtobufEnum {
   static const InferencePhase INFERENCE_PHASE_COMPLETE =
       InferencePhase._(12, _omitEnumNames ? '' : 'INFERENCE_PHASE_COMPLETE');
 
-  /// A best-effort dial is about to be attempted, answered later by a
-  /// PEER_DIAL for the same peer. Emitted separately because the dial
-  /// can take tens of seconds to time out, during which the result-only
-  /// event would leave a client unable to say who is being waited on.
-  /// Sets: peer_id, peer_name, is_self.
-  static const InferencePhase INFERENCE_PHASE_PEER_DIAL_START =
-      InferencePhase._(
-          13, _omitEnumNames ? '' : 'INFERENCE_PHASE_PEER_DIAL_START');
-
   static const $core.List<InferencePhase> values = <InferencePhase>[
     INFERENCE_PHASE_UNSPECIFIED,
     INFERENCE_PHASE_RESOLVED,
@@ -243,6 +246,7 @@ class InferencePhase extends $pb.ProtobufEnum {
     INFERENCE_PHASE_DISCOVERY_RESULT,
     INFERENCE_PHASE_CIRCUIT_LOADED,
     INFERENCE_PHASE_CHAIN_PINNED,
+    INFERENCE_PHASE_PEER_DIAL_START,
     INFERENCE_PHASE_PEER_DIAL,
     INFERENCE_PHASE_HOP_START,
     INFERENCE_PHASE_HOP_OK,
@@ -250,7 +254,6 @@ class InferencePhase extends $pb.ProtobufEnum {
     INFERENCE_PHASE_PATH_REBUILD,
     INFERENCE_PHASE_TOKEN_SAMPLED,
     INFERENCE_PHASE_COMPLETE,
-    INFERENCE_PHASE_PEER_DIAL_START,
   ];
 
   static final $core.List<InferencePhase?> _byValue =
