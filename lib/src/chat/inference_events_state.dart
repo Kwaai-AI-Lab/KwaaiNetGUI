@@ -67,6 +67,7 @@ class InferenceRunLog {
     this.hopMs = const {},
     this.running = false,
     this.sawAnyEvent = false,
+    this.sawComplete = false,
     this.model = '',
     this.sessionId = '',
     this.totalBlocks = 0,
@@ -96,6 +97,12 @@ class InferenceRunLog {
   /// silently, so silence is the only signal an old daemon gives.
   final bool sawAnyEvent;
 
+  /// Whether the run reached INFERENCE_PHASE_COMPLETE — i.e. a response
+  /// actually came back. What separates a finished run (whose log the
+  /// panel may condense) from one that died mid-flight (whose log is
+  /// exactly what you want to read in full).
+  final bool sawComplete;
+
   final String model;
 
   /// The daemon's id for this run, shown once in the header.
@@ -120,6 +127,7 @@ class InferenceRunLog {
     Map<int, double>? hopMs,
     bool? running,
     bool? sawAnyEvent,
+    bool? sawComplete,
     String? model,
     String? sessionId,
     int? totalBlocks,
@@ -132,6 +140,7 @@ class InferenceRunLog {
     hopMs: hopMs ?? this.hopMs,
     running: running ?? this.running,
     sawAnyEvent: sawAnyEvent ?? this.sawAnyEvent,
+    sawComplete: sawComplete ?? this.sawComplete,
     model: model ?? this.model,
     sessionId: sessionId ?? this.sessionId,
     totalBlocks: totalBlocks ?? this.totalBlocks,
@@ -159,6 +168,7 @@ class InferenceEventsNotifier extends Notifier<InferenceRunLog> {
   Map<int, HopStatus> _hopStatus = {};
   Map<int, double> _hopMs = {};
   bool _sawAny = false;
+  bool _sawComplete = false;
   String _model = '';
   String _sessionId = '';
   int _totalBlocks = 0;
@@ -184,6 +194,7 @@ class InferenceEventsNotifier extends Notifier<InferenceRunLog> {
     _hopStatus = {};
     _hopMs = {};
     _sawAny = false;
+    _sawComplete = false;
     _model = '';
     _sessionId = '';
     _totalBlocks = 0;
@@ -238,6 +249,8 @@ class InferenceEventsNotifier extends Notifier<InferenceRunLog> {
         }
       case pb.InferencePhase.INFERENCE_PHASE_HOP_FAILED:
         if (e.hasBlockStart()) _hopStatus[e.blockStart] = HopStatus.failed;
+      case pb.InferencePhase.INFERENCE_PHASE_COMPLETE:
+        _sawComplete = true;
       default:
         break;
     }
@@ -264,6 +277,7 @@ class InferenceEventsNotifier extends Notifier<InferenceRunLog> {
     _hopStatus = {};
     _hopMs = {};
     _sawAny = false;
+    _sawComplete = false;
     _dropped = 0;
     state = const InferenceRunLog();
   }
@@ -279,6 +293,7 @@ class InferenceEventsNotifier extends Notifier<InferenceRunLog> {
       hopMs: Map.unmodifiable(_hopMs),
       running: running ?? state.running,
       sawAnyEvent: _sawAny,
+      sawComplete: _sawComplete,
       model: _model,
       sessionId: _sessionId,
       totalBlocks: _totalBlocks,

@@ -103,9 +103,13 @@ String _failureLabel(pb.HopFailure f) => switch (f) {
 /// separate line. Three collapses, each answering a question the raw log
 /// answered badly:
 ///
-///  - **Dials** become a single running tally. A 13-peer mesh emitted 13
-///    near-simultaneous lines that said nothing individually and buried
-///    the chain that followed.
+///  - **Dials** are one row per peer when the daemon announces them
+///    (`PEER_DIAL_START`), pending while the connect is in flight — a dial
+///    can take tens of seconds to time out, and who is being waited on is
+///    exactly what the panel could not answer before. An older daemon
+///    emits only results, which still become a single running tally: its
+///    13 near-simultaneous lines said nothing individually and buried the
+///    chain that followed.
 ///  - **Hops** become one row that starts as `→` and becomes `✓` when the
 ///    answer arrives, carrying its duration. Two lines per hop per token
 ///    is the bulk of a long run's log.
@@ -117,9 +121,21 @@ String _failureLabel(pb.HopFailure f) => switch (f) {
 ///  - **Failures** stay as their own `✗` row, and the retry lands on the
 ///    next row, so a fallback reads as two lines rather than being merged
 ///    into one and disappearing.
-List<LogRow> collapseEvents(List<pb.InferenceEvent> events) {
+///
+/// With `condensed` set (a run that finished with a response), the rows
+/// are additionally passed through [_condense], which trades the
+/// per-token detail for brevity now that there is nothing left to watch.
+List<LogRow> collapseEvents(
+  List<pb.InferenceEvent> events, {
+  bool condensed = false,
+}) {
   final rows = <LogRow>[];
   final byKey = <String, LogRow>{};
+
+  // Per-peer dial rows awaiting their result, keyed by peer id. Dials are
+  // sequential, so at most one is genuinely pending at a time.
+  final pendingDialByPeer = <String, LogRow>{};
+  var dialSeq = 0;
 
   // The last successfully-completed hop row, per token. A token's result
   // is folded into this rather than getting a line of its own; a *failed*
@@ -143,7 +159,39 @@ List<LogRow> collapseEvents(List<pb.InferenceEvent> events) {
   for (final e in events) {
     final ms = e.elapsedMs.toInt();
 
+    if (e.phase == pb.InferencePhase.INFERENCE_PHASE_PEER_DIAL_START) {
+      final row = LogRow(
+        key: 'dialp:${e.peerId}:${dialSeq++}',
+        elapsedMs: ms,
+        label: 'dial',
+        detail: _peer(e),
+        outcome: RowOutcome.pending,
+        phase: e.phase,
+        isSelf: e.isSelf,
+      );
+      rows.add(row);
+      byKey[row.key] = row;
+      pendingDialByPeer[e.peerId] = row;
+      continue;
+    }
+
     if (e.phase == pb.InferencePhase.INFERENCE_PHASE_PEER_DIAL) {
+      // A result whose start we saw resolves that peer's own row in
+      // place. Without a start (an older daemon) it falls through to the
+      // tally below.
+      final started = pendingDialByPeer.remove(e.peerId);
+      if (started != null) {
+        started
+          ..outcome = e.ok ? RowOutcome.ok : RowOutcome.failed
+          ..phase = e.phase
+          ..trailing = e.ok
+              ? (e.hasDurationMs() ? '${e.durationMs.round()}ms' : '')
+              : 'unreachable';
+        // A refused dial is routine — the peer may still answer when its
+        // hop is actually made — so it renders amber, not red.
+        if (!e.ok) started.failure = pb.HopFailure.HOP_FAILURE_TRANSIENT;
+        continue;
+      }
       if (e.ok) {
         dialOk++;
       } else {
@@ -265,7 +313,45 @@ List<LogRow> collapseEvents(List<pb.InferenceEvent> events) {
     }
   }
 
-  return rows;
+  return condensed ? _condense(rows) : rows;
+}
+
+/// The completed-run view: what mattered, without the play-by-play.
+///
+/// A finished run's per-token rows restate what the answer's existence
+/// already proves, so they are dropped: successful hops (except prefill,
+/// whose duration is the number people actually ask about) and standalone
+/// token rows. Successful per-peer dials fold back into a single tally.
+/// Everything diagnostic stays — failures, rebuilds, discovery, the
+/// pinned chain and the closing summary.
+List<LogRow> _condense(List<LogRow> rows) {
+  final out = <LogRow>[];
+  LogRow? dialTally;
+  var dialOk = 0;
+  for (final row in rows) {
+    if (row.key.startsWith('dialp:') && row.outcome == RowOutcome.ok) {
+      dialOk++;
+      if (dialTally == null) {
+        dialTally = LogRow(
+          key: 'dialsum:${row.key}',
+          elapsedMs: row.elapsedMs,
+          label: 'dial',
+          outcome: RowOutcome.ok,
+        );
+        out.add(dialTally);
+      }
+      dialTally.detail = '$dialOk peer${dialOk == 1 ? '' : 's'} reachable';
+      continue;
+    }
+    final okHop = row.label == 'hop' && row.outcome == RowOutcome.ok;
+    if (okHop && row.prefix != 'prefill') continue;
+    if (row.phase == pb.InferencePhase.INFERENCE_PHASE_TOKEN_SAMPLED &&
+        row.label == 'token') {
+      continue;
+    }
+    out.add(row);
+  }
+  return out;
 }
 
 /// The leading verb for a non-hop, non-dial phase.
@@ -307,7 +393,10 @@ String _detail(pb.InferenceEvent e) {
       return '#${e.hasTokenIndex() ? e.tokenIndex : 0}$ms';
     case pb.InferencePhase.INFERENCE_PHASE_COMPLETE:
       final n = e.hasTokenIndex() ? e.tokenIndex : 0;
-      return '$n tokens${e.message.isEmpty ? '' : ' (${e.message})'}';
+      final total = e.hasDurationMs()
+          ? ' · ${(e.durationMs / 1000).toStringAsFixed(1)}s'
+          : '';
+      return '$n tokens$total${e.message.isEmpty ? '' : ' (${e.message})'}';
     default:
       return e.message.isEmpty ? e.phase.name : e.message;
   }

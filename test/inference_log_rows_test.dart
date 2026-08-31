@@ -87,6 +87,80 @@ void main() {
     });
   });
 
+  group('per-peer dials (daemon announces PEER_DIAL_START)', () {
+    pb.InferenceEvent start(String name, {int ms = 3000}) =>
+        pb.InferenceEvent()
+          ..phase = pb.InferencePhase.INFERENCE_PHASE_PEER_DIAL_START
+          ..elapsedMs = Int64(ms)
+          ..peerId = 'id-$name'
+          ..peerName = name;
+
+    pb.InferenceEvent result(
+      String name, {
+      bool ok = true,
+      int ms = 3500,
+      double durationMs = 480,
+    }) =>
+        pb.InferenceEvent()
+          ..phase = pb.InferencePhase.INFERENCE_PHASE_PEER_DIAL
+          ..elapsedMs = Int64(ms)
+          ..peerId = 'id-$name'
+          ..peerName = name
+          ..ok = ok
+          ..durationMs = durationMs;
+
+    /// The whole point of the start event: a dial can take tens of
+    /// seconds to time out, and this is the row that names who is being
+    /// waited on while it does.
+    test('a dial is pending, and names its peer, until its result', () {
+      final rows = collapseEvents([start('node-f')]);
+
+      expect(rows, hasLength(1));
+      expect(rows.single.label, 'dial');
+      expect(rows.single.detail, 'node-f');
+      expect(rows.single.outcome, RowOutcome.pending);
+    });
+
+    test('the result resolves the same row rather than adding one', () {
+      final rows = collapseEvents([start('node-f'), result('node-f')]);
+
+      expect(rows, hasLength(1));
+      expect(rows.single.outcome, RowOutcome.ok);
+      expect(rows.single.trailing, '480ms');
+    });
+
+    test('an unreachable peer stays on screen by name, amber not red', () {
+      // A refused dial is routine — the peer may still answer its hop —
+      // so it must not read as a terminal failure.
+      final rows = collapseEvents([
+        start('node-g'),
+        result('node-g', ok: false),
+      ]);
+
+      expect(rows.single.outcome, RowOutcome.failed);
+      expect(rows.single.detail, 'node-g');
+      expect(rows.single.trailing, 'unreachable');
+      expect(rows.single.failure, pb.HopFailure.HOP_FAILURE_TRANSIENT);
+    });
+
+    test('sequential dials are one row per peer, in dial order', () {
+      final rows = collapseEvents([
+        start('a'),
+        result('a'),
+        start('b'),
+        result('b', ok: false),
+        start('c'),
+      ]);
+
+      expect(rows.map((r) => r.detail), ['a', 'b', 'c']);
+      expect(rows.map((r) => r.outcome), [
+        RowOutcome.ok,
+        RowOutcome.failed,
+        RowOutcome.pending,
+      ]);
+    });
+  });
+
   group('hop collapsing', () {
     test('a hop is one row that turns from → into ✓', () {
       final rows = collapseEvents([
@@ -441,6 +515,98 @@ void main() {
         _hop(pb.InferencePhase.INFERENCE_PHASE_HOP_START, start: 0, end: 32),
       ]);
       expect(rows.single.seqPos, isNull);
+    });
+  });
+
+  group('condensed (completed run)', () {
+    pb.InferenceEvent phase(
+      pb.InferencePhase p, {
+      int ms = 0,
+      String msg = '',
+    }) => pb.InferenceEvent()
+      ..phase = p
+      ..elapsedMs = Int64(ms)
+      ..message = msg;
+
+    test('successful per-token hops are dropped, failures stay', () {
+      final rows = collapseEvents(condensed: true, [
+        phase(pb.InferencePhase.INFERENCE_PHASE_RESOLVED),
+        _hop(pb.InferencePhase.INFERENCE_PHASE_HOP_START, start: 0, end: 32),
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_FAILED,
+          start: 0,
+          end: 32,
+          failure: pb.HopFailure.HOP_FAILURE_TRANSIENT,
+        ),
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_START,
+          start: 0,
+          end: 32,
+          candidate: 1,
+        ),
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_OK,
+          start: 0,
+          end: 32,
+          candidate: 1,
+          durationMs: 120,
+        ),
+        phase(pb.InferencePhase.INFERENCE_PHASE_COMPLETE, ms: 9000),
+      ]);
+
+      expect(rows.map((r) => r.label), ['resolved', 'hop', 'done']);
+      expect(rows[1].outcome, RowOutcome.failed);
+    });
+
+    test('the prefill hop survives condensation', () {
+      // Prefill duration is the number people actually ask about.
+      final rows = collapseEvents(condensed: true, [
+        _hop(pb.InferencePhase.INFERENCE_PHASE_HOP_START, start: 0, end: 32),
+        _hop(
+          pb.InferencePhase.INFERENCE_PHASE_HOP_OK,
+          start: 0,
+          end: 32,
+          durationMs: 119600,
+        ),
+        pb.InferenceEvent()
+          ..phase = pb.InferencePhase.INFERENCE_PHASE_TOKEN_SAMPLED
+          ..elapsedMs = Int64(120000)
+          ..tokenIndex = 0
+          ..isPrefill = true,
+      ]);
+
+      expect(rows, hasLength(1));
+      expect(rows.single.prefix, 'prefill');
+      expect(rows.single.trailing, '119600ms');
+    });
+
+    test('successful per-peer dials fold back into a tally', () {
+      pb.InferenceEvent dialStart(String name) => pb.InferenceEvent()
+        ..phase = pb.InferencePhase.INFERENCE_PHASE_PEER_DIAL_START
+        ..peerId = 'id-$name'
+        ..peerName = name;
+      pb.InferenceEvent dialResult(String name, {bool ok = true}) =>
+          pb.InferenceEvent()
+            ..phase = pb.InferencePhase.INFERENCE_PHASE_PEER_DIAL
+            ..peerId = 'id-$name'
+            ..peerName = name
+            ..ok = ok;
+
+      final rows = collapseEvents(condensed: true, [
+        dialStart('a'),
+        dialResult('a'),
+        dialStart('b'),
+        dialResult('b', ok: false),
+        dialStart('c'),
+        dialResult('c'),
+      ]);
+
+      // The unreachable peer keeps its name — that was the original
+      // complaint — while the routine successes become one line.
+      expect(rows, hasLength(2));
+      expect(rows.first.detail, '2 peers reachable');
+      expect(rows.last.detail, 'b');
+      expect(rows.last.trailing, 'unreachable');
     });
   });
 
