@@ -13,6 +13,7 @@ import '../../daemon/peers_state.dart';
 import '../../p2p/protocols.dart';
 import '../theme/kwaai_theme.dart';
 import '../widgets/filter_toggle.dart';
+import '../widgets/kwaai_dropdown.dart';
 import '../widgets/service_status_view.dart';
 
 /// How long without an update before the view is marked stale.
@@ -185,6 +186,9 @@ class _PeersTabState extends ConsumerState<PeersTab> {
           child: _TableSection(
             connected: update.connected,
             routing: update.routing,
+            localProtocols: update.hasSelfStatus()
+                ? update.selfStatus.localProtocols
+                : const [],
             selectedPeerId: _selectedPeerId,
             onSelectPeer: _togglePeer,
             onConnect: _connectPeer,
@@ -683,6 +687,7 @@ class _TableSection extends StatefulWidget {
   const _TableSection({
     required this.connected,
     required this.routing,
+    required this.localProtocols,
     required this.selectedPeerId,
     required this.onSelectPeer,
     required this.onConnect,
@@ -690,6 +695,12 @@ class _TableSection extends StatefulWidget {
 
   final List<pb.ConnectedPeer> connected;
   final List<pb.RoutingPeer> routing;
+
+  /// What this node itself advertises. The protocol filter offers the union
+  /// of this and everything the connected peers advertise — one discovered
+  /// list, so a capability only the network has (a hivemind peer's
+  /// DHTProtocol handlers, say) is still filterable.
+  final List<String> localProtocols;
   final String? selectedPeerId;
   final void Function(String peerId) onSelectPeer;
   final Future<bool> Function(String peerId) onConnect;
@@ -719,6 +730,13 @@ class _TableSectionState extends State<_TableSection> {
   /// talking to"; shown, it answers "who could I talk to".
   bool _showUnconnected = false;
 
+  /// Protocol families the table is narrowed to. Empty means no narrowing —
+  /// the default shows every peer whatever it advertises.
+  ///
+  /// Families rather than full ids, so a peer running a different version of
+  /// a protocol we advertise still matches.
+  final Set<String> _protocolFilter = {};
+
   @override
   Widget build(BuildContext context) {
     final allRows = mergePeerRows(widget.connected, widget.routing);
@@ -728,7 +746,8 @@ class _TableSectionState extends State<_TableSection> {
         .where(
           (r) =>
               (_showDhtClients || !r.isDhtClient) &&
-              (_showUnconnected || r.isConnected),
+              (_showUnconnected || r.isConnected) &&
+              (_protocolFilter.isEmpty || r.advertisesAny(_protocolFilter)),
         )
         .toList();
     // What the table is actually withholding — zero once everything is shown.
@@ -760,6 +779,20 @@ class _TableSectionState extends State<_TableSection> {
             unconnectedRows: unconnectedRows,
             onShowDhtClients: (v) => setState(() => _showDhtClients = v),
             onShowUnconnected: (v) => setState(() => _showUnconnected = v),
+            // Discovered, not curated: what we serve plus whatever the
+            // connected peers advertise, in one list. A closure so the union
+            // is only computed when the drop-down opens — this build runs on
+            // every snapshot, and peers joining or leaving should not cost a
+            // sweep over every peer's protocol list each time.
+            discoverProtocols: () => protocolFamilies([
+              ...widget.localProtocols,
+              for (final c in widget.connected) ...c.protocols,
+            ]),
+            selectedProtocols: _protocolFilter,
+            onToggleProtocol: (family, on) => setState(() {
+              on ? _protocolFilter.add(family) : _protocolFilter.remove(family);
+            }),
+            onClearProtocols: () => setState(_protocolFilter.clear),
           ),
         ),
         Expanded(
@@ -902,6 +935,17 @@ class PeerRow {
   /// A client-mode peer still advertises circuit relay hop, and one of our own
   /// nodes runs kad in client mode whenever it is only reachable via a relay.
   bool get isDhtClient => primary?.dhtRole == pbenum.DhtRole.DHT_ROLE_CLIENT;
+
+  /// Whether this peer advertises any of [families] (protocol ids compared by
+  /// family, so versions do not have to agree).
+  ///
+  /// Checked across every connection rather than just [primary]: identify is
+  /// per peer, but there is no guarantee which connection's snapshot carries
+  /// it. Routing-only peers have no identify to read and never match — a
+  /// protocol filter deliberately shows only peers *known* to serve it.
+  bool advertisesAny(Set<String> families) => connections.any(
+    (c) => c.protocols.any((p) => families.contains(protocolFamily(p))),
+  );
 }
 
 /// Merge the two peer sets into one row per peer, in display order.
@@ -1589,6 +1633,10 @@ class _Filters extends StatelessWidget {
     required this.unconnectedRows,
     required this.onShowDhtClients,
     required this.onShowUnconnected,
+    required this.discoverProtocols,
+    required this.selectedProtocols,
+    required this.onToggleProtocol,
+    required this.onClearProtocols,
   });
 
   final bool showDhtClients;
@@ -1598,10 +1646,18 @@ class _Filters extends StatelessWidget {
   final ValueChanged<bool> onShowDhtClients;
   final ValueChanged<bool> onShowUnconnected;
 
+  /// Discovers the filterable protocols — family → an advertised id carrying
+  /// it. A callback rather than a value: it is only invoked when the
+  /// drop-down opens, so the per-snapshot rebuild never pays for it.
+  final Map<String, String> Function() discoverProtocols;
+
+  final Set<String> selectedProtocols;
+  final void Function(String family, bool selected) onToggleProtocol;
+  final VoidCallback onClearProtocols;
+
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
+  Widget build(BuildContext context) {
+    final toggles = <Widget>[
       if (unconnectedRows > 0 || showUnconnected)
         FilterToggle(
           label: 'Show unconnected',
@@ -1612,9 +1668,6 @@ class _Filters extends StatelessWidget {
           value: showUnconnected,
           onChanged: onShowUnconnected,
         ),
-      if ((unconnectedRows > 0 || showUnconnected) &&
-          (clientRows > 0 || showDhtClients))
-        const SizedBox(width: 10),
       if (clientRows > 0 || showDhtClients)
         FilterToggle(
           label: 'Show DHT clients',
@@ -1625,8 +1678,285 @@ class _Filters extends StatelessWidget {
           value: showDhtClients,
           onChanged: onShowDhtClients,
         ),
-    ],
-  );
+      // Always offered, unlike the appear-when-useful checkboxes: whether
+      // there is anything to filter on is only knowable by running the
+      // discovery this control exists to defer.
+      _ProtocolFilter(
+        discover: discoverProtocols,
+        selected: selectedProtocols,
+        onToggle: onToggleProtocol,
+        onClear: onClearProtocols,
+      ),
+    ];
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < toggles.length; i++) ...[
+          if (i > 0) const SizedBox(width: 10),
+          toggles[i],
+        ],
+      ],
+    );
+  }
+}
+
+/// Drop-down narrowing the table to peers advertising selected protocols.
+///
+/// One discovered list, not a curated one: the union of what this node serves
+/// (the header's "Serving" line) and every protocol its connected peers
+/// advertise. A capability only the network has — a hivemind peer's
+/// `DHTProtocol.*` handlers, kad on a build that does not serve it — is
+/// therefore still filterable, and nothing is hidden by a namespace rule.
+///
+/// Discovery runs when the drop-down *opens*, never on the snapshot rebuilds
+/// that arrive every few seconds — that is the point of taking a callback. The
+/// union is a few hundred string operations, so it runs synchronously on the
+/// tap; if peer counts ever make it heavy, this is the seam to move it behind.
+///
+/// Nothing checked means no filtering. With boxes checked, a peer stays listed
+/// if it advertises **any** checked family — the faceted-filter convention,
+/// and the useful one: "who serves storage or inference" is a real question,
+/// "who serves both" rarely is. Matching is by family ([protocolFamily]), so a
+/// peer on a different version still counts.
+///
+/// The popup wears [kwaaiMenuStyle] so it reads as the same control as the
+/// app's other drop-downs rather than a stock Material menu — same surface,
+/// same tight rows. Toggling a row keeps the menu open; each protocol's gloss
+/// rides its row as a tooltip rather than a second line, which is what keeps
+/// the rows one line tall.
+class _ProtocolFilter extends StatefulWidget {
+  const _ProtocolFilter({
+    required this.discover,
+    required this.selected,
+    required this.onToggle,
+    required this.onClear,
+  });
+
+  /// Discovers family → an advertised full id (kept for [describeProtocol] —
+  /// its wildcard keys match versioned ids, not families). Called on open.
+  final Map<String, String> Function() discover;
+
+  final Set<String> selected;
+  final void Function(String family, bool selected) onToggle;
+  final VoidCallback onClear;
+
+  @override
+  State<_ProtocolFilter> createState() => _ProtocolFilterState();
+}
+
+class _ProtocolFilterState extends State<_ProtocolFilter> {
+  /// Owned rather than taken from the builder: the "Show all peers" row lives
+  /// in the overlay, where the builder's controller is out of reach.
+  final _menu = MenuController();
+
+  /// What the last open discovered. Only read while the menu is up, so it can
+  /// go stale between opens without anyone seeing it.
+  Map<String, String> _choices = const {};
+
+  void _open() {
+    setState(() => _choices = widget.discover());
+    _menu.open();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final kwaai = context.kwaai;
+    final active = widget.selected.isNotEmpty;
+    // A ticked family that has since vanished from discovery stays listed —
+    // removing it would strand a filter the user can see the effect of but
+    // not undo.
+    final families = {..._choices.keys, ...widget.selected}.toList()..sort();
+
+    final color = active
+        ? kwaai.accentPrimary
+        : theme.textTheme.labelSmall?.color;
+
+    return MenuAnchor(
+      controller: _menu,
+      // Below the trigger, unlike KwaaiDropdown's selected-row-over-trigger
+      // anchoring — this menu has no "current value" row to line up.
+      style: kwaaiMenuStyle(context, alignment: AlignmentDirectional.bottomStart),
+      menuChildren: [
+        KwaaiMenuSurface(
+          children: [
+            // Always present so the menu keeps its shape; disabled rather
+            // than hidden while there is nothing to clear.
+            _ProtocolMenuRow(
+              label: 'Show all peers',
+              onTap: active
+                  ? () {
+                      _menu.close();
+                      widget.onClear();
+                    }
+                  : null,
+            ),
+            // Discovery can come up empty — no self status yet and no
+            // identified peers. Say so rather than opening a bare menu.
+            if (families.isEmpty)
+              const _ProtocolMenuRow(
+                label: 'No protocols discovered yet',
+                onTap: null,
+              ),
+            for (final family in families)
+              _ProtocolMenuRow(
+                label: family,
+                mono: true,
+                checked: widget.selected.contains(family),
+                // Same gloss the connections panel shows, minus ids that only
+                // describe themselves.
+                tooltip: switch (_choices[family]) {
+                  final id? when describeProtocol(id) != id =>
+                    describeProtocol(id),
+                  _ => null,
+                },
+                // Not closing here is the point — picking two protocols
+                // should not cost two round trips through the drop-down.
+                onTap: () => widget.onToggle(
+                  family,
+                  !widget.selected.contains(family),
+                ),
+              ),
+          ],
+        ),
+      ],
+      builder: (context, controller, _) => Tooltip(
+        message:
+            'Show only peers advertising any of the checked protocols. The '
+            'list is discovered when opened: what this node serves plus '
+            'everything its peers advertise. Nothing checked shows every '
+            'peer. Only peers with a completed identify can match — '
+            'routing-only entries never do.',
+        child: InkWell(
+          onTap: () => controller.isOpen ? controller.close() : _open(),
+          borderRadius: BorderRadius.circular(4),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  active
+                      ? 'Protocols (${widget.selected.length})'
+                      : 'Protocols',
+                  style: theme.textTheme.labelSmall?.copyWith(color: color),
+                ),
+                Icon(Icons.arrow_drop_down, size: 16, color: color),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One row of the protocol filter menu, shaped like [KwaaiDropdown]'s rows —
+/// tight single-line padding, an accent hover pill with a left/right gutter —
+/// but multi-select: a checkbox mark in the leading slot, and tapping does not
+/// close the menu.
+class _ProtocolMenuRow extends StatefulWidget {
+  const _ProtocolMenuRow({
+    required this.label,
+    required this.onTap,
+    this.checked,
+    this.mono = false,
+    this.tooltip,
+  });
+
+  final String label;
+
+  /// Null disables the row: muted label, no hover pill, taps ignored.
+  final VoidCallback? onTap;
+
+  /// Checkbox state, or null for a plain action row ("Show all peers") whose
+  /// leading slot stays empty so its label still aligns with the ids.
+  final bool? checked;
+
+  /// Monospace label — protocol ids are things you grep for.
+  final bool mono;
+
+  final String? tooltip;
+
+  @override
+  State<_ProtocolMenuRow> createState() => _ProtocolMenuRowState();
+}
+
+class _ProtocolMenuRowState extends State<_ProtocolMenuRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final kwaai = context.kwaai;
+    final enabled = widget.onTap != null;
+    final fg = !enabled
+        ? theme.disabledColor
+        : _hovered
+        ? Colors.white
+        : theme.colorScheme.onSurface;
+    final style = theme.textTheme.bodySmall?.copyWith(
+      height: 1.0,
+      color: fg,
+      fontFamily: widget.mono ? 'Menlo' : null,
+      fontFamilyFallback: widget.mono
+          ? const ['Consolas', 'monospace']
+          : null,
+    );
+
+    final row = MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: enabled && _hovered
+                  ? kwaai.accentPrimary
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: Row(
+              children: [
+                // Fixed-width slot keeps labels aligned across rows, checkbox
+                // or not. An icon rather than a Material Checkbox: it follows
+                // the hover pill's foreground for free, and costs no ink
+                // controller in an often-rebuilt overlay.
+                SizedBox(
+                  width: 16,
+                  child: switch (widget.checked) {
+                    null => null,
+                    true => Icon(
+                      Icons.check_box,
+                      size: 14,
+                      color: _hovered ? fg : kwaai.accentPrimary,
+                    ),
+                    false => Icon(
+                      Icons.check_box_outline_blank,
+                      size: 14,
+                      color: _hovered
+                          ? fg
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                    ),
+                  },
+                ),
+                const SizedBox(width: 4),
+                Text(widget.label, style: style),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (widget.tooltip == null) return row;
+    return Tooltip(message: widget.tooltip!, child: row);
+  }
 }
 
 class _Caption extends StatelessWidget {
@@ -1659,7 +1989,20 @@ class _Caption extends StatelessWidget {
           // Sits immediately after the title, with the Spacer pushing the
           // summary to the right edge. The gap is fixed rather than flexible
           // so the control keeps its position as the summary text changes.
-          if (trailing != null) ...[const SizedBox(width: 12), trailing!],
+          //
+          // Flexible with an internal horizontal scroll, not bare: the filter
+          // controls are always present now, and on a narrow window they are
+          // wider than the bar. Scrolling within their slot keeps every
+          // control reachable where an overflow would just clip them.
+          if (trailing != null) ...[
+            const SizedBox(width: 12),
+            Flexible(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: trailing!,
+              ),
+            ),
+          ],
           // Expanded, and no Spacer: a Spacer takes flex 1 and a Flexible
           // text takes another, so the slack was split between them and the
           // summary sat mid-bar. One flexible child claiming all of it, with
