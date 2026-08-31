@@ -1033,6 +1033,8 @@ class StatusReply extends $pb.GeneratedMessage {
     $core.int? peerCount,
     $fixnum.Int64? uptimeSecs,
     $core.String? version,
+    $core.int? bootstrapTotal,
+    $core.int? bootstrapReachable,
   }) {
     final result = create();
     if (serverTime != null) result.serverTime = serverTime;
@@ -1041,6 +1043,9 @@ class StatusReply extends $pb.GeneratedMessage {
     if (peerCount != null) result.peerCount = peerCount;
     if (uptimeSecs != null) result.uptimeSecs = uptimeSecs;
     if (version != null) result.version = version;
+    if (bootstrapTotal != null) result.bootstrapTotal = bootstrapTotal;
+    if (bootstrapReachable != null)
+      result.bootstrapReachable = bootstrapReachable;
     return result;
   }
 
@@ -1065,6 +1070,10 @@ class StatusReply extends $pb.GeneratedMessage {
         5, _omitFieldNames ? '' : 'uptimeSecs', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOS(6, _omitFieldNames ? '' : 'version')
+    ..aI(7, _omitFieldNames ? '' : 'bootstrapTotal',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(8, _omitFieldNames ? '' : 'bootstrapReachable',
+        fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1154,6 +1163,40 @@ class StatusReply extends $pb.GeneratedMessage {
   $core.bool hasVersion() => $_has(5);
   @$pb.TagNumber(6)
   void clearVersion() => $_clearField(6);
+
+  /// Bootstrap connectivity, for surfacing "my configured initial peers
+  /// are down" to clients. `bootstrap_total` counts the distinct peer IDs
+  /// derivable from the configured bootstrap set (initial_peers, or the
+  /// built-in defaults when that list is absent); entries without a /p2p
+  /// component contribute nothing, so 0 with peers configured means the
+  /// condition is unknowable, not healthy.
+  ///
+  /// `bootstrap_reachable` counts those that are currently connected OR
+  /// present in the Kademlia routing table. Routing-table membership is
+  /// deliberately part of the definition: bootstraps close idle
+  /// connections (~30s), so a healthy node's live-connection count to
+  /// them is legitimately 0 at steady state — but a bootstrap that was
+  /// never reachable never enters the table at all.
+  ///
+  /// Both 0 on daemons built before these fields existed and on the Go
+  /// p2p path; clients should only act on reachable == 0 when total > 0.
+  @$pb.TagNumber(7)
+  $core.int get bootstrapTotal => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set bootstrapTotal($core.int value) => $_setUnsignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasBootstrapTotal() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearBootstrapTotal() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get bootstrapReachable => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set bootstrapReachable($core.int value) => $_setUnsignedInt32(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasBootstrapReachable() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearBootstrapReachable() => $_clearField(8);
 }
 
 /// `kwaainet shard chain` — model block coverage from the DHT.
@@ -2478,6 +2521,8 @@ class NetworkUpdate extends $pb.GeneratedMessage {
     SelfStatus? selfStatus,
     $core.Iterable<ConnectedPeer>? connected,
     $core.Iterable<RoutingPeer>? routing,
+    $core.int? bootstrapTotal,
+    $core.int? bootstrapReachable,
   }) {
     final result = create();
     if (serverTime != null) result.serverTime = serverTime;
@@ -2485,6 +2530,9 @@ class NetworkUpdate extends $pb.GeneratedMessage {
     if (selfStatus != null) result.selfStatus = selfStatus;
     if (connected != null) result.connected.addAll(connected);
     if (routing != null) result.routing.addAll(routing);
+    if (bootstrapTotal != null) result.bootstrapTotal = bootstrapTotal;
+    if (bootstrapReachable != null)
+      result.bootstrapReachable = bootstrapReachable;
     return result;
   }
 
@@ -2510,6 +2558,10 @@ class NetworkUpdate extends $pb.GeneratedMessage {
         subBuilder: ConnectedPeer.create)
     ..pPM<RoutingPeer>(5, _omitFieldNames ? '' : 'routing',
         subBuilder: RoutingPeer.create)
+    ..aI(6, _omitFieldNames ? '' : 'bootstrapTotal',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(7, _omitFieldNames ? '' : 'bootstrapReachable',
+        fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2570,6 +2622,35 @@ class NetworkUpdate extends $pb.GeneratedMessage {
   /// The Kademlia routing table, sorted by peer id.
   @$pb.TagNumber(5)
   $pb.PbList<RoutingPeer> get routing => $_getList(4);
+
+  /// Bootstrap connectivity, so a client can tell "my configured initial
+  /// peers are down" apart from ordinary churn. Same definitions as the
+  /// StatusReply pair: `bootstrap_total` is the distinct peer IDs derivable
+  /// from the configured bootstrap set (0 = unknowable, not healthy), and
+  /// `bootstrap_reachable` counts those connected or in the routing table —
+  /// table membership included because bootstraps drop idle connections,
+  /// while one that was never dialable never enters the table at all.
+  ///
+  /// A change in `bootstrap_reachable` always changes the connected/routing
+  /// sets too, so it is never suppressed as an unchanged snapshot: clients
+  /// get the transition pushed, not polled.
+  @$pb.TagNumber(6)
+  $core.int get bootstrapTotal => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set bootstrapTotal($core.int value) => $_setUnsignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasBootstrapTotal() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearBootstrapTotal() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get bootstrapReachable => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set bootstrapReachable($core.int value) => $_setUnsignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasBootstrapReachable() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearBootstrapReachable() => $_clearField(7);
 }
 
 /// Dial a peer we know of but hold no connection to.

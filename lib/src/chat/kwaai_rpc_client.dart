@@ -457,12 +457,19 @@ class KwaaiRpcClient {
   /// unreachable daemon is the normal stopped case, not a sign the cached
   /// channel has gone bad, and the probe loop already owns reconnection.
   Future<String?> daemonVersion() async {
+    final version = (await statusSnapshot())?.version ?? '';
+    return version.isEmpty ? null : version;
+  }
+
+  /// One-shot daemon status (`StatusReply`), or null when the daemon isn't
+  /// reachable. Same non-resetting failure contract as [daemonVersion],
+  /// which reads its answer from this.
+  Future<pb.StatusReply?> statusSnapshot() async {
     try {
       final session = await _sessionOrInit();
-      final reply = await session.status().timeout(const Duration(seconds: 2));
-      return reply.version.isEmpty ? null : reply.version;
+      return await session.status().timeout(const Duration(seconds: 2));
     } catch (e) {
-      _log('daemonVersion failed: $e');
+      _log('statusSnapshot failed: $e');
       return null;
     }
   }

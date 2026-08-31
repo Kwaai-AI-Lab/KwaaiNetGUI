@@ -447,6 +447,14 @@ const StatusReply$json = {
     {'1': 'peer_count', '3': 4, '4': 1, '5': 13, '10': 'peerCount'},
     {'1': 'uptime_secs', '3': 5, '4': 1, '5': 4, '10': 'uptimeSecs'},
     {'1': 'version', '3': 6, '4': 1, '5': 9, '10': 'version'},
+    {'1': 'bootstrap_total', '3': 7, '4': 1, '5': 13, '10': 'bootstrapTotal'},
+    {
+      '1': 'bootstrap_reachable',
+      '3': 8,
+      '4': 1,
+      '5': 13,
+      '10': 'bootstrapReachable'
+    },
   ],
 };
 
@@ -455,7 +463,9 @@ final $typed_data.Uint8List statusReplyDescriptor = $convert.base64Decode(
     'CgtTdGF0dXNSZXBseRIfCgtzZXJ2ZXJfdGltZRgBIAEoCVIKc2VydmVyVGltZRIUCgVtb2RlbB'
     'gCIAEoCVIFbW9kZWwSHwoLc2hhcmRfcmVhZHkYAyABKAhSCnNoYXJkUmVhZHkSHQoKcGVlcl9j'
     'b3VudBgEIAEoDVIJcGVlckNvdW50Eh8KC3VwdGltZV9zZWNzGAUgASgEUgp1cHRpbWVTZWNzEh'
-    'gKB3ZlcnNpb24YBiABKAlSB3ZlcnNpb24=');
+    'gKB3ZlcnNpb24YBiABKAlSB3ZlcnNpb24SJwoPYm9vdHN0cmFwX3RvdGFsGAcgASgNUg5ib290'
+    'c3RyYXBUb3RhbBIvChNib290c3RyYXBfcmVhY2hhYmxlGAggASgNUhJib290c3RyYXBSZWFjaG'
+    'FibGU=');
 
 @$core.Deprecated('Use blockCoverageRequestDescriptor instead')
 const BlockCoverageRequest$json = {
@@ -762,6 +772,14 @@ const NetworkUpdate$json = {
       '6': '.kwaai.v1.RoutingPeer',
       '10': 'routing'
     },
+    {'1': 'bootstrap_total', '3': 6, '4': 1, '5': 13, '10': 'bootstrapTotal'},
+    {
+      '1': 'bootstrap_reachable',
+      '3': 7,
+      '4': 1,
+      '5': 13,
+      '10': 'bootstrapReachable'
+    },
   ],
 };
 
@@ -771,7 +789,9 @@ final $typed_data.Uint8List networkUpdateDescriptor = $convert.base64Decode(
     'NvbhgCIAEoDjIWLmt3YWFpLnYxLlVwZGF0ZVJlYXNvblIGcmVhc29uEjUKC3NlbGZfc3RhdHVz'
     'GAMgASgLMhQua3dhYWkudjEuU2VsZlN0YXR1c1IKc2VsZlN0YXR1cxI1Cgljb25uZWN0ZWQYBC'
     'ADKAsyFy5rd2FhaS52MS5Db25uZWN0ZWRQZWVyUgljb25uZWN0ZWQSLwoHcm91dGluZxgFIAMo'
-    'CzIVLmt3YWFpLnYxLlJvdXRpbmdQZWVyUgdyb3V0aW5n');
+    'CzIVLmt3YWFpLnYxLlJvdXRpbmdQZWVyUgdyb3V0aW5nEicKD2Jvb3RzdHJhcF90b3RhbBgGIA'
+    'EoDVIOYm9vdHN0cmFwVG90YWwSLwoTYm9vdHN0cmFwX3JlYWNoYWJsZRgHIAEoDVISYm9vdHN0'
+    'cmFwUmVhY2hhYmxl');
 
 @$core.Deprecated('Use connectRequestDescriptor instead')
 const ConnectRequest$json = {

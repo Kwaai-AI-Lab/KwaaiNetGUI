@@ -340,9 +340,15 @@ class _UpdateBanner extends ConsumerWidget {
           for (final a in spec.actions)
             TextButton(
               onPressed: () => run(a),
+              // Same shrink as BootstrapDownBanner's action: the default
+              // 40px button minimum would make this bar taller than the
+              // Settings page's pinned bars.
               style: TextButton.styleFrom(
                 foregroundColor: _isPrimary(a) ? accent : muted,
                 visualDensity: VisualDensity.compact,
+                minimumSize: const Size(0, 24),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               child: Text(_label(a)),
             ),
