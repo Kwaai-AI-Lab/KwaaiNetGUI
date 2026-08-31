@@ -264,7 +264,7 @@ class _HopRow extends StatelessWidget {
           if (ms != null)
             Text('${ms!.round()}ms', style: mono)
           else if (status == HopStatus.inFlight)
-            Text('…', style: mono),
+            _AnimatedEllipsis(style: mono),
         ],
       ),
     );
@@ -309,7 +309,14 @@ class _EventLog extends StatelessWidget {
     // Collapsed on the way to the screen rather than on the way in, so the
     // raw stream stays intact for anything else that wants it and a row
     // can still be revised in place when its answer arrives.
-    final rows = collapseEvents(log.events);
+    //
+    // Once the response is in, the play-by-play is condensed down to what
+    // mattered. A run that *failed* is never condensed: its full log is
+    // exactly what you want to read.
+    final rows = collapseEvents(
+      log.events,
+      condensed: !log.running && log.sawComplete,
+    );
 
     return ListView.builder(
       controller: controller,
@@ -410,6 +417,9 @@ class _LogRowView extends StatelessWidget {
             if (row.trailing.isNotEmpty) ...[
               const SizedBox(width: 6),
               Text(row.trailing, maxLines: 1, style: mono),
+            ] else if (row.outcome == RowOutcome.pending) ...[
+              const SizedBox(width: 6),
+              _AnimatedEllipsis(style: mono),
             ],
           ],
         ),
@@ -421,6 +431,49 @@ class _LogRowView extends StatelessWidget {
       message: 'seq_pos ${row.seqPos} — the position the serving peer logs',
       waitDuration: const Duration(milliseconds: 500),
       child: row0,
+    );
+  }
+}
+
+/// The waiting marker: dots that fill and reset, so an in-flight row reads
+/// as *live* rather than stalled — a static glyph cannot make that
+/// distinction, and during a slow dial or prefill "stalled" is precisely
+/// the wrong impression.
+class _AnimatedEllipsis extends StatefulWidget {
+  const _AnimatedEllipsis({this.style});
+
+  final TextStyle? style;
+
+  @override
+  State<_AnimatedEllipsis> createState() => _AnimatedEllipsisState();
+}
+
+class _AnimatedEllipsisState extends State<_AnimatedEllipsis> {
+  Timer? _timer;
+  int _tick = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 400), (_) {
+      setState(() => _tick++);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Padded to a constant width so the neighbouring text does not shift
+    // as the dots cycle (the row font is monospace).
+    return Text(
+      ('·' * (_tick % 3 + 1)).padRight(3),
+      maxLines: 1,
+      style: widget.style,
     );
   }
 }
