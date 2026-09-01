@@ -23,6 +23,7 @@ class ConfigSnapshot {
     required this.forcePrivate,
     required this.enableUpnp,
     required this.enableQuic,
+    required this.maxConnections,
     required this.healthEnabled,
     required this.healthEndpoint,
   });
@@ -72,6 +73,11 @@ class ConfigSnapshot {
   /// a restart.
   final bool enableQuic;
 
+  /// `max_connections` — ceiling on simultaneously established connections,
+  /// inbound and outbound. Null = key absent, so the daemon's own default
+  /// (100) applies. The daemon rejects anything below 8.
+  final int? maxConnections;
+
   /// `health_monitoring.enabled`.
   final bool healthEnabled;
 
@@ -89,6 +95,7 @@ class ConfigSnapshot {
     bool? forcePrivate,
     bool? enableUpnp,
     bool? enableQuic,
+    int? maxConnections,
     bool? healthEnabled,
     String? healthEndpoint,
   }) {
@@ -103,6 +110,7 @@ class ConfigSnapshot {
       forcePrivate: forcePrivate ?? this.forcePrivate,
       enableUpnp: enableUpnp ?? this.enableUpnp,
       enableQuic: enableQuic ?? this.enableQuic,
+      maxConnections: maxConnections ?? this.maxConnections,
       healthEnabled: healthEnabled ?? this.healthEnabled,
       healthEndpoint: healthEndpoint ?? this.healthEndpoint,
     );
@@ -128,6 +136,7 @@ class ConfigFile {
     // key reads the same here as it behaves there.
     enableUpnp: true,
     enableQuic: true,
+    maxConnections: null,
     healthEnabled: true,
     healthEndpoint: '',
   );
@@ -168,6 +177,7 @@ class ConfigFile {
       final forcePrivate = (doc['force_private'] as bool?) ?? false;
       final enableUpnp = (doc['enable_upnp'] as bool?) ?? true;
       final enableQuic = (doc['enable_quic'] as bool?) ?? true;
+      final maxConnections = (doc['max_connections'] as num?)?.toInt();
       final health = doc['health_monitoring'];
       final healthEnabled = health is YamlMap
           ? (health['enabled'] as bool? ?? true)
@@ -186,6 +196,7 @@ class ConfigFile {
         forcePrivate: forcePrivate,
         enableUpnp: enableUpnp,
         enableQuic: enableQuic,
+        maxConnections: maxConnections,
         healthEnabled: healthEnabled,
         healthEndpoint: healthEndpoint,
       );
@@ -219,6 +230,14 @@ class ConfigFile {
     _setScalar(editor, ['force_private'], updated.forcePrivate);
     _setScalar(editor, ['enable_upnp'], updated.enableUpnp);
     _setScalar(editor, ['enable_quic'], updated.enableQuic);
+    // Unset means "let the daemon decide". Written as an explicit null the
+    // key would be present with a value serde cannot read into a usize, so
+    // clear it instead of writing one.
+    if (updated.maxConnections != null) {
+      _setScalar(editor, ['max_connections'], updated.maxConnections);
+    } else {
+      _removeIfPresent(editor, ['max_connections']);
+    }
     _setScalar(editor, ['health_monitoring', 'enabled'], updated.healthEnabled);
     _setScalar(editor, [
       'health_monitoring',
@@ -227,6 +246,17 @@ class ConfigFile {
 
     f.writeAsStringSync(editor.toString());
     _log('wrote ${f.path}');
+  }
+
+  /// Drop a key only if it is actually there — [YamlEditor.remove] throws
+  /// on a path that does not exist.
+  static void _removeIfPresent(YamlEditor editor, List<String> keyPath) {
+    try {
+      editor.parseAt(keyPath);
+    } catch (_) {
+      return;
+    }
+    editor.remove(keyPath);
   }
 
   /// Update a single key path. yaml_edit's [YamlEditor.update] throws if any

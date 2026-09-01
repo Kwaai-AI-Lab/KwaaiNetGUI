@@ -563,9 +563,8 @@ class _SettingsTopBar extends StatelessWidget {
               padding: const EdgeInsets.only(top: 14),
               child: Text(
                 'Settings',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -680,8 +679,7 @@ class _StatusHeader extends ConsumerWidget {
                 bitWidgets.add(const SizedBox(width: 4));
                 bitWidgets.add(
                   Tooltip(
-                    message:
-                        'Status from PID probe only — full stats appear once daemon writes kwaainet.status',
+                    message: 'Status from PID probe only — full stats appear once daemon writes kwaainet.status',
                     child: Icon(
                       Icons.info_outline,
                       size: 16,
@@ -871,9 +869,8 @@ class _SwitchRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: labelColor),
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(color: labelColor),
               ),
             ),
             const SizedBox(width: 6),
@@ -952,9 +949,8 @@ class _DaemonSourcePickerState extends State<_DaemonSourcePicker> {
       await _commitCustomPath(path);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('File picker failed: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('File picker failed: $e')));
     }
   }
 
@@ -1033,9 +1029,8 @@ class _SandboxNote extends StatelessWidget {
     return Text(
       'Dev sandbox: this app has its own node identity, config and ports '
       'under ${KwaainetPaths.home} — separate from an installed KwaaiNet.',
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
+      style: Theme.of(context).textTheme.bodySmall
+          ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
     );
   }
 }
@@ -1052,9 +1047,8 @@ class _ExternalModeHelp extends StatelessWidget {
       'The app will not start or stop the service. Run kwaainet '
       'yourself (launchd, systemd, Docker, or `kwaainet start` in a '
       'terminal); the GUI only observes the gRPC channel.',
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
+      style: Theme.of(context).textTheme.bodySmall
+          ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
     );
   }
 }
@@ -1109,9 +1103,8 @@ class _RadioRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final group = RadioGroup.maybeOf<DaemonMode>(context);
-    final disabledColor = Theme.of(
-      context,
-    ).colorScheme.onSurface.withValues(alpha: 0.38);
+    final disabledColor = Theme.of(context).colorScheme.onSurface
+        .withValues(alpha: 0.38);
     return InkWell(
       borderRadius: BorderRadius.circular(6),
       // The row is tappable anywhere, so it has to make the check the
@@ -1151,9 +1144,8 @@ class _RadioRow extends StatelessWidget {
             Flexible(
               child: Text(
                 label,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: enabled ? null : disabledColor,
-                ),
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(color: enabled ? null : disabledColor),
               ),
             ),
             if (enabled) _RadioRowVersion(mode: value),
@@ -1220,9 +1212,8 @@ class _RadioRowVersion extends ConsumerWidget {
       padding: const EdgeInsets.only(left: 8),
       child: Text(
         'v$version',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
+        style: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
     );
   }
@@ -1253,9 +1244,8 @@ class _SystemPathResult extends StatelessWidget {
     if (path == null) {
       return Text(
         'No kwaainet binary found',
-        style: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(color: context.kwaai.error),
+        style: Theme.of(context).textTheme.bodyMedium
+            ?.copyWith(color: context.kwaai.error),
       );
     }
     return SelectableText.rich(
@@ -1446,11 +1436,19 @@ class _NetworkBindSectionState extends ConsumerState<_NetworkBindSection> {
   late final TextEditingController _ipController = TextEditingController(
     text: widget.draft.publicIp,
   );
+  late final TextEditingController _maxConnController = TextEditingController(
+    text: widget.draft.maxConnections?.toString() ?? '',
+  );
+
+  /// Set while the max-connections box holds something we refuse to write,
+  /// so the user sees why the value did not take.
+  String? _maxConnError;
 
   @override
   void dispose() {
     _portController.dispose();
     _ipController.dispose();
+    _maxConnController.dispose();
     super.dispose();
   }
 
@@ -1468,11 +1466,29 @@ class _NetworkBindSectionState extends ConsumerState<_NetworkBindSection> {
     ref.read(featuresDraftProvider.notifier).setPublicIp(raw.trim());
   }
 
+  /// Empty clears the key so the daemon's default (100) applies. Under 8 is
+  /// refused as `kwaainet config set` refuses it: below the bootstraps plus a
+  /// relay reservation the node cannot stay reachable.
+  void _commitMaxConn(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      setState(() => _maxConnError = null);
+      ref.read(featuresDraftProvider.notifier).setMaxConnections(null);
+      return;
+    }
+    final parsed = int.tryParse(trimmed);
+    if (parsed == null || parsed < 8) {
+      setState(() => _maxConnError = 'Must be a whole number, 8 or more.');
+      return;
+    }
+    setState(() => _maxConnError = null);
+    ref.read(featuresDraftProvider.notifier).setMaxConnections(parsed);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final labelStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
-    );
+    final labelStyle = Theme.of(context).textTheme.bodyMedium
+        ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1519,8 +1535,38 @@ class _NetworkBindSectionState extends ConsumerState<_NetworkBindSection> {
                 ),
               ],
             ),
+            const Spacer(),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Max connections', style: labelStyle),
+                const SizedBox(height: 4),
+                SizedBox(
+                  width: 110,
+                  child: KwaaiTextField(
+                    controller: _maxConnController,
+                    hintText: '100',
+                    onChanged: _commitMaxConn,
+                    onSubmitted: _commitMaxConn,
+                    onEditingComplete: () =>
+                        _commitMaxConn(_maxConnController.text),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
+        if (_maxConnError != null) ...[
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              _maxConnError!,
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1576,9 +1622,8 @@ class _InitialPeersSectionState extends ConsumerState<_InitialPeersSection> {
         const SizedBox(height: 4),
         Text(
           'Multiaddrs used to bootstrap the DHT.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 8),
         for (var i = 0; i < _controllers.length; i++)
@@ -1654,9 +1699,8 @@ class _HealthMonitoringSectionState
         const SizedBox(height: 12),
         Text(
           'Endpoint',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 4),
         Align(
@@ -1862,9 +1906,8 @@ class _ShardingSection extends ConsumerWidget {
         const SizedBox(height: 12),
         Text(
           'Model',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 4),
         // Align prevents the parent Column(stretch) from forcing the
@@ -1905,9 +1948,8 @@ class _StorageSection extends ConsumerWidget {
         const SizedBox(height: 12),
         Text(
           'Capacity (GB)',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 4),
         // Align prevents the parent Column's stretch from forcing the
@@ -2433,9 +2475,8 @@ class _VariantPicker extends StatelessWidget {
           isActive
               ? '${current.displayName} — ${current.description} (active)'
               : '${current.displayName} — ${current.description}',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       ],
     );
