@@ -8,7 +8,7 @@ import 'package:kwaainet_gui/src/daemon/config_file.dart';
 /// copyWith semantics are worth pinning.
 ConfigSnapshot _snapshot({
   bool enableUpnp = true,
-  bool enableQuic = true,
+  bool enableQuic = false,
   int? maxConnections,
 }) => ConfigSnapshot(
   model: '',
@@ -61,11 +61,18 @@ void main() {
     });
 
     test('can be toggled explicitly in both directions', () {
-      expect(_snapshot().copyWith(enableQuic: false).enableQuic, isFalse);
       expect(
-        _snapshot(enableQuic: false).copyWith(enableQuic: true).enableQuic,
-        isTrue,
+        _snapshot(enableQuic: true).copyWith(enableQuic: false).enableQuic,
+        isFalse,
       );
+      expect(_snapshot().copyWith(enableQuic: true).enableQuic, isTrue);
+    });
+
+    // The daemon has `#[serde(default)]` on the key, so a config without it
+    // runs TCP-only. Defaulting to true here showed QUIC on and wrote
+    // `enable_quic: true` on the next Apply.
+    test('defaults off, matching the daemon', () {
+      expect(ConfigFile.defaults.enableQuic, isFalse);
     });
   });
 

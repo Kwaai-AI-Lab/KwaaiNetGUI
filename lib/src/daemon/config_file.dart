@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 
@@ -68,9 +69,8 @@ class ConfigSnapshot {
 
   /// `enable_quic` — listen on and dial QUIC as well as TCP.
   ///
-  /// Defaults true on the daemon side. Off is for networks that block or
-  /// throttle UDP; the transport is bound at startup, so changing it needs
-  /// a restart.
+  /// Off by default, matching the daemon: some networks block or throttle
+  /// UDP. Bound at startup, so changing it needs a restart.
   final bool enableQuic;
 
   /// `max_connections` — ceiling on simultaneously established connections,
@@ -123,6 +123,10 @@ class ConfigFile {
   /// Path to ~/.kwaainet/config.yaml.
   static String get path => KwaainetPaths.configFile;
 
+  /// The snapshot returned when config.yaml is missing or unreadable.
+  @visibleForTesting
+  static ConfigSnapshot get defaults => _defaults;
+
   static const ConfigSnapshot _defaults = ConfigSnapshot(
     model: '',
     shardingEnabled: true,
@@ -132,10 +136,10 @@ class ConfigFile {
     publicIp: '',
     initialPeers: [],
     forcePrivate: false,
-    // Mirrors the daemon's own default, so a config that has never set the
+    // Mirror the daemon's own defaults, so a config that has never set a
     // key reads the same here as it behaves there.
     enableUpnp: true,
-    enableQuic: true,
+    enableQuic: false,
     maxConnections: null,
     healthEnabled: true,
     healthEndpoint: '',
@@ -176,7 +180,7 @@ class ConfigFile {
           : <String>[];
       final forcePrivate = (doc['force_private'] as bool?) ?? false;
       final enableUpnp = (doc['enable_upnp'] as bool?) ?? true;
-      final enableQuic = (doc['enable_quic'] as bool?) ?? true;
+      final enableQuic = (doc['enable_quic'] as bool?) ?? false;
       final maxConnections = (doc['max_connections'] as num?)?.toInt();
       final health = doc['health_monitoring'];
       final healthEnabled = health is YamlMap
