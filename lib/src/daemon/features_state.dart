@@ -41,6 +41,7 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
       s.forcePrivate;
       s.enableUpnp;
       s.enableQuic;
+      s.ipv6;
       s.maxConnections;
       s.healthEnabled;
       s.healthEndpoint;
@@ -84,6 +85,7 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
       forcePrivate: s.forcePrivate,
       enableUpnp: s.enableUpnp,
       enableQuic: s.enableQuic,
+      ipv6: s.ipv6,
       maxConnections: s.maxConnections,
       healthEnabled: s.healthEnabled,
       healthEndpoint: s.healthEndpoint,
@@ -104,6 +106,7 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
       forcePrivate: s.forcePrivate,
       enableUpnp: s.enableUpnp,
       enableQuic: s.enableQuic,
+      ipv6: s.ipv6,
       maxConnections: s.maxConnections,
       healthEnabled: s.healthEnabled,
       healthEndpoint: s.healthEndpoint,
@@ -140,6 +143,12 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
     state = s.copyWith(enableQuic: v);
   }
 
+  void setIpv6(Ipv6Mode v) {
+    final s = state;
+    if (s == null) return;
+    state = s.copyWith(ipv6: v);
+  }
+
   /// Null clears the key so the daemon's own default applies; copyWith
   /// treats null as "unchanged", so this rebuilds the snapshot.
   void setMaxConnections(int? v) {
@@ -156,6 +165,7 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
       forcePrivate: s.forcePrivate,
       enableUpnp: s.enableUpnp,
       enableQuic: s.enableQuic,
+      ipv6: s.ipv6,
       maxConnections: v,
       healthEnabled: s.healthEnabled,
       healthEndpoint: s.healthEndpoint,
@@ -188,6 +198,7 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
         s.forcePrivate != onDisk.forcePrivate ||
         s.enableUpnp != onDisk.enableUpnp ||
         s.enableQuic != onDisk.enableQuic ||
+        s.ipv6 != onDisk.ipv6 ||
         s.maxConnections != onDisk.maxConnections ||
         s.healthEnabled != onDisk.healthEnabled ||
         s.healthEndpoint != onDisk.healthEndpoint;

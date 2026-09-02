@@ -10,6 +10,36 @@ void _log(String msg) {
   stderr.writeln('[config-file] $msg');
 }
 
+/// `ipv6` — auto binds /ip6/:: and tolerates failure, on refuses to start
+/// without an IPv6 listener, off never binds it. Absent means auto.
+enum Ipv6Mode {
+  auto,
+  on,
+  off;
+
+  /// YAML types `true` as a bool but `auto` as a String, so this takes
+  /// Object?. Anything unrecognised reads as auto, same as an absent key.
+  static Ipv6Mode fromYaml(Object? v) {
+    if (v is bool) return v ? Ipv6Mode.on : Ipv6Mode.off;
+    switch (v is String ? v.toLowerCase() : null) {
+      case 'true':
+        return Ipv6Mode.on;
+      case 'false':
+        return Ipv6Mode.off;
+      default:
+        return Ipv6Mode.auto;
+    }
+  }
+
+  /// What to write to config.yaml; null means remove the key, since absent
+  /// is how auto is spelled.
+  Object? get yamlValue => switch (this) {
+    Ipv6Mode.auto => null,
+    Ipv6Mode.on => true,
+    Ipv6Mode.off => false,
+  };
+}
+
 /// Subset of ~/.kwaainet/config.yaml that the GUI surfaces in the Features
 /// settings. Other keys in the file are read but never touched on write.
 class ConfigSnapshot {
@@ -24,6 +54,7 @@ class ConfigSnapshot {
     required this.forcePrivate,
     required this.enableUpnp,
     required this.enableQuic,
+    required this.ipv6,
     required this.maxConnections,
     required this.healthEnabled,
     required this.healthEndpoint,
@@ -73,6 +104,10 @@ class ConfigSnapshot {
   /// UDP. Bound at startup, so changing it needs a restart.
   final bool enableQuic;
 
+  /// `ipv6` — whether the daemon binds an IPv6 listener. Bound at startup,
+  /// so changing it needs a restart.
+  final Ipv6Mode ipv6;
+
   /// `max_connections` — ceiling on simultaneously established connections,
   /// inbound and outbound. Null = key absent, so the daemon's own default
   /// (100) applies. The daemon rejects anything below 8.
@@ -95,6 +130,7 @@ class ConfigSnapshot {
     bool? forcePrivate,
     bool? enableUpnp,
     bool? enableQuic,
+    Ipv6Mode? ipv6,
     int? maxConnections,
     bool? healthEnabled,
     String? healthEndpoint,
@@ -110,6 +146,7 @@ class ConfigSnapshot {
       forcePrivate: forcePrivate ?? this.forcePrivate,
       enableUpnp: enableUpnp ?? this.enableUpnp,
       enableQuic: enableQuic ?? this.enableQuic,
+      ipv6: ipv6 ?? this.ipv6,
       maxConnections: maxConnections ?? this.maxConnections,
       healthEnabled: healthEnabled ?? this.healthEnabled,
       healthEndpoint: healthEndpoint ?? this.healthEndpoint,
@@ -140,6 +177,7 @@ class ConfigFile {
     // key reads the same here as it behaves there.
     enableUpnp: true,
     enableQuic: false,
+    ipv6: Ipv6Mode.auto,
     maxConnections: null,
     healthEnabled: true,
     healthEndpoint: '',
@@ -181,6 +219,7 @@ class ConfigFile {
       final forcePrivate = (doc['force_private'] as bool?) ?? false;
       final enableUpnp = (doc['enable_upnp'] as bool?) ?? true;
       final enableQuic = (doc['enable_quic'] as bool?) ?? false;
+      final ipv6 = Ipv6Mode.fromYaml(doc['ipv6']);
       final maxConnections = (doc['max_connections'] as num?)?.toInt();
       final health = doc['health_monitoring'];
       final healthEnabled = health is YamlMap
@@ -200,6 +239,7 @@ class ConfigFile {
         forcePrivate: forcePrivate,
         enableUpnp: enableUpnp,
         enableQuic: enableQuic,
+        ipv6: ipv6,
         maxConnections: maxConnections,
         healthEnabled: healthEnabled,
         healthEndpoint: healthEndpoint,
@@ -234,6 +274,13 @@ class ConfigFile {
     _setScalar(editor, ['force_private'], updated.forcePrivate);
     _setScalar(editor, ['enable_upnp'], updated.enableUpnp);
     _setScalar(editor, ['enable_quic'], updated.enableQuic);
+    // Auto is spelled "key absent", so clear it rather than writing a null.
+    final ipv6Value = updated.ipv6.yamlValue;
+    if (ipv6Value != null) {
+      _setScalar(editor, ['ipv6'], ipv6Value);
+    } else {
+      _removeIfPresent(editor, ['ipv6']);
+    }
     // Unset means "let the daemon decide". Written as an explicit null the
     // key would be present with a value serde cannot read into a usize, so
     // clear it instead of writing one.
