@@ -6,21 +6,25 @@ import 'package:kwaainet_gui/src/daemon/config_file.dart';
 /// in turn decides whether it is publicly reachable or falls back to relays.
 /// Carrying it wrongly through an edit would silently flip that, so the
 /// copyWith semantics are worth pinning.
-ConfigSnapshot _snapshot({bool enableUpnp = true, bool enableQuic = true}) =>
-    ConfigSnapshot(
-      model: '',
-      shardingEnabled: true,
-      storageEnabled: true,
-      storageCapacityGb: null,
-      port: null,
-      publicIp: '',
-      initialPeers: const [],
-      forcePrivate: false,
-      enableUpnp: enableUpnp,
-      enableQuic: enableQuic,
-      healthEnabled: true,
-      healthEndpoint: '',
-    );
+ConfigSnapshot _snapshot({
+  bool enableUpnp = true,
+  bool enableQuic = true,
+  int? maxConnections,
+}) => ConfigSnapshot(
+  model: '',
+  shardingEnabled: true,
+  storageEnabled: true,
+  storageCapacityGb: null,
+  port: null,
+  publicIp: '',
+  initialPeers: const [],
+  forcePrivate: false,
+  enableUpnp: enableUpnp,
+  enableQuic: enableQuic,
+  maxConnections: maxConnections,
+  healthEnabled: true,
+  healthEndpoint: '',
+);
 
 void main() {
   group('enableUpnp', () {
@@ -62,6 +66,24 @@ void main() {
         _snapshot(enableQuic: false).copyWith(enableQuic: true).enableQuic,
         isTrue,
       );
+    });
+  });
+
+  group('maxConnections', () {
+    test('null means unset, so the daemon default applies', () {
+      expect(_snapshot().maxConnections, isNull);
+    });
+
+    // copyWith reads null as "unchanged", so a set value can only be cleared
+    // by rebuilding the snapshot — see FeaturesDraftNotifier.setMaxConnections.
+    test('survives an unrelated edit', () {
+      final capped = _snapshot(maxConnections: 400);
+      expect(capped.copyWith(port: 9000).maxConnections, 400);
+      expect(capped.copyWith(enableQuic: false).maxConnections, 400);
+    });
+
+    test('can be raised explicitly', () {
+      expect(_snapshot().copyWith(maxConnections: 800).maxConnections, 800);
     });
   });
 }
