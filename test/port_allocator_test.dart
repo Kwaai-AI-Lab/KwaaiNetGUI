@@ -25,4 +25,49 @@ void main() {
     final port = await allocateFreePort(address: InternetAddress.anyIPv4);
     expect(port, greaterThan(0));
   });
+
+  // The daemon binds [::1] on the same port it was handed, so a port only
+  // IPv4 vouched for would make it fail to start on a dual-stack host.
+  test('returned port is bindable on ::1', () async {
+    if (!await _hasIPv6Loopback()) {
+      markTestSkipped('host has no IPv6 loopback');
+      return;
+    }
+    final port = await allocateFreePort();
+    final s = await ServerSocket.bind(
+      InternetAddress.loopbackIPv6,
+      port,
+      v6Only: true,
+    );
+    expect(s.port, port);
+    await s.close();
+  });
+
+  test('avoids a port held only on IPv6', () async {
+    if (!await _hasIPv6Loopback()) {
+      markTestSkipped('host has no IPv6 loopback');
+      return;
+    }
+    final held = await ServerSocket.bind(
+      InternetAddress.loopbackIPv6,
+      0,
+      v6Only: true,
+    );
+    final v4 = InternetAddress.loopbackIPv4;
+    expect(await freeOnBothFamilies(v4, held.port), isFalse);
+    await held.close();
+    expect(await freeOnBothFamilies(v4, held.port), isTrue);
+  });
+}
+
+/// CI images and some containers run without an IPv6 stack; there the v6
+/// half of the check is unreachable rather than failing.
+Future<bool> _hasIPv6Loopback() async {
+  try {
+    final s = await ServerSocket.bind(InternetAddress.loopbackIPv6, 0);
+    await s.close();
+    return true;
+  } on SocketException {
+    return false;
+  }
 }
