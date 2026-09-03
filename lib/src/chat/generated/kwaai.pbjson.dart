@@ -61,21 +61,6 @@ final $typed_data.Uint8List dhtRoleDescriptor = $convert.base64Decode(
     'CgdEaHRSb2xlEhQKEERIVF9ST0xFX1VOS05PV04QABITCg9ESFRfUk9MRV9TRVJWRVIQARITCg'
     '9ESFRfUk9MRV9DTElFTlQQAg==');
 
-@$core.Deprecated('Use kadStatusDescriptor instead')
-const KadStatus$json = {
-  '1': 'KadStatus',
-  '2': [
-    {'1': 'KAD_STATUS_UNSPECIFIED', '2': 0},
-    {'1': 'KAD_STATUS_CONNECTED', '2': 1},
-    {'1': 'KAD_STATUS_DISCONNECTED', '2': 2},
-  ],
-};
-
-/// Descriptor for `KadStatus`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List kadStatusDescriptor = $convert.base64Decode(
-    'CglLYWRTdGF0dXMSGgoWS0FEX1NUQVRVU19VTlNQRUNJRklFRBAAEhgKFEtBRF9TVEFUVVNfQ0'
-    '9OTkVDVEVEEAESGwoXS0FEX1NUQVRVU19ESVNDT05ORUNURUQQAg==');
-
 @$core.Deprecated('Use storageReachabilityDescriptor instead')
 const StorageReachability$json = {
   '1': 'StorageReachability',
@@ -106,6 +91,23 @@ const DhtRecordKind$json = {
 final $typed_data.Uint8List dhtRecordKindDescriptor = $convert.base64Decode(
     'Cg1EaHRSZWNvcmRLaW5kEh8KG0RIVF9SRUNPUkRfS0lORF9VTlNQRUNJRklFRBAAEhsKF0RIVF'
     '9SRUNPUkRfS0lORF9SRUdVTEFSEAESHgoaREhUX1JFQ09SRF9LSU5EX0RJQ1RJT05BUlkQAg==');
+
+@$core.Deprecated('Use dhtLookupOutcomeDescriptor instead')
+const DhtLookupOutcome$json = {
+  '1': 'DhtLookupOutcome',
+  '2': [
+    {'1': 'DHT_LOOKUP_OUTCOME_UNSPECIFIED', '2': 0},
+    {'1': 'DHT_LOOKUP_OUTCOME_FOUND', '2': 1},
+    {'1': 'DHT_LOOKUP_OUTCOME_NOT_FOUND', '2': 2},
+    {'1': 'DHT_LOOKUP_OUTCOME_ERROR', '2': 3},
+  ],
+};
+
+/// Descriptor for `DhtLookupOutcome`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List dhtLookupOutcomeDescriptor = $convert.base64Decode(
+    'ChBEaHRMb29rdXBPdXRjb21lEiIKHkRIVF9MT09LVVBfT1VUQ09NRV9VTlNQRUNJRklFRBAAEh'
+    'wKGERIVF9MT09LVVBfT1VUQ09NRV9GT1VORBABEiAKHERIVF9MT09LVVBfT1VUQ09NRV9OT1Rf'
+    'Rk9VTkQQAhIcChhESFRfTE9PS1VQX09VVENPTUVfRVJST1IQAw==');
 
 @$core.Deprecated('Use clientFrameDescriptor instead')
 const ClientFrame$json = {
@@ -202,6 +204,15 @@ const ClientFrame$json = {
       '9': 0,
       '10': 'dhtRecords'
     },
+    {
+      '1': 'dht_lookup',
+      '3': 27,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.DhtLookupRequest',
+      '9': 0,
+      '10': 'dhtLookup'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -221,7 +232,8 @@ final $typed_data.Uint8List clientFrameDescriptor = $convert.base64Decode(
     'ZWN0UmVxdWVzdEgAUgdjb25uZWN0ElAKEXN0b3JhZ2VfZGlzY292ZXJ5GBAgASgLMiEua3dhYW'
     'kudjEuU3RvcmFnZURpc2NvdmVyeVJlcXVlc3RIAFIQc3RvcmFnZURpc2NvdmVyeRI+CgtkaHRf'
     'cmVjb3JkcxgaIAEoCzIbLmt3YWFpLnYxLkRodFJlY29yZHNSZXF1ZXN0SABSCmRodFJlY29yZH'
-    'NCBgoEYm9keQ==');
+    'MSOwoKZGh0X2xvb2t1cBgbIAEoCzIaLmt3YWFpLnYxLkRodExvb2t1cFJlcXVlc3RIAFIJZGh0'
+    'TG9va3VwQgYKBGJvZHk=');
 
 @$core.Deprecated('Use serverFrameDescriptor instead')
 const ServerFrame$json = {
@@ -318,6 +330,15 @@ const ServerFrame$json = {
       '9': 0,
       '10': 'dhtRecords'
     },
+    {
+      '1': 'dht_lookup',
+      '3': 27,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.DhtLookupReply',
+      '9': 0,
+      '10': 'dhtLookup'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -335,7 +356,8 @@ final $typed_data.Uint8List serverFrameDescriptor = $convert.base64Decode(
     'CzIXLmt3YWFpLnYxLk5ldHdvcmtVcGRhdGVIAFIHbmV0d29yaxIyCgdjb25uZWN0GBIgASgLMh'
     'Yua3dhYWkudjEuQ29ubmVjdFJlcGx5SABSB2Nvbm5lY3QSMwoHc3RvcmFnZRgQIAEoCzIXLmt3'
     'YWFpLnYxLlN0b3JhZ2VVcGRhdGVIAFIHc3RvcmFnZRI8CgtkaHRfcmVjb3JkcxgaIAEoCzIZLm'
-    't3YWFpLnYxLkRodFJlY29yZHNSZXBseUgAUgpkaHRSZWNvcmRzQgYKBGJvZHk=');
+    't3YWFpLnYxLkRodFJlY29yZHNSZXBseUgAUgpkaHRSZWNvcmRzEjkKCmRodF9sb29rdXAYGyAB'
+    'KAsyGC5rd2FhaS52MS5EaHRMb29rdXBSZXBseUgAUglkaHRMb29rdXBCBgoEYm9keQ==');
 
 @$core.Deprecated('Use cancelDescriptor instead')
 const Cancel$json = {
@@ -672,31 +694,6 @@ const RoutingPeer$json = {
     {'1': 'connected', '3': 2, '4': 1, '5': 8, '10': 'connected'},
     {'1': 'is_bootstrap', '3': 3, '4': 1, '5': 8, '10': 'isBootstrap'},
     {'1': 'addrs', '3': 4, '4': 3, '5': 9, '10': 'addrs'},
-    {
-      '1': 'kad_status',
-      '3': 5,
-      '4': 1,
-      '5': 14,
-      '6': '.kwaai.v1.KadStatus',
-      '10': 'kadStatus'
-    },
-    {'1': 'bucket', '3': 6, '4': 1, '5': 13, '10': 'bucket'},
-    {'1': 'bucket_entries', '3': 7, '4': 1, '5': 13, '10': 'bucketEntries'},
-    {'1': 'bucket_capacity', '3': 8, '4': 1, '5': 13, '10': 'bucketCapacity'},
-    {'1': 'bucket_pending', '3': 9, '4': 1, '5': 8, '10': 'bucketPending'},
-    {'1': 'distance', '3': 10, '4': 1, '5': 9, '10': 'distance'},
-    {
-      '1': 'last_contact_secs',
-      '3': 11,
-      '4': 1,
-      '5': 13,
-      '9': 0,
-      '10': 'lastContactSecs',
-      '17': true
-    },
-  ],
-  '8': [
-    {'1': '_last_contact_secs'},
   ],
 };
 
@@ -704,12 +701,7 @@ const RoutingPeer$json = {
 final $typed_data.Uint8List routingPeerDescriptor = $convert.base64Decode(
     'CgtSb3V0aW5nUGVlchIXCgdwZWVyX2lkGAEgASgJUgZwZWVySWQSHAoJY29ubmVjdGVkGAIgAS'
     'gIUgljb25uZWN0ZWQSIQoMaXNfYm9vdHN0cmFwGAMgASgIUgtpc0Jvb3RzdHJhcBIUCgVhZGRy'
-    'cxgEIAMoCVIFYWRkcnMSMgoKa2FkX3N0YXR1cxgFIAEoDjITLmt3YWFpLnYxLkthZFN0YXR1c1'
-    'IJa2FkU3RhdHVzEhYKBmJ1Y2tldBgGIAEoDVIGYnVja2V0EiUKDmJ1Y2tldF9lbnRyaWVzGAcg'
-    'ASgNUg1idWNrZXRFbnRyaWVzEicKD2J1Y2tldF9jYXBhY2l0eRgIIAEoDVIOYnVja2V0Q2FwYW'
-    'NpdHkSJQoOYnVja2V0X3BlbmRpbmcYCSABKAhSDWJ1Y2tldFBlbmRpbmcSGgoIZGlzdGFuY2UY'
-    'CiABKAlSCGRpc3RhbmNlEi8KEWxhc3RfY29udGFjdF9zZWNzGAsgASgNSABSD2xhc3RDb250YW'
-    'N0U2Vjc4gBAUIUChJfbGFzdF9jb250YWN0X3NlY3M=');
+    'cxgEIAMoCVIFYWRkcnM=');
 
 @$core.Deprecated('Use selfStatusDescriptor instead')
 const SelfStatus$json = {
@@ -730,7 +722,6 @@ const SelfStatus$json = {
     {'1': 'observed_addrs', '3': 7, '4': 3, '5': 9, '10': 'observedAddrs'},
     {'1': 'relay_addrs', '3': 8, '4': 3, '5': 9, '10': 'relayAddrs'},
     {'1': 'local_protocols', '3': 9, '4': 3, '5': 9, '10': 'localProtocols'},
-    {'1': 'ipv6', '3': 10, '4': 1, '5': 9, '10': 'ipv6'},
   ],
 };
 
@@ -742,7 +733,7 @@ final $typed_data.Uint8List selfStatusDescriptor = $convert.base64Decode(
     'VhYmxlGAUgASgIUgxhbm5vdW5jZWFibGUSIQoMbGlzdGVuX2FkZHJzGAYgAygJUgtsaXN0ZW5B'
     'ZGRycxIlCg5vYnNlcnZlZF9hZGRycxgHIAMoCVINb2JzZXJ2ZWRBZGRycxIfCgtyZWxheV9hZG'
     'RycxgIIAMoCVIKcmVsYXlBZGRycxInCg9sb2NhbF9wcm90b2NvbHMYCSADKAlSDmxvY2FsUHJv'
-    'dG9jb2xzEhIKBGlwdjYYCiABKAlSBGlwdjY=');
+    'dG9jb2xz');
 
 @$core.Deprecated('Use networkUpdateDescriptor instead')
 const NetworkUpdate$json = {
@@ -907,14 +898,13 @@ const DhtRecordsRequest$json = {
   '2': [
     {'1': 'include_values', '3': 1, '4': 1, '5': 8, '10': 'includeValues'},
     {'1': 'key_ids', '3': 2, '4': 3, '5': 9, '10': 'keyIds'},
-    {'1': 'limit', '3': 3, '4': 1, '5': 13, '10': 'limit'},
   ],
 };
 
 /// Descriptor for `DhtRecordsRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List dhtRecordsRequestDescriptor = $convert.base64Decode(
     'ChFEaHRSZWNvcmRzUmVxdWVzdBIlCg5pbmNsdWRlX3ZhbHVlcxgBIAEoCFINaW5jbHVkZVZhbH'
-    'VlcxIXCgdrZXlfaWRzGAIgAygJUgZrZXlJZHMSFAoFbGltaXQYAyABKA1SBWxpbWl0');
+    'VlcxIXCgdrZXlfaWRzGAIgAygJUgZrZXlJZHM=');
 
 @$core.Deprecated('Use dhtRecordsReplyDescriptor instead')
 const DhtRecordsReply$json = {
@@ -937,7 +927,6 @@ const DhtRecordsReply$json = {
       '6': '.kwaai.v1.DhtKnownKey',
       '10': 'knownKeys'
     },
-    {'1': 'total_records', '3': 4, '4': 1, '5': 13, '10': 'totalRecords'},
   ],
 };
 
@@ -945,8 +934,7 @@ const DhtRecordsReply$json = {
 final $typed_data.Uint8List dhtRecordsReplyDescriptor = $convert.base64Decode(
     'Cg9EaHRSZWNvcmRzUmVwbHkSHwoLc2VydmVyX3RpbWUYASABKAlSCnNlcnZlclRpbWUSLQoHcm'
     'Vjb3JkcxgCIAMoCzITLmt3YWFpLnYxLkRodFJlY29yZFIHcmVjb3JkcxI0Cgprbm93bl9rZXlz'
-    'GAMgAygLMhUua3dhYWkudjEuRGh0S25vd25LZXlSCWtub3duS2V5cxIjCg10b3RhbF9yZWNvcm'
-    'RzGAQgASgNUgx0b3RhbFJlY29yZHM=');
+    'GAMgAygLMhUua3dhYWkudjEuRGh0S25vd25LZXlSCWtub3duS2V5cw==');
 
 @$core.Deprecated('Use dhtKnownKeyDescriptor instead')
 const DhtKnownKey$json = {
@@ -1093,6 +1081,97 @@ final $typed_data.Uint8List dhtValueViewDescriptor = $convert.base64Decode(
     '5kZXJlZBgCIAEoCVIIcmVuZGVyZWQSGwoJcmF3X2J5dGVzGAMgASgEUghyYXdCeXRlcxIeCghl'
     'eHRfY29kZRgEIAEoBUgAUgdleHRDb2RliAEBEhgKB2RlY29kZWQYBSABKAhSB2RlY29kZWRCCw'
     'oJX2V4dF9jb2Rl');
+
+@$core.Deprecated('Use dhtLookupRequestDescriptor instead')
+const DhtLookupRequest$json = {
+  '1': 'DhtLookupRequest',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'peers', '3': 2, '4': 3, '5': 9, '10': 'peers'},
+    {'1': 'timeout_secs', '3': 3, '4': 1, '5': 13, '10': 'timeoutSecs'},
+  ],
+};
+
+/// Descriptor for `DhtLookupRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List dhtLookupRequestDescriptor = $convert.base64Decode(
+    'ChBEaHRMb29rdXBSZXF1ZXN0EhAKA2tleRgBIAEoCVIDa2V5EhQKBXBlZXJzGAIgAygJUgVwZW'
+    'VycxIhCgx0aW1lb3V0X3NlY3MYAyABKA1SC3RpbWVvdXRTZWNz');
+
+@$core.Deprecated('Use dhtLookupReplyDescriptor instead')
+const DhtLookupReply$json = {
+  '1': 'DhtLookupReply',
+  '2': [
+    {'1': 'server_time', '3': 1, '4': 1, '5': 9, '10': 'serverTime'},
+    {'1': 'key', '3': 2, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'key_id', '3': 3, '4': 1, '5': 9, '10': 'keyId'},
+    {
+      '1': 'peers',
+      '3': 4,
+      '4': 3,
+      '5': 11,
+      '6': '.kwaai.v1.DhtLookupPeer',
+      '10': 'peers'
+    },
+    {
+      '1': 'record',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.DhtRecord',
+      '9': 0,
+      '10': 'record',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_record'},
+  ],
+};
+
+/// Descriptor for `DhtLookupReply`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List dhtLookupReplyDescriptor = $convert.base64Decode(
+    'Cg5EaHRMb29rdXBSZXBseRIfCgtzZXJ2ZXJfdGltZRgBIAEoCVIKc2VydmVyVGltZRIQCgNrZX'
+    'kYAiABKAlSA2tleRIVCgZrZXlfaWQYAyABKAlSBWtleUlkEi0KBXBlZXJzGAQgAygLMhcua3dh'
+    'YWkudjEuRGh0TG9va3VwUGVlclIFcGVlcnMSMAoGcmVjb3JkGAUgASgLMhMua3dhYWkudjEuRG'
+    'h0UmVjb3JkSABSBnJlY29yZIgBAUIJCgdfcmVjb3Jk');
+
+@$core.Deprecated('Use dhtLookupPeerDescriptor instead')
+const DhtLookupPeer$json = {
+  '1': 'DhtLookupPeer',
+  '2': [
+    {'1': 'peer_id', '3': 1, '4': 1, '5': 9, '10': 'peerId'},
+    {
+      '1': 'outcome',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.kwaai.v1.DhtLookupOutcome',
+      '10': 'outcome'
+    },
+    {'1': 'error', '3': 3, '4': 1, '5': 9, '10': 'error'},
+    {'1': 'elapsed_ms', '3': 4, '4': 1, '5': 13, '10': 'elapsedMs'},
+    {
+      '1': 'record',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.DhtRecord',
+      '9': 0,
+      '10': 'record',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_record'},
+  ],
+};
+
+/// Descriptor for `DhtLookupPeer`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List dhtLookupPeerDescriptor = $convert.base64Decode(
+    'Cg1EaHRMb29rdXBQZWVyEhcKB3BlZXJfaWQYASABKAlSBnBlZXJJZBI0CgdvdXRjb21lGAIgAS'
+    'gOMhoua3dhYWkudjEuRGh0TG9va3VwT3V0Y29tZVIHb3V0Y29tZRIUCgVlcnJvchgDIAEoCVIF'
+    'ZXJyb3ISHQoKZWxhcHNlZF9tcxgEIAEoDVIJZWxhcHNlZE1zEjAKBnJlY29yZBgFIAEoCzITLm'
+    't3YWFpLnYxLkRodFJlY29yZEgAUgZyZWNvcmSIAQFCCQoHX3JlY29yZA==');
 
 @$core.Deprecated('Use chatMessageDescriptor instead')
 const ChatMessage$json = {

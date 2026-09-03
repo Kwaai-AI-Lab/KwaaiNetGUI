@@ -445,6 +445,36 @@ class KwaaiRpcClient {
     }
   }
 
+  /// One-shot listing of the hivemind DHT records this node holds locally.
+  ///
+  /// Throws rather than returning null on failure: the DHT view has to tell an
+  /// unimplemented operation (the Go p2p daemon) apart from an empty store,
+  /// and a null would collapse the two. Doesn't reset the channel, for the
+  /// same reason as [statusSnapshot].
+  Future<pb.DhtRecordsReply> dhtRecords({
+    bool includeValues = false,
+    List<String> keyIds = const [],
+  }) async {
+    final session = await _sessionOrInit();
+    return session.dhtRecords(includeValues: includeValues, keyIds: keyIds);
+  }
+
+  /// Resolve one DHT key across the network.
+  ///
+  /// [onOperationId] mirrors [chatStreamCancellable]: the id only exists once
+  /// the session has been opened, which happens after the caller has already
+  /// committed to awaiting the reply.
+  Future<pb.DhtLookupReply> dhtLookup(
+    String key, {
+    int timeoutSecs = 0,
+    required void Function(int? operationId) onOperationId,
+  }) async {
+    final session = await _sessionOrInit();
+    final op = session.dhtLookupOp(key, timeoutSecs: timeoutSecs);
+    onOperationId(op.id);
+    return op.reply;
+  }
+
   /// Version of the *running* daemon, read from `StatusReply.version`.
   ///
   /// Returns null when the daemon isn't reachable, or when it predates the

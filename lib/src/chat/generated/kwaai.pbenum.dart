@@ -113,33 +113,6 @@ class DhtRole extends $pb.ProtobufEnum {
   const DhtRole._(super.value, super.name);
 }
 
-/// Kad's view of a routing entry's liveness.
-///
-/// Distinct from `RoutingPeer.connected` — see the field. UNSPECIFIED is
-/// reserved for a daemon predating the field rather than a third real
-/// state: kad itself has only the two.
-class KadStatus extends $pb.ProtobufEnum {
-  static const KadStatus KAD_STATUS_UNSPECIFIED =
-      KadStatus._(0, _omitEnumNames ? '' : 'KAD_STATUS_UNSPECIFIED');
-  static const KadStatus KAD_STATUS_CONNECTED =
-      KadStatus._(1, _omitEnumNames ? '' : 'KAD_STATUS_CONNECTED');
-  static const KadStatus KAD_STATUS_DISCONNECTED =
-      KadStatus._(2, _omitEnumNames ? '' : 'KAD_STATUS_DISCONNECTED');
-
-  static const $core.List<KadStatus> values = <KadStatus>[
-    KAD_STATUS_UNSPECIFIED,
-    KAD_STATUS_CONNECTED,
-    KAD_STATUS_DISCONNECTED,
-  ];
-
-  static final $core.List<KadStatus?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
-  static KadStatus? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const KadStatus._(super.value, super.name);
-}
-
 /// Whether a discovered node answered a storage RPC.
 ///
 /// Reachability is a property of *this* node's route to the peer, not of
@@ -198,6 +171,39 @@ class DhtRecordKind extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const DhtRecordKind._(super.value, super.name);
+}
+
+class DhtLookupOutcome extends $pb.ProtobufEnum {
+  static const DhtLookupOutcome DHT_LOOKUP_OUTCOME_UNSPECIFIED =
+      DhtLookupOutcome._(
+          0, _omitEnumNames ? '' : 'DHT_LOOKUP_OUTCOME_UNSPECIFIED');
+
+  /// The peer answered and had the key.
+  static const DhtLookupOutcome DHT_LOOKUP_OUTCOME_FOUND =
+      DhtLookupOutcome._(1, _omitEnumNames ? '' : 'DHT_LOOKUP_OUTCOME_FOUND');
+
+  /// The peer answered and did not have it.
+  static const DhtLookupOutcome DHT_LOOKUP_OUTCOME_NOT_FOUND =
+      DhtLookupOutcome._(
+          2, _omitEnumNames ? '' : 'DHT_LOOKUP_OUTCOME_NOT_FOUND');
+
+  /// We never got an answer: dial failure, timeout, or a refusal.
+  static const DhtLookupOutcome DHT_LOOKUP_OUTCOME_ERROR =
+      DhtLookupOutcome._(3, _omitEnumNames ? '' : 'DHT_LOOKUP_OUTCOME_ERROR');
+
+  static const $core.List<DhtLookupOutcome> values = <DhtLookupOutcome>[
+    DHT_LOOKUP_OUTCOME_UNSPECIFIED,
+    DHT_LOOKUP_OUTCOME_FOUND,
+    DHT_LOOKUP_OUTCOME_NOT_FOUND,
+    DHT_LOOKUP_OUTCOME_ERROR,
+  ];
+
+  static final $core.List<DhtLookupOutcome?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static DhtLookupOutcome? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const DhtLookupOutcome._(super.value, super.name);
 }
 
 class Error_Code extends $pb.ProtobufEnum {

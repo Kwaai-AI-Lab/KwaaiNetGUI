@@ -26,6 +26,7 @@ import '../widgets/kwaai_dropdown.dart';
 import '../widgets/kwaai_heading.dart';
 import '../widgets/kwaai_status_bar.dart';
 import '../widgets/kwaai_text_field.dart';
+import 'dht_tab.dart';
 import 'peers_tab.dart';
 import 'sharding_tab.dart';
 import 'storage_tab.dart';
@@ -254,6 +255,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       const PeersTab()
                     else
                       const SizedBox.shrink(),
+                    // Same again: mounting this asks the daemon to enumerate
+                    // its hivemind store, and re-asks on every refresh.
+                    if (_selectedTab == _dhtTabIndex)
+                      const DhtTab()
+                    else
+                      const SizedBox.shrink(),
                     const _ContributeTab(),
                     const _NetworkTab(),
                     const _AppearanceTab(),
@@ -371,6 +378,9 @@ const _settingsNavEntries = <_SettingsNavEntry>[
   // Live p2p state. Named "Peers" rather than "Network" because that name is
   // already taken below by the bind/initial-peers *configuration* tab.
   _SettingsNavEntry(Icons.hub_outlined, Icons.hub, 'Peers'),
+  // The hivemind DHT's contents, as opposed to the Kademlia routing table the
+  // Peers tab shows — different layer, different store.
+  _SettingsNavEntry(Icons.key_outlined, Icons.key, 'DHT'),
   _SettingsNavEntry(
     Icons.volunteer_activism_outlined,
     Icons.volunteer_activism,
@@ -389,6 +399,7 @@ const _settingsNavEntries = <_SettingsNavEntry>[
 const _shardingTabIndex = 1;
 const _storageTabIndex = 2;
 const _peersTabIndex = 3;
+const _dhtTabIndex = 4;
 
 class _SettingsNav extends StatelessWidget {
   const _SettingsNav({
