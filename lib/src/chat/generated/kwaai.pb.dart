@@ -1892,12 +1892,26 @@ class RoutingPeer extends $pb.GeneratedMessage {
     $core.bool? connected,
     $core.bool? isBootstrap,
     $core.Iterable<$core.String>? addrs,
+    KadStatus? kadStatus,
+    $core.int? bucket,
+    $core.int? bucketEntries,
+    $core.int? bucketCapacity,
+    $core.bool? bucketPending,
+    $core.String? distance,
+    $core.int? lastContactSecs,
   }) {
     final result = create();
     if (peerId != null) result.peerId = peerId;
     if (connected != null) result.connected = connected;
     if (isBootstrap != null) result.isBootstrap = isBootstrap;
     if (addrs != null) result.addrs.addAll(addrs);
+    if (kadStatus != null) result.kadStatus = kadStatus;
+    if (bucket != null) result.bucket = bucket;
+    if (bucketEntries != null) result.bucketEntries = bucketEntries;
+    if (bucketCapacity != null) result.bucketCapacity = bucketCapacity;
+    if (bucketPending != null) result.bucketPending = bucketPending;
+    if (distance != null) result.distance = distance;
+    if (lastContactSecs != null) result.lastContactSecs = lastContactSecs;
     return result;
   }
 
@@ -1918,6 +1932,17 @@ class RoutingPeer extends $pb.GeneratedMessage {
     ..aOB(2, _omitFieldNames ? '' : 'connected')
     ..aOB(3, _omitFieldNames ? '' : 'isBootstrap')
     ..pPS(4, _omitFieldNames ? '' : 'addrs')
+    ..aE<KadStatus>(5, _omitFieldNames ? '' : 'kadStatus',
+        enumValues: KadStatus.values)
+    ..aI(6, _omitFieldNames ? '' : 'bucket', fieldType: $pb.PbFieldType.OU3)
+    ..aI(7, _omitFieldNames ? '' : 'bucketEntries',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(8, _omitFieldNames ? '' : 'bucketCapacity',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOB(9, _omitFieldNames ? '' : 'bucketPending')
+    ..aOS(10, _omitFieldNames ? '' : 'distance')
+    ..aI(11, _omitFieldNames ? '' : 'lastContactSecs',
+        fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1983,6 +2008,102 @@ class RoutingPeer extends $pb.GeneratedMessage {
   /// is its own loopback reads as healthy until the address is visible.
   @$pb.TagNumber(4)
   $pb.PbList<$core.String> get addrs => $_getList(3);
+
+  /// Kad's own liveness verdict for this entry.
+  ///
+  /// Not the same claim as `connected`, which is the swarm's live
+  /// connection set: kad marks an entry Disconnected on connection close
+  /// but keeps it in the bucket, and it lags the swarm by an event loop
+  /// turn either way. A row where the two disagree is the normal
+  /// steady state for a peer we have dropped and still know how to reach.
+  @$pb.TagNumber(5)
+  KadStatus get kadStatus => $_getN(4);
+  @$pb.TagNumber(5)
+  set kadStatus(KadStatus value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasKadStatus() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearKadStatus() => $_clearField(5);
+
+  /// Which k-bucket holds this entry: floor(log2(XOR distance)), 0-255.
+  ///
+  /// Derived from the distance rather than the iteration order, so it is
+  /// the bucket's real index and not a position in a filtered walk.
+  @$pb.TagNumber(6)
+  $core.int get bucket => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set bucket($core.int value) => $_setUnsignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasBucket() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearBucket() => $_clearField(6);
+
+  /// How many entries that bucket currently holds, and the k it is capped
+  /// at. Together they say whether the bucket is full — which is what
+  /// decides if a newly-discovered peer can be inserted at all, or has to
+  /// wait as a pending replacement for a disconnected occupant.
+  @$pb.TagNumber(7)
+  $core.int get bucketEntries => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set bucketEntries($core.int value) => $_setUnsignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasBucketEntries() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearBucketEntries() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get bucketCapacity => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set bucketCapacity($core.int value) => $_setUnsignedInt32(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasBucketCapacity() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearBucketCapacity() => $_clearField(8);
+
+  /// Whether that bucket holds a pending node: a peer waiting to take the
+  /// place of a disconnected entry. Per bucket, not per entry — every
+  /// entry in a full bucket reports the same flag.
+  @$pb.TagNumber(9)
+  $core.bool get bucketPending => $_getBF(8);
+  @$pb.TagNumber(9)
+  set bucketPending($core.bool value) => $_setBool(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasBucketPending() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearBucketPending() => $_clearField(9);
+
+  /// XOR distance from our own key to this peer's, big-endian hex, 64
+  /// digits, no leading `0x`.
+  ///
+  /// The DHT's own metric, and the only way to check that a lookup
+  /// actually walked closer. Fixed for the life of the entry, so it costs
+  /// nothing in subscription churn.
+  @$pb.TagNumber(10)
+  $core.String get distance => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set distance($core.String value) => $_setString(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasDistance() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearDistance() => $_clearField(10);
+
+  /// Seconds since we last *established* a connection to this peer, in
+  /// either direction. Absent means never — which is a real and common
+  /// state for a routing entry: kad holds a peer the moment a configured
+  /// address is seeded into it, before any dial has succeeded.
+  ///
+  /// Deliberately not part of the subscription's change identity, for the
+  /// same reason as `rtt_ms`: it moves every tick and would turn a quiet
+  /// node into a 5-second frame generator. The value a client holds is
+  /// therefore as of the last snapshot it was actually sent.
+  @$pb.TagNumber(11)
+  $core.int get lastContactSecs => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set lastContactSecs($core.int value) => $_setUnsignedInt32(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasLastContactSecs() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearLastContactSecs() => $_clearField(11);
 }
 
 /// This node's own position in the network.

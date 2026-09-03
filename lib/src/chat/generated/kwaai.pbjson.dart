@@ -61,6 +61,21 @@ final $typed_data.Uint8List dhtRoleDescriptor = $convert.base64Decode(
     'CgdEaHRSb2xlEhQKEERIVF9ST0xFX1VOS05PV04QABITCg9ESFRfUk9MRV9TRVJWRVIQARITCg'
     '9ESFRfUk9MRV9DTElFTlQQAg==');
 
+@$core.Deprecated('Use kadStatusDescriptor instead')
+const KadStatus$json = {
+  '1': 'KadStatus',
+  '2': [
+    {'1': 'KAD_STATUS_UNSPECIFIED', '2': 0},
+    {'1': 'KAD_STATUS_CONNECTED', '2': 1},
+    {'1': 'KAD_STATUS_DISCONNECTED', '2': 2},
+  ],
+};
+
+/// Descriptor for `KadStatus`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List kadStatusDescriptor = $convert.base64Decode(
+    'CglLYWRTdGF0dXMSGgoWS0FEX1NUQVRVU19VTlNQRUNJRklFRBAAEhgKFEtBRF9TVEFUVVNfQ0'
+    '9OTkVDVEVEEAESGwoXS0FEX1NUQVRVU19ESVNDT05ORUNURUQQAg==');
+
 @$core.Deprecated('Use storageReachabilityDescriptor instead')
 const StorageReachability$json = {
   '1': 'StorageReachability',
@@ -621,6 +636,31 @@ const RoutingPeer$json = {
     {'1': 'connected', '3': 2, '4': 1, '5': 8, '10': 'connected'},
     {'1': 'is_bootstrap', '3': 3, '4': 1, '5': 8, '10': 'isBootstrap'},
     {'1': 'addrs', '3': 4, '4': 3, '5': 9, '10': 'addrs'},
+    {
+      '1': 'kad_status',
+      '3': 5,
+      '4': 1,
+      '5': 14,
+      '6': '.kwaai.v1.KadStatus',
+      '10': 'kadStatus'
+    },
+    {'1': 'bucket', '3': 6, '4': 1, '5': 13, '10': 'bucket'},
+    {'1': 'bucket_entries', '3': 7, '4': 1, '5': 13, '10': 'bucketEntries'},
+    {'1': 'bucket_capacity', '3': 8, '4': 1, '5': 13, '10': 'bucketCapacity'},
+    {'1': 'bucket_pending', '3': 9, '4': 1, '5': 8, '10': 'bucketPending'},
+    {'1': 'distance', '3': 10, '4': 1, '5': 9, '10': 'distance'},
+    {
+      '1': 'last_contact_secs',
+      '3': 11,
+      '4': 1,
+      '5': 13,
+      '9': 0,
+      '10': 'lastContactSecs',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_last_contact_secs'},
   ],
 };
 
@@ -628,7 +668,12 @@ const RoutingPeer$json = {
 final $typed_data.Uint8List routingPeerDescriptor = $convert.base64Decode(
     'CgtSb3V0aW5nUGVlchIXCgdwZWVyX2lkGAEgASgJUgZwZWVySWQSHAoJY29ubmVjdGVkGAIgAS'
     'gIUgljb25uZWN0ZWQSIQoMaXNfYm9vdHN0cmFwGAMgASgIUgtpc0Jvb3RzdHJhcBIUCgVhZGRy'
-    'cxgEIAMoCVIFYWRkcnM=');
+    'cxgEIAMoCVIFYWRkcnMSMgoKa2FkX3N0YXR1cxgFIAEoDjITLmt3YWFpLnYxLkthZFN0YXR1c1'
+    'IJa2FkU3RhdHVzEhYKBmJ1Y2tldBgGIAEoDVIGYnVja2V0EiUKDmJ1Y2tldF9lbnRyaWVzGAcg'
+    'ASgNUg1idWNrZXRFbnRyaWVzEicKD2J1Y2tldF9jYXBhY2l0eRgIIAEoDVIOYnVja2V0Q2FwYW'
+    'NpdHkSJQoOYnVja2V0X3BlbmRpbmcYCSABKAhSDWJ1Y2tldFBlbmRpbmcSGgoIZGlzdGFuY2UY'
+    'CiABKAlSCGRpc3RhbmNlEi8KEWxhc3RfY29udGFjdF9zZWNzGAsgASgNSABSD2xhc3RDb250YW'
+    'N0U2Vjc4gBAUIUChJfbGFzdF9jb250YWN0X3NlY3M=');
 
 @$core.Deprecated('Use selfStatusDescriptor instead')
 const SelfStatus$json = {

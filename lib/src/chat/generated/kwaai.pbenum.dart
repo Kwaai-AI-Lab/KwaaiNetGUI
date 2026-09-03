@@ -113,6 +113,33 @@ class DhtRole extends $pb.ProtobufEnum {
   const DhtRole._(super.value, super.name);
 }
 
+/// Kad's view of a routing entry's liveness.
+///
+/// Distinct from `RoutingPeer.connected` — see the field. UNSPECIFIED is
+/// reserved for a daemon predating the field rather than a third real
+/// state: kad itself has only the two.
+class KadStatus extends $pb.ProtobufEnum {
+  static const KadStatus KAD_STATUS_UNSPECIFIED =
+      KadStatus._(0, _omitEnumNames ? '' : 'KAD_STATUS_UNSPECIFIED');
+  static const KadStatus KAD_STATUS_CONNECTED =
+      KadStatus._(1, _omitEnumNames ? '' : 'KAD_STATUS_CONNECTED');
+  static const KadStatus KAD_STATUS_DISCONNECTED =
+      KadStatus._(2, _omitEnumNames ? '' : 'KAD_STATUS_DISCONNECTED');
+
+  static const $core.List<KadStatus> values = <KadStatus>[
+    KAD_STATUS_UNSPECIFIED,
+    KAD_STATUS_CONNECTED,
+    KAD_STATUS_DISCONNECTED,
+  ];
+
+  static final $core.List<KadStatus?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static KadStatus? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const KadStatus._(super.value, super.name);
+}
+
 /// Whether a discovered node answered a storage RPC.
 ///
 /// Reachability is a property of *this* node's route to the peer, not of

@@ -920,10 +920,9 @@ class PeerRow {
   const PeerRow({
     required this.peerId,
     required this.connections,
-    required this.inRoutingTable,
     required this.isBootstrap,
     required this.isTrustedRelay,
-    this.routingAddrs = const [],
+    this.routing,
   });
 
   final String peerId;
@@ -936,16 +935,26 @@ class PeerRow {
   /// row shows.
   final List<pb.ConnectedPeer> connections;
 
-  final bool inRoutingTable;
   final bool isBootstrap;
   final bool isTrustedRelay;
 
-  /// What the DHT routing table holds for this peer.
+  /// The DHT routing-table entry for this peer, or null if kad does not hold
+  /// one.
   ///
-  /// Present even with no connection — that is the point. A routing entry with
-  /// no address is a peer we know of but cannot dial, which looks identical to
-  /// a merely-unconnected one unless the addresses are shown.
-  final List<String> routingAddrs;
+  /// Present even with no connection — that is the point. It carries more than
+  /// the addresses: kad's own liveness verdict, which bucket the entry sits in
+  /// and how full that bucket is. The row shows only that an entry exists; the
+  /// rest is what the DHT dialog is for.
+  final pb.RoutingPeer? routing;
+
+  bool get inRoutingTable => routing != null;
+
+  /// The addresses kad holds for this peer.
+  ///
+  /// A routing entry with none is a peer we know of but cannot dial, which
+  /// looks identical to a merely-unconnected one unless the addresses are
+  /// shown.
+  List<String> get routingAddrs => routing?.addrs ?? const [];
 
   bool get isConnected => connections.isNotEmpty;
 
@@ -1046,12 +1055,11 @@ List<PeerRow> mergePeerRows(
       PeerRow(
         peerId: entry.key,
         connections: conns,
-        inRoutingTable: routingById.containsKey(entry.key),
         // Read off the connection: the daemon has already applied local
         // configuration there, and a routing entry carries the same flag.
         isBootstrap: conns.any((c) => c.isBootstrap),
         isTrustedRelay: conns.any((c) => c.isTrustedRelay),
-        routingAddrs: routingById[entry.key]?.addrs ?? const [],
+        routing: routingById[entry.key],
       ),
     );
   }
@@ -1061,10 +1069,9 @@ List<PeerRow> mergePeerRows(
       PeerRow(
         peerId: r.peerId,
         connections: const [],
-        inRoutingTable: true,
         isBootstrap: r.isBootstrap,
         isTrustedRelay: false,
-        routingAddrs: r.addrs,
+        routing: r,
       ),
     );
   }
@@ -1171,7 +1178,7 @@ class _PeerTable extends StatelessWidget {
                                 dialable: r.routingAddrs.isNotEmpty,
                               ),
                       ),
-                      DataCell(_StateMark(on: r.inRoutingTable)),
+                      DataCell(_DhtCell(row: r)),
                       DataCell(
                         r.primary == null
                             ? Text('—', style: cellStyle)
@@ -1394,6 +1401,289 @@ class _StateMark extends StatelessWidget {
       on ? Icons.check : Icons.remove,
       size: 14,
       color: on ? kwaai.statusRunning : Theme.of(context).dividerColor,
+    );
+  }
+}
+
+/// The DHT column's mark, and the way into the routing entry behind it.
+///
+/// The mark alone says only that kad holds an entry, which is the least
+/// interesting thing about it: the bucket it landed in, whether that bucket is
+/// full, and whether kad still believes the peer is up are all knowable and all
+/// invisible. Hovering swaps the check for a magnifier and clicking opens the
+/// entry in full.
+///
+/// Only when there *is* an entry. A dash has nothing to open, so it stays inert
+/// rather than offering an affordance that leads to an empty dialog.
+class _DhtCell extends StatefulWidget {
+  const _DhtCell({required this.row});
+
+  final PeerRow row;
+
+  @override
+  State<_DhtCell> createState() => _DhtCellState();
+}
+
+class _DhtCellState extends State<_DhtCell> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final entry = widget.row.routing;
+    if (entry == null) return const _StateMark(on: false);
+
+    final kwaai = context.kwaai;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Tooltip(
+        message: 'Show this peer\'s DHT routing entry',
+        waitDuration: const Duration(milliseconds: 600),
+        // The gesture is on the cell, not the row: a DataRow's
+        // onSelectChanged would otherwise swallow the tap and merely select
+        // the peer.
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _showDhtEntryDialog(context, widget.row),
+          child: Icon(
+            _hovered ? Icons.search : Icons.check,
+            size: 14,
+            color: _hovered ? kwaai.accentPrimary : kwaai.statusRunning,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _showDhtEntryDialog(BuildContext context, PeerRow row) {
+  return showDialog<void>(
+    context: context,
+    builder: (_) => _DhtEntryDialog(row: row),
+  );
+}
+
+/// How long ago we last established a connection, in the coarsest unit that
+/// still says something.
+///
+/// Public for `test/peers_dht_entry_test.dart`. `null` is not "0 seconds ago"
+/// — it is a peer no dial has ever succeeded against, which for a routing entry
+/// is a normal state and a materially different one, so it gets its own words
+/// rather than a number.
+String formatLastContact(int? secs) {
+  if (secs == null) return 'Never — no dial has succeeded';
+  if (secs < 60) return '${secs}s ago';
+  if (secs < 3600) return '${secs ~/ 60}m ago';
+  if (secs < 86400) return '${secs ~/ 3600}h ago';
+  return '${secs ~/ 86400}d ago';
+}
+
+/// What kad believes about an entry, in words, alongside our own connection
+/// state.
+///
+/// Reported as one sentence rather than two fields because the interesting
+/// case is the *disagreement*: kad marks an entry disconnected on close and
+/// keeps it in the bucket, and it lags the swarm by an event-loop turn in
+/// either direction. Two ticks side by side would read as a contradiction; the
+/// sentence says which it is.
+///
+/// Public for `test/peers_dht_entry_test.dart`.
+String kadStatusSummary({
+  required pbenum.KadStatus kadStatus,
+  required bool connected,
+}) {
+  switch (kadStatus) {
+    case pbenum.KadStatus.KAD_STATUS_CONNECTED:
+      return connected
+          ? 'Live — kad and the swarm agree'
+          : 'Kad still has it as connected; the swarm has already dropped it';
+    case pbenum.KadStatus.KAD_STATUS_DISCONNECTED:
+      return connected
+          ? 'Kad has not caught up with the new connection yet'
+          : 'Retained while disconnected — the entry is how we would reach it '
+                'again';
+    default:
+      // A daemon predating the field. Not a third real state — kad has only
+      // the two — so say why it is missing rather than inventing a verdict.
+      return 'Not reported by this daemon';
+  }
+}
+
+/// Everything we hold about one Kademlia routing entry.
+///
+/// The peers table answers "is this peer in my routing table"; this answers the
+/// question that follows, which is why the answer is what it is. The k-bucket
+/// facts are the point: an entry's bucket is fixed by the XOR distance and
+/// cannot change, a full bucket refuses new peers outright, and a pending node
+/// means one is queued behind a disconnected occupant.
+class _DhtEntryDialog extends StatelessWidget {
+  const _DhtEntryDialog({required this.row});
+
+  final PeerRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final kwaai = context.kwaai;
+    final entry = row.routing!;
+
+    // A daemon predating these fields sends none of them, and proto3 makes
+    // that indistinguishable from real zeros. `bucket_capacity` is the tell:
+    // it is `k`, a compiled-in constant that is never legitimately 0.
+    final hasBucketDetail = entry.bucketCapacity > 0;
+    final full = hasBucketDetail && entry.bucketEntries >= entry.bucketCapacity;
+
+    return AlertDialog(
+      backgroundColor: kwaai.elevatedSurface,
+      title: Text('DHT routing entry', style: theme.textTheme.titleMedium),
+      content: SizedBox(
+        width: 560,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _DhtField(
+                label: 'Peer',
+                child: SelectableText(entry.peerId, style: _mono(context)),
+              ),
+              _DhtField(
+                label: 'State',
+                child: Text(
+                  kadStatusSummary(
+                    kadStatus: entry.kadStatus,
+                    connected: entry.connected,
+                  ),
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+              _DhtField(
+                label: 'Last dialled',
+                child: Text(
+                  formatLastContact(
+                    entry.hasLastContactSecs() ? entry.lastContactSecs : null,
+                  ),
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+              if (entry.isBootstrap)
+                _DhtField(
+                  label: 'Configured',
+                  child: Text(
+                    'One of this node\'s bootstrap peers',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+              const Divider(height: 20),
+              if (!hasBucketDetail)
+                _DhtField(
+                  label: 'Bucket',
+                  child: Text(
+                    'Not reported — this daemon predates k-bucket detail',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                )
+              else ...[
+                _DhtField(
+                  label: 'Bucket',
+                  child: Text(
+                    '${entry.bucket} — '
+                    '${entry.bucketEntries} of ${entry.bucketCapacity} '
+                    '${full ? "(full)" : "used"}'
+                    '${entry.bucketPending ? ", replacement pending" : ""}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: full ? kwaai.semanticWarning : null,
+                    ),
+                  ),
+                ),
+                _DhtField(
+                  label: 'Distance',
+                  child: SelectableText(entry.distance, style: _mono(context)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 74, top: 4),
+                  child: Text(
+                    // Spelled out because the two numbers above look unrelated
+                    // until you know one is the log of the other.
+                    'XOR of the two peer ids. Its bucket is floor(log2) of it, '
+                    'so an entry never moves buckets — only in and out of the '
+                    'table.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.textTheme.bodySmall?.color?.withValues(
+                        alpha: 0.6,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const Divider(height: 20),
+              if (entry.addrs.isEmpty)
+                _DhtField(
+                  label: 'Known at',
+                  child: Text(
+                    // The degenerate case the addresses exist to expose.
+                    'No address — kad knows this peer but holds no way to '
+                    'reach it, and cannot hand it to anyone else either',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: kwaai.semanticWarning,
+                    ),
+                  ),
+                )
+              else
+                _AddressLine(
+                  label: 'Known at',
+                  itemLabel: 'address',
+                  values: entry.addrs,
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+}
+
+TextStyle? _mono(BuildContext context) => Theme.of(context).textTheme.bodySmall
+    ?.copyWith(
+      fontFamily: 'Menlo',
+      fontFamilyFallback: const ['Consolas', 'monospace'],
+    );
+
+/// One labelled line in the DHT dialog, on the same 74px label column the
+/// expanded peer panel uses so the two read as one surface.
+class _DhtField extends StatelessWidget {
+  const _DhtField({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 74,
+            child: Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+              ),
+            ),
+          ),
+          Expanded(child: child),
+        ],
+      ),
     );
   }
 }
