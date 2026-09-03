@@ -89,17 +89,49 @@ void main() {
       );
     });
 
-    test('passes through anything it cannot parse', () {
-      // Better a line the user can read than a silently dropped address: a
-      // future transport (quic, ip6) must not vanish from the view.
+    test('collapses IPv6 ephemeral ports the same as IPv4', () {
+      expect(
+        summariseObservedAddrs([
+          '/ip6/2001:db8::1/tcp/40001',
+          '/ip6/2001:db8::1/tcp/40002',
+        ]),
+        ['/ip6/2001:db8::1/tcp/40001 (+1 more ephemeral port)'],
+      );
+    });
+
+    test('collapses QUIC ports and keeps the transport suffix', () {
+      // Dropping '/quic-v1' would leave a line naming a UDP port that is not
+      // the address anyone can dial.
+      expect(
+        summariseObservedAddrs([
+          '/ip4/203.0.113.9/udp/4001/quic-v1',
+          '/ip4/203.0.113.9/udp/4002/quic-v1',
+        ]),
+        ['/ip4/203.0.113.9/udp/4001/quic-v1 (+1 more ephemeral port)'],
+      );
+    });
+
+    test('keeps the two families apart', () {
       final summary = summariseObservedAddrs([
         '/ip4/203.0.113.7/tcp/8080',
         '/ip6/2001:db8::1/tcp/8080',
-        '/ip4/203.0.113.9/udp/4001/quic-v1',
       ]);
+      expect(summary, [
+        '/ip4/203.0.113.7/tcp/8080',
+        '/ip6/2001:db8::1/tcp/8080',
+      ]);
+    });
 
-      expect(summary, contains('/ip6/2001:db8::1/tcp/8080'));
-      expect(summary, contains('/ip4/203.0.113.9/udp/4001/quic-v1'));
+    test('passes through anything it cannot parse', () {
+      // Better a line the user can read than a silently dropped address: a
+      // transport with no port at all must not vanish from the view.
+      expect(
+        summariseObservedAddrs([
+          '/ip4/203.0.113.7/tcp/8080',
+          '/ip4/203.0.113.8/sctp/1',
+        ]),
+        contains('/ip4/203.0.113.8/sctp/1'),
+      );
     });
 
     test('handles an empty list', () {
@@ -108,6 +140,20 @@ void main() {
   });
 
   group('scopeOf', () {
+    // A mapped address is a v4 address wearing a v6 costume; classifying it
+    // by the costume put loopback at the top of the address list.
+    test('classifies an IPv4-mapped address by the v4 inside it', () {
+      expect(scopeOf('/ip6/::ffff:127.0.0.1/tcp/1'), AddrScope.local);
+      expect(scopeOf('/ip6/::ffff:10.1.2.3/tcp/1'), AddrScope.internal);
+      expect(scopeOf('/ip6/::ffff:192.168.1.5/tcp/1'), AddrScope.internal);
+      expect(scopeOf('/ip6/::ffff:203.0.113.7/tcp/1'), AddrScope.public);
+    });
+
+    test('classifies IPv6 by its own prefixes', () {
+      expect(scopeOf('/ip6/fdc6:1200::20/tcp/8080'), AddrScope.internal);
+      expect(scopeOf('/ip6/2001:db8::1/tcp/1'), AddrScope.public);
+    });
+
     test('classifies public addresses', () {
       expect(scopeOf('/ip4/98.232.246.19/tcp/8080'), AddrScope.public);
       expect(scopeOf('/ip4/18.219.43.67/tcp/8000'), AddrScope.public);
@@ -222,6 +268,38 @@ void main() {
     test('handles empty and single-element lists', () {
       expect(sortByScope([]), isEmpty);
       expect(sortByScope(['/ip4/127.0.0.1/tcp/1']), ['/ip4/127.0.0.1/tcp/1']);
+    });
+  });
+
+  group('shortenAddrPeerIds', () {
+    const relay = '12D3KooWRelayExamplePeerIdentifierAAAAAAAAAAAAAAAAAAAA';
+
+    test('elides the peer id and leaves the address whole', () {
+      final short = shortenAddrPeerIds('/ip6/2001:db8::1/tcp/8080/p2p/$relay');
+      // The port is what the elision used to eat on a long v6 multiaddr.
+      expect(short, startsWith('/ip6/2001:db8::1/tcp/8080/p2p/'));
+      expect(short, isNot(contains(relay)));
+      expect(
+        short.length,
+        lessThan('/ip6/2001:db8::1/tcp/8080/p2p/$relay'.length),
+      );
+    });
+
+    test('shortens every peer id in a circuit address', () {
+      const self = '12D3KooWSelfExamplePeerIdentifierBBBBBBBBBBBBBBBBBBBB';
+      final short = shortenAddrPeerIds(
+        '/ip4/198.51.100.7/tcp/4001/p2p/$relay/p2p-circuit/p2p/$self',
+      );
+      expect(short, contains('/p2p-circuit/p2p/'));
+      expect(short, isNot(contains(relay)));
+      expect(short, isNot(contains(self)));
+    });
+
+    test('leaves an address with no peer id alone', () {
+      expect(
+        shortenAddrPeerIds('/ip4/203.0.113.7/tcp/8080'),
+        '/ip4/203.0.113.7/tcp/8080',
+      );
     });
   });
 }
