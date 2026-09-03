@@ -829,6 +829,55 @@ class _KeepInTrayToggleState extends State<_KeepInTrayToggle> {
   }
 }
 
+/// Compact choice row — label on the left, a [KwaaiDropdown] on the right.
+/// What [_SwitchRow] is to a bool, this is to a setting with three states.
+class ChoiceRow<T> extends StatelessWidget {
+  const ChoiceRow({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final String label;
+  final T value;
+  final List<KwaaiDropdownItem<T>> items;
+  final ValueChanged<T> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // The dropdown sizes itself to its widest label; cap it so a long
+          // one cannot push the row's label into an ellipsis.
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 140),
+            child: KwaaiDropdown<T>(
+              items: items,
+              value: value,
+              onChanged: (v) {
+                if (v != null) onChanged(v);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Compact switch row — label on the left, scaled-down Switch on the right,
 /// the whole row tappable. Mirrors `_RadioRow`'s visual rhythm so radios
 /// and switches read as siblings.
@@ -1414,6 +1463,22 @@ class _ReachabilitySection extends ConsumerWidget {
           label: 'Enable QUIC transport',
           value: draft.enableQuic,
           onChanged: notifier.setEnableQuic,
+        ),
+        Tooltip(
+          message:
+              'Automatic listens on IPv6 when the host has it. Required '
+              'refuses to start without an IPv6 listener. Off never binds '
+              'IPv6. Takes effect on restart.',
+          child: ChoiceRow<Ipv6Mode>(
+            label: 'IPv6',
+            value: draft.ipv6,
+            items: const [
+              KwaaiDropdownItem(value: Ipv6Mode.auto, label: 'Automatic'),
+              KwaaiDropdownItem(value: Ipv6Mode.on, label: 'Required'),
+              KwaaiDropdownItem(value: Ipv6Mode.off, label: 'Off'),
+            ],
+            onChanged: notifier.setIpv6,
+          ),
         ),
       ],
     );
