@@ -366,6 +366,10 @@ class _SelfStatusHeader extends StatelessWidget {
                   Text('This node', style: theme.textTheme.titleSmall),
                   if (s != null)
                     _ReachabilityBadge(self: s, holePunched: holePunched),
+                  // Only added when it has something to say — an empty child
+                  // would still take the Wrap's spacing and leave a gap.
+                  if (s != null && ipv6Chip(s.ipv6) != null)
+                    _Ipv6Chip(ipv6: s.ipv6),
                 ],
               ),
             ),
@@ -443,6 +447,57 @@ class _SelfStatusHeader extends StatelessWidget {
 /// rather than as relaying being the ceiling. It used to read "relayed", which
 /// claimed the degraded case for a node that simply had no punched connection
 /// live at that moment.
+/// The chip to show for `SelfStatus.ipv6`, or null for nothing at all.
+///
+/// Empty is what a daemon too old to carry the field sends, and it has to read
+/// exactly like an explicit "off": no chip. A chip there would be a claim
+/// about something the daemon never reported. Anything unrecognised is
+/// treated the same way, so a future state cannot render a bogus badge.
+///
+/// Public for `test/peers_ipv6_chip_test.dart`.
+({String label, bool warn})? ipv6Chip(String ipv6) => switch (ipv6) {
+  'active' => (label: 'IPv6', warn: false),
+  'unavailable' => (label: 'IPv6 unavailable', warn: true),
+  _ => null,
+};
+
+/// IPv6 state, beside the reachability badge. Silent unless the node actually
+/// has an IPv6 listener, or asked for one and did not get it.
+class _Ipv6Chip extends StatelessWidget {
+  const _Ipv6Chip({required this.ipv6});
+
+  final String ipv6;
+
+  @override
+  Widget build(BuildContext context) {
+    final chip = ipv6Chip(ipv6);
+    if (chip == null) return const SizedBox.shrink();
+    final kwaai = context.kwaai;
+    final color = chip.warn ? kwaai.semanticWarning : kwaai.statusRunning;
+
+    return Tooltip(
+      message: chip.warn
+          ? 'The daemon asked for an IPv6 listener and the host could not '
+                'provide one; it is running IPv4-only.'
+          : 'This node is listening on IPv6 as well as IPv4.',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          chip.label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ReachabilityBadge extends StatelessWidget {
   const _ReachabilityBadge({required this.self, required this.holePunched});
 
