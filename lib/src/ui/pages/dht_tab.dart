@@ -116,7 +116,8 @@ class _DhtTabState extends ConsumerState<DhtTab> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
           child: _DhtHeader(
-            records: reply.records,
+            shown: reply.records.length,
+            total: reply.totalRecords,
             serverTime: reply.serverTime,
             refreshing: listing.isLoading,
             onRefresh: () {
@@ -157,7 +158,7 @@ class _DhtTabState extends ConsumerState<DhtTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _Caption(title: 'LOCAL RECORDS', detail: _summary(reply.records)),
+              _Caption(title: 'LOCAL RECORDS', detail: _summary(reply)),
               Expanded(
                 child: reply.records.isEmpty
                     ? const _EmptyRow(
@@ -196,13 +197,16 @@ class _DhtTabState extends ConsumerState<DhtTab> {
     );
   }
 
-  String _summary(List<pb.DhtRecord> records) {
+  String _summary(pb.DhtRecordsReply reply) {
+    final records = reply.records;
     final cached = records.where((r) => r.inCache).length;
     final dicts = records
         .where((r) => r.kind == pb.DhtRecordKind.DHT_RECORD_KIND_DICTIONARY)
         .length;
-    return '${records.length} records · $dicts dictionaries · '
-        '$cached cached';
+    final count = reply.totalRecords > records.length
+        ? '${records.length} of ${reply.totalRecords} records'
+        : '${records.length} records';
+    return '$count · $dicts dictionaries · $cached cached';
   }
 
   void _clearSelection() {
@@ -307,8 +311,9 @@ String shortKeyId(String keyId) =>
 
 /// A countdown, from `expires_in_secs`.
 ///
-/// Negative is a real reading, not a bug: sweeping is periodic, so a listing
-/// can legitimately see a record that has expired but not yet been removed.
+/// Negative is a real reading, not a bug: a local listing filters expired
+/// records, but a lookup answer is stamped with the answering peer's clock,
+/// and a dictionary keeps subkeys that have expired.
 String formatExpiry(double secs) {
   final rounded = secs.round();
   final magnitude = _magnitude(rounded.abs());
@@ -350,13 +355,18 @@ String formatEpoch(double epochSecs) {
 /// a reader can most easily get wrong.
 class _DhtHeader extends StatelessWidget {
   const _DhtHeader({
-    required this.records,
+    required this.shown,
+    required this.total,
     required this.serverTime,
     required this.refreshing,
     required this.onRefresh,
   });
 
-  final List<pb.DhtRecord> records;
+  final int shown;
+
+  /// `total_records` — what matched before the daemon's limit was applied.
+  final int total;
+
   final String serverTime;
   final bool refreshing;
   final VoidCallback onRefresh;
@@ -367,7 +377,7 @@ class _DhtHeader extends StatelessWidget {
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.75),
     );
-    final expired = records.where((r) => r.expiresInSecs < 0).length;
+    final truncated = total > shown;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,15 +402,33 @@ class _DhtHeader extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(_localStoreNote, style: muted),
+              // A cut-short listing that reads as a whole one is the same
+              // failure as implying the local store is the network.
+              if (truncated) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_outlined,
+                      size: 14,
+                      color: context.kwaai.semanticWarning,
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Showing $shown of $total records — the listing was '
+                        'cut short at the daemon\u2019s limit.',
+                        style: muted?.copyWith(
+                          color: context.kwaai.semanticWarning,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               if (serverTime.isNotEmpty) ...[
                 const SizedBox(height: 6),
-                Text(
-                  expired > 0
-                      ? 'Daemon time $serverTime · $expired expired, '
-                            'not yet swept'
-                      : 'Daemon time $serverTime',
-                  style: muted,
-                ),
+                Text('Daemon time $serverTime', style: muted),
               ],
             ],
           ),
@@ -698,9 +726,9 @@ class _RecordTable extends StatelessWidget {
                       DataCell(_TierChip(inCache: r.inCache)),
                       DataCell(
                         Text(
-                          // Meaningless for a regular value, and 0 on a
-                          // dictionary means every subkey has expired — the
-                          // kind column is what tells those apart.
+                          // Meaningless for a regular value, which is why
+                          // `kind` and not this column says what a record is.
+                          // Counts expired subkeys too; nothing prunes them.
                           r.kind == pb.DhtRecordKind.DHT_RECORD_KIND_DICTIONARY
                               ? '${r.subkeyCount}'
                               : '—',
@@ -875,7 +903,9 @@ class _RecordFacts extends StatelessWidget {
 }
 
 /// A dictionary's subkeys, each with its own expiration — independent of the
-/// record's, which is the point of a dictionary.
+/// record's, which is the point of a dictionary. Expired subkeys are listed
+/// too: nothing prunes them, so their own countdown is what says they are
+/// gone.
 class _SubkeyList extends StatelessWidget {
   const _SubkeyList({required this.subkeys});
 
@@ -888,11 +918,7 @@ class _SubkeyList extends StatelessWidget {
       color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.75),
     );
     if (subkeys.isEmpty) {
-      return Text(
-        'Every subkey has expired — the record is still here, its '
-        'contents are not.',
-        style: muted,
-      );
+      return Text('This dictionary holds no subkeys.', style: muted);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

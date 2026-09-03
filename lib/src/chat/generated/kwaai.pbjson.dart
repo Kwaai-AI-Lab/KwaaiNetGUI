@@ -898,13 +898,14 @@ const DhtRecordsRequest$json = {
   '2': [
     {'1': 'include_values', '3': 1, '4': 1, '5': 8, '10': 'includeValues'},
     {'1': 'key_ids', '3': 2, '4': 3, '5': 9, '10': 'keyIds'},
+    {'1': 'limit', '3': 3, '4': 1, '5': 13, '10': 'limit'},
   ],
 };
 
 /// Descriptor for `DhtRecordsRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List dhtRecordsRequestDescriptor = $convert.base64Decode(
     'ChFEaHRSZWNvcmRzUmVxdWVzdBIlCg5pbmNsdWRlX3ZhbHVlcxgBIAEoCFINaW5jbHVkZVZhbH'
-    'VlcxIXCgdrZXlfaWRzGAIgAygJUgZrZXlJZHM=');
+    'VlcxIXCgdrZXlfaWRzGAIgAygJUgZrZXlJZHMSFAoFbGltaXQYAyABKA1SBWxpbWl0');
 
 @$core.Deprecated('Use dhtRecordsReplyDescriptor instead')
 const DhtRecordsReply$json = {
@@ -927,6 +928,7 @@ const DhtRecordsReply$json = {
       '6': '.kwaai.v1.DhtKnownKey',
       '10': 'knownKeys'
     },
+    {'1': 'total_records', '3': 4, '4': 1, '5': 13, '10': 'totalRecords'},
   ],
 };
 
@@ -934,7 +936,8 @@ const DhtRecordsReply$json = {
 final $typed_data.Uint8List dhtRecordsReplyDescriptor = $convert.base64Decode(
     'Cg9EaHRSZWNvcmRzUmVwbHkSHwoLc2VydmVyX3RpbWUYASABKAlSCnNlcnZlclRpbWUSLQoHcm'
     'Vjb3JkcxgCIAMoCzITLmt3YWFpLnYxLkRodFJlY29yZFIHcmVjb3JkcxI0Cgprbm93bl9rZXlz'
-    'GAMgAygLMhUua3dhYWkudjEuRGh0S25vd25LZXlSCWtub3duS2V5cw==');
+    'GAMgAygLMhUua3dhYWkudjEuRGh0S25vd25LZXlSCWtub3duS2V5cxIjCg10b3RhbF9yZWNvcm'
+    'RzGAQgASgNUgx0b3RhbFJlY29yZHM=');
 
 @$core.Deprecated('Use dhtKnownKeyDescriptor instead')
 const DhtKnownKey$json = {

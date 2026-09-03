@@ -25,14 +25,16 @@ pb.DhtRecord _record({
   ..expiration = 1756900000
   ..expiresInSecs = expiresInSecs;
 
-pb.DhtRecordsReply _reply(List<pb.DhtRecord> records) => pb.DhtRecordsReply()
-  ..serverTime = '2026-09-03T12:00:00Z'
-  ..records.addAll(records)
-  ..knownKeys.add(
-    pb.DhtKnownKey()
-      ..name = '_petals.models'
-      ..keyId = 'aa11',
-  );
+pb.DhtRecordsReply _reply(List<pb.DhtRecord> records, {int? totalRecords}) =>
+    pb.DhtRecordsReply()
+      ..serverTime = '2026-09-03T12:00:00Z'
+      ..records.addAll(records)
+      ..totalRecords = totalRecords ?? records.length
+      ..knownKeys.add(
+        pb.DhtKnownKey()
+          ..name = '_petals.models'
+          ..keyId = 'aa11',
+      );
 
 Widget _host(pb.DhtRecordsReply reply) => ProviderScope(
   overrides: [dhtRecordsProvider.overrideWith((ref) => Stream.value(reply))],
@@ -57,7 +59,8 @@ void main() {
       expect(formatExpiry(172800), 'in 2d');
     });
 
-    // Sweeping is periodic, so a listing legitimately sees expired records.
+    // A lookup answer carries the answering peer's clock, and a dictionary
+    // keeps subkeys past their expiration.
     test('reads an expired record as expired, not as a negative countdown', () {
       expect(formatExpiry(-90), 'expired 1m ago');
     });
@@ -112,8 +115,8 @@ void main() {
       expect(find.text('cache'), findsOneWidget);
     });
 
-    // `subkey_count == 0` is ambiguous on its own — a fully-expired dictionary
-    // counts zero subkeys, exactly like a regular value.
+    // `subkey_count` says nothing about what a record is: it is 0 for every
+    // regular value, so `kind` is the discriminator.
     testWidgets('distinguishes an empty dictionary from a value', (
       tester,
     ) async {
@@ -135,6 +138,26 @@ void main() {
       // The value's subkey cell is blank; the dictionary's is a real zero.
       expect(find.text('—'), findsOneWidget);
       expect(find.text('0'), findsOneWidget);
+    });
+
+    testWidgets('says so when the listing was cut short', (tester) async {
+      await tester.pumpWidget(
+        _host(_reply([_record(keyId: 'ff01')], totalRecords: 812)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(_textWith('Showing 1 of 812 records'), findsOneWidget);
+      expect(_textWith('1 of 812 records · '), findsOneWidget);
+    });
+
+    testWidgets('claims no truncation when the listing is whole', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_host(_reply([_record(keyId: 'ff01')])));
+      await tester.pumpAndSettle();
+
+      expect(_textWith('cut short'), findsNothing);
+      expect(_textWith('1 records · '), findsOneWidget);
     });
   });
 }

@@ -355,8 +355,9 @@ class SessionClient {
   /// holds in its own store. There is no network-wide listing to ask for:
   /// Kademlia has no key-enumeration operation, so this is the whole of what
   /// can be enumerated. [includeValues] fills in each record's decoded value
-  /// and subkeys, which is the expensive half — pair it with [keyIds] to pay
-  /// for one record's detail rather than the whole store's.
+  /// and subkeys and *requires* [keyIds]: values run to a megabyte each, so a
+  /// whole-store listing carrying them could not fit one frame, and the daemon
+  /// rejects the combination with INVALID_ARGUMENT.
   Future<pb.DhtRecordsReply> dhtRecords({
     bool includeValues = false,
     List<String> keyIds = const [],

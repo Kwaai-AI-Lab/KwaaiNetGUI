@@ -2885,23 +2885,20 @@ class ConnectReply extends $pb.GeneratedMessage {
   void clearError() => $_clearField(2);
 }
 
-/// List the DHT records this node holds locally.
-///
-/// The local store is the *only* thing that can be enumerated. Hivemind
-/// is a Kademlia DHT and Kademlia has no key-listing operation: there is
-/// no request that means "tell me every key you know". What a node holds
-/// is whatever replication, caching and its own announces happened to
-/// land on it, so this listing is a true and complete answer about *this
-/// node* and says nothing about the network's key space. Use
+/// List the DHT records this node holds locally — the only listing that
+/// exists. Kademlia has no key-enumeration operation, so what a node
+/// holds is answerable in full while "what is in the DHT" is not; use
 /// DhtLookupRequest for a key you already know the name of.
 class DhtRecordsRequest extends $pb.GeneratedMessage {
   factory DhtRecordsRequest({
     $core.bool? includeValues,
     $core.Iterable<$core.String>? keyIds,
+    $core.int? limit,
   }) {
     final result = create();
     if (includeValues != null) result.includeValues = includeValues;
     if (keyIds != null) result.keyIds.addAll(keyIds);
+    if (limit != null) result.limit = limit;
     return result;
   }
 
@@ -2920,6 +2917,7 @@ class DhtRecordsRequest extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'includeValues')
     ..pPS(2, _omitFieldNames ? '' : 'keyIds')
+    ..aI(3, _omitFieldNames ? '' : 'limit', fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2941,11 +2939,9 @@ class DhtRecordsRequest extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<DhtRecordsRequest>(create);
   static DhtRecordsRequest? _defaultInstance;
 
-  /// Fill in `value` and `subkeys` on every record.
-  ///
-  /// Off by default because it is the expensive half: a listing needs
-  /// only the metadata, while a detail view needs one record's decoded
-  /// value. Combine with `key_ids` to pay it for one row.
+  /// Fill in `value` and `subkeys`. Requires a non-empty `key_ids`:
+  /// values run to a megabyte each, so a whole-store listing carrying
+  /// them could not fit one frame. INVALID_ARGUMENT otherwise.
   @$pb.TagNumber(1)
   $core.bool get includeValues => $_getBF(0);
   @$pb.TagNumber(1)
@@ -2959,6 +2955,17 @@ class DhtRecordsRequest extends $pb.GeneratedMessage {
   /// DhtRecord.key_id). Empty lists everything.
   @$pb.TagNumber(2)
   $pb.PbList<$core.String> get keyIds => $_getList(1);
+
+  /// Maximum records to return. 0 uses the daemon's default (500);
+  /// above its ceiling (5000) it is clamped, not rejected.
+  @$pb.TagNumber(3)
+  $core.int get limit => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set limit($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasLimit() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearLimit() => $_clearField(3);
 }
 
 class DhtRecordsReply extends $pb.GeneratedMessage {
@@ -2966,11 +2973,13 @@ class DhtRecordsReply extends $pb.GeneratedMessage {
     $core.String? serverTime,
     $core.Iterable<DhtRecord>? records,
     $core.Iterable<DhtKnownKey>? knownKeys,
+    $core.int? totalRecords,
   }) {
     final result = create();
     if (serverTime != null) result.serverTime = serverTime;
     if (records != null) result.records.addAll(records);
     if (knownKeys != null) result.knownKeys.addAll(knownKeys);
+    if (totalRecords != null) result.totalRecords = totalRecords;
     return result;
   }
 
@@ -2992,6 +3001,8 @@ class DhtRecordsReply extends $pb.GeneratedMessage {
         subBuilder: DhtRecord.create)
     ..pPM<DhtKnownKey>(3, _omitFieldNames ? '' : 'knownKeys',
         subBuilder: DhtKnownKey.create)
+    ..aI(4, _omitFieldNames ? '' : 'totalRecords',
+        fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3023,20 +3034,30 @@ class DhtRecordsReply extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearServerTime() => $_clearField(1);
 
-  /// Every live record, primary tier first, then cache, each tier in
-  /// key order. A key held in both tiers appears twice — the copies
-  /// carry independent expirations and a lookup answers from the
-  /// primary one, so they are genuinely two records.
+  /// Live records, primary tier first, then cache, each tier in key
+  /// order. A key held in both appears twice: the copies carry their
+  /// own expirations and values, and a find serves whichever expires
+  /// later, so they are genuinely two records.
   @$pb.TagNumber(2)
   $pb.PbList<DhtRecord> get records => $_getList(1);
 
-  /// The keys this node can name: the well-known registries plus the
-  /// per-block keys derived from its configured model prefix. This is
-  /// both the reverse table for DhtRecord.key_name — a DHT id is
-  /// SHA1(msgpack(name)) and cannot be inverted — and the candidate
-  /// list a client offers for DhtLookupRequest.
+  /// The keys this node can name: the registries plus one per block of
+  /// its configured prefix. Both the reverse table for
+  /// DhtRecord.key_name — a DHT id is SHA1(msgpack(name)) and cannot be
+  /// inverted — and the candidate list for DhtLookupRequest.
   @$pb.TagNumber(3)
   $pb.PbList<DhtKnownKey> get knownKeys => $_getList(2);
+
+  /// Records matching the filter before `limit` was applied. Greater
+  /// than `records.len()` means the listing was cut short.
+  @$pb.TagNumber(4)
+  $core.int get totalRecords => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set totalRecords($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTotalRecords() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTotalRecords() => $_clearField(4);
 }
 
 /// A plaintext key name and the DHT id it hashes to.
@@ -3244,9 +3265,11 @@ class DhtRecord extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearInCache() => $_clearField(4);
 
-  /// Subkey count for a dictionary; 0 for a regular value, and also 0
-  /// for a dictionary whose subkeys have all expired — `kind` is what
-  /// separates those two.
+  /// Subkeys held for a dictionary, 0 for a regular value; `kind`
+  /// separates those. Counts expired subkeys too: nothing prunes a
+  /// stored subkey once it expires — sweeping drops whole records, and
+  /// the freshness check only rejects incoming stores — so compare
+  /// each subkey's own expiration to see what is still live.
   @$pb.TagNumber(5)
   $core.int get subkeyCount => $_getIZ(4);
   @$pb.TagNumber(5)
@@ -3257,8 +3280,8 @@ class DhtRecord extends $pb.GeneratedMessage {
   void clearSubkeyCount() => $_clearField(5);
 
   /// Value bytes only: the stored value for a regular record, the
-  /// summed subkey values for a dictionary. Not the serialized wire
-  /// size, which adds msgpack framing.
+  /// summed subkey values (expired ones included) for a dictionary.
+  /// Not the serialized wire size, which adds msgpack framing.
   @$pb.TagNumber(6)
   $fixnum.Int64 get valueBytes => $_getI64(5);
   @$pb.TagNumber(6)
@@ -3268,9 +3291,9 @@ class DhtRecord extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearValueBytes() => $_clearField(6);
 
-  /// The record's outer expiration, seconds since the UNIX epoch. This
-  /// is the one `rpc_find` reports, and for a dictionary it can differ
-  /// from `latest_expiration`.
+  /// The record's outer expiration, seconds since the UNIX epoch. The
+  /// one `rpc_find` reports, and for a dictionary it can differ from
+  /// `latest_expiration`.
   @$pb.TagNumber(7)
   $core.double get expiration => $_getN(6);
   @$pb.TagNumber(7)
@@ -3280,13 +3303,11 @@ class DhtRecord extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearExpiration() => $_clearField(7);
 
-  /// Seconds until `expiration`, as of `server_time`. Negative for a
-  /// record that has expired but not yet been swept — which a listing
-  /// can legitimately see, since sweeping is periodic.
-  ///
-  /// Sent alongside the absolute time rather than instead of it: a
-  /// client's clock is not the daemon's, and the countdown is what a
-  /// reader actually wants.
+  /// Seconds until `expiration`, as of `server_time`. Never negative
+  /// in a local listing, which filters expired records; a lookup
+  /// result can be, since it is stamped with the answering peer's
+  /// clock. Sent alongside the absolute time because a client's clock
+  /// is not the daemon's.
   @$pb.TagNumber(8)
   $core.double get expiresInSecs => $_getN(7);
   @$pb.TagNumber(8)
@@ -3576,12 +3597,9 @@ class DhtValueView extends $pb.GeneratedMessage {
   void clearDecoded() => $_clearField(5);
 }
 
-/// Resolve one key across the network.
-///
-/// The counterpart to DhtRecordsRequest: that one enumerates what is
-/// here, this one fetches what is elsewhere. It can only ever work for a
-/// key whose *name* is known, because the id is SHA1(msgpack(name)) and
-/// there is nothing to enumerate against.
+/// Resolve one key across the network — the counterpart to
+/// DhtRecordsRequest, and only ever possible for a key whose *name* is
+/// known, since the id is SHA1(msgpack(name)).
 class DhtLookupRequest extends $pb.GeneratedMessage {
   factory DhtLookupRequest({
     $core.String? key,
@@ -3635,8 +3653,7 @@ class DhtLookupRequest extends $pb.GeneratedMessage {
 
   /// The plaintext key name — `_petals.models`, `_kwaai.vpk.nodes`,
   /// `_kwaai.inference.nodes`, `<prefix>.<block>`, or anything else.
-  /// Hashed to its DHT id here so a client never has to reproduce
-  /// SHA1(msgpack(name)).
+  /// Hashed to its DHT id here.
   @$pb.TagNumber(1)
   $core.String get key => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -3646,10 +3663,11 @@ class DhtLookupRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearKey() => $_clearField(1);
 
-  /// Peers to ask, base58 peer ids. Empty means this node's own
-  /// configured peers plus its routing table — never a compiled-in
-  /// default, so a lookup can only reach the network this node is
-  /// already part of.
+  /// Peers to ask, base58 peer ids. Empty means the node's configured
+  /// peers plus its routing table — whoever it was already going to
+  /// talk to. A node configured with an explicitly empty peer list
+  /// gets UNAVAILABLE, never a fallback to a compiled-in bootstrap.
+  /// Both lists are capped at 16 peers.
   @$pb.TagNumber(2)
   $pb.PbList<$core.String> get peers => $_getList(1);
 
