@@ -9,14 +9,13 @@ import 'package:kwaainet_gui/src/p2p/protocols.dart';
 import 'package:kwaainet_gui/src/ui/pages/peers_tab.dart';
 import 'package:kwaainet_gui/src/ui/theme/theme_variants.dart';
 
-pb.ConnectedPeer _conn(String id, List<String> protocols) =>
-    pb.ConnectedPeer()
-      ..peerId = id
-      ..addr = '/ip4/198.18.0.10/tcp/8000'
-      ..kind = pbenum.PeerConnKind.PEER_CONN_KIND_DIRECT
-      ..direction = 'outbound'
-      ..protocols.addAll(protocols)
-      ..dhtRole = pbenum.DhtRole.DHT_ROLE_SERVER;
+pb.ConnectedPeer _conn(String id, List<String> protocols) => pb.ConnectedPeer()
+  ..peerId = id
+  ..addr = '/ip4/198.18.0.10/tcp/8000'
+  ..kind = pbenum.PeerConnKind.PEER_CONN_KIND_DIRECT
+  ..direction = 'outbound'
+  ..protocols.addAll(protocols)
+  ..dhtRole = pbenum.DhtRole.DHT_ROLE_SERVER;
 
 /// Two connected peers with different KwaaiNet capabilities, on a node that
 /// itself serves both.
@@ -50,12 +49,21 @@ pb.NetworkUpdate _update({List<String>? localProtocols}) => pb.NetworkUpdate()
     ]),
   ]);
 
+/// Pumps on a surface wide enough for the whole caption bar: on the default
+/// 800px one the filter slot scrolls, and the drop-down sits out of view.
+Future<void> _pump(WidgetTester tester, Widget host) async {
+  tester.view.physicalSize = const Size(1400, 700);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(host);
+}
+
 Widget _host(pb.NetworkUpdate update) => ProviderScope(
   overrides: [peersProvider.overrideWith((ref) => Stream.value(update))],
   child: MaterialApp(
     theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
     home: const Scaffold(
-      body: SizedBox(width: 1100, height: 700, child: PeersTab()),
+      body: SizedBox(width: 1300, height: 700, child: PeersTab()),
     ),
   ),
 );
@@ -105,7 +113,7 @@ void main() {
     testWidgets('shows all peers by default, next to the other filters', (
       tester,
     ) async {
-      await tester.pumpWidget(_host(_update()));
+      await _pump(tester, _host(_update()));
       await tester.pumpAndSettle();
 
       expect(find.text('Protocols'), findsOneWidget);
@@ -116,7 +124,7 @@ void main() {
     testWidgets('offers a disabled Show all peers while nothing is selected', (
       tester,
     ) async {
-      await tester.pumpWidget(_host(_update()));
+      await _pump(tester, _host(_update()));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Protocols'));
@@ -134,7 +142,7 @@ void main() {
 
     testWidgets('narrows to peers advertising a checked family, across '
         'versions', (tester) async {
-      await tester.pumpWidget(_host(_update()));
+      await _pump(tester, _host(_update()));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Protocols'));
@@ -153,7 +161,7 @@ void main() {
     });
 
     testWidgets('clearing the selection restores every peer', (tester) async {
-      await tester.pumpWidget(_host(_update()));
+      await _pump(tester, _host(_update()));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Protocols'));
@@ -172,9 +180,7 @@ void main() {
         'serve', (tester) async {
       // The node serves nothing of interest itself; the list must still
       // offer what its peers advertise — the union, not just "Serving".
-      await tester.pumpWidget(
-        _host(_update(localProtocols: ['/ipfs/id/1.0.0'])),
-      );
+      await _pump(tester, _host(_update(localProtocols: ['/ipfs/id/1.0.0'])));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Protocols'));

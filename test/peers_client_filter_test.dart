@@ -77,7 +77,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(_summaryWith('hidden'), findsOneWidget);
 
-    await tester.tap(find.byType(Checkbox));
+    await tester.tap(find.text('Show DHT clients'));
     await tester.pumpAndSettle();
 
     expect(_summaryWith('hidden'), findsNothing);
@@ -89,10 +89,9 @@ void main() {
     await tester.pumpWidget(_host(_update(clients: 2)));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(Checkbox));
+    await tester.tap(find.text('Show DHT clients'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(Checkbox), findsOneWidget);
     expect(find.text('Show DHT clients'), findsOneWidget);
   });
 
@@ -101,12 +100,12 @@ void main() {
   testWidgets('does not move when toggled', (tester) async {
     await tester.pumpWidget(_host(_update(clients: 2)));
     await tester.pumpAndSettle();
-    final before = tester.getTopLeft(find.byType(Checkbox));
+    final before = tester.getTopLeft(find.text('Show DHT clients'));
 
-    await tester.tap(find.byType(Checkbox));
+    await tester.tap(find.text('Show DHT clients'));
     await tester.pumpAndSettle();
 
-    expect(tester.getTopLeft(find.byType(Checkbox)), before);
+    expect(tester.getTopLeft(find.text('Show DHT clients')), before);
   });
 
   /// Both count summaries — the "This node" header and the PEERS caption —
@@ -116,20 +115,21 @@ void main() {
     await tester.pumpWidget(_host(_update(clients: 2)));
     await tester.pumpAndSettle();
 
-    final rects = _summaryWith(
-      'in routing table',
-    ).evaluate().map((e) => tester.getRect(find.byWidget(e.widget))).toList();
+    final rects = _summaryWith('in routing table')
+        .evaluate()
+        .map((e) => tester.getRect(find.byWidget(e.widget)))
+        .toList();
 
     expect(rects.length, 2, reason: 'header summary and caption summary');
     expect(rects[0].right, closeTo(rects[1].right, 0.5));
   });
 
-  /// With no client peers there is nothing to filter, so the control is noise.
-  testWidgets('omits the toggle when no client peers exist', (tester) async {
+  /// The toggle stays put with no client peers; only the hidden count goes.
+  testWidgets('hides nothing when no client peers exist', (tester) async {
     await tester.pumpWidget(_host(_update(clients: 0)));
     await tester.pumpAndSettle();
 
-    expect(find.byType(Checkbox), findsNothing);
+    expect(find.text('Show DHT clients'), findsOneWidget);
     expect(_summaryWith('hidden'), findsNothing);
   });
 }

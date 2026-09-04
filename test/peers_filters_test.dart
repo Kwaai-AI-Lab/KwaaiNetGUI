@@ -49,12 +49,12 @@ pb.NetworkUpdate _update({
         ..addrs.add('/ip4/198.18.0.${20 + i}/tcp/8000'),
   ]);
 
-Widget _host(pb.NetworkUpdate update) => ProviderScope(
+Widget _host(pb.NetworkUpdate update, {double width = 1100}) => ProviderScope(
   overrides: [peersProvider.overrideWith((ref) => Stream.value(update))],
   child: MaterialApp(
     theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
-    home: const Scaffold(
-      body: SizedBox(width: 1100, height: 700, child: PeersTab()),
+    home: Scaffold(
+      body: SizedBox(width: width, height: 700, child: const PeersTab()),
     ),
   ),
 );
@@ -89,12 +89,28 @@ void main() {
       expect(find.text('Show unconnected'), findsOneWidget);
     });
 
-    /// Nothing to hide, so the control would be noise.
-    testWidgets('omits the box when every peer is connected', (tester) async {
+    /// Present even with nothing to hide: a box that comes and goes reads as
+    /// a control going missing.
+    testWidgets('keeps the box when every peer is connected', (tester) async {
       await tester.pumpWidget(_host(_update(routingOnly: 0)));
       await tester.pumpAndSettle();
 
-      expect(find.text('Show unconnected'), findsNothing);
+      expect(find.text('Show unconnected'), findsOneWidget);
+      expect(find.text('Show DHT clients'), findsOneWidget);
+    });
+
+    /// The filter controls take their own width and the summary the rest;
+    /// a flex split used to strand the summary mid-bar on a wide window.
+    testWidgets('right-aligns the summary on a wide window', (tester) async {
+      tester.view.physicalSize = const Size(1600, 600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(_host(_update(routingOnly: 2), width: 1500));
+      await tester.pumpAndSettle();
+
+      final summary = tester.getRect(_textWith('2 hidden'));
+      // The caption bar carries 16px of horizontal padding.
+      expect(summary.right, closeTo(1500 - 16, 0.5));
     });
   });
 
@@ -167,10 +183,8 @@ void main() {
       );
       expect(row([_conn(id)]).bothDirections, isFalse);
       expect(
-        row([
-          _conn(id, direction: 'inbound'),
-          _conn(id, direction: 'inbound'),
-        ]).bothDirections,
+        row([_conn(id, direction: 'inbound'), _conn(id, direction: 'inbound')])
+            .bothDirections,
         isFalse,
       );
       expect(row(const []).bothDirections, isFalse);

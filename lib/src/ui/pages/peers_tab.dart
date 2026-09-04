@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -488,10 +489,8 @@ class _Ipv6Chip extends StatelessWidget {
         ),
         child: Text(
           chip.label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w600,
-          ),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: color, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -562,10 +561,8 @@ class _ReachabilityBadge extends StatelessWidget {
         ),
         child: Text(
           parts.join(' · '),
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w600,
-          ),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: color, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -588,9 +585,8 @@ class _StaleChip extends StatelessWidget {
       ),
       child: Text(
         'No update for ${staleFor.inSeconds}s',
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: kwaai.semanticWarning),
+        style: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(color: kwaai.semanticWarning),
       ),
     );
   }
@@ -799,8 +795,6 @@ class _TableSectionState extends State<_TableSection> {
   @override
   Widget build(BuildContext context) {
     final allRows = mergePeerRows(widget.connected, widget.routing);
-    final clientRows = allRows.where((r) => r.isDhtClient).length;
-    final unconnectedRows = allRows.where((r) => !r.isConnected).length;
     final rows = allRows
         .where(
           (r) =>
@@ -833,10 +827,6 @@ class _TableSectionState extends State<_TableSection> {
           trailing: _Filters(
             showDhtClients: _showDhtClients,
             showUnconnected: _showUnconnected,
-            // Keyed off such rows existing at all, not off how many are
-            // hidden — otherwise checking a box would make it vanish.
-            clientRows: clientRows,
-            unconnectedRows: unconnectedRows,
             onShowDhtClients: (v) => setState(() => _showDhtClients = v),
             onShowUnconnected: (v) => setState(() => _showUnconnected = v),
             // Discovered, not curated: what we serve plus whatever the
@@ -1703,17 +1693,15 @@ class _ProtocolLinesState extends State<_ProtocolLines> {
   }
 }
 
-/// The caption bar's filter checkboxes.
+/// The caption bar's filter controls.
 ///
-/// Each appears only once it has something to hide, so a small network is not
-/// asked about categories it does not have — but a box the user has ticked
-/// stays put, or unticking it would make it disappear.
+/// All of them are always present. They used to appear only once they had
+/// something to hide, which read as a control going missing rather than as a
+/// category being absent.
 class _Filters extends StatelessWidget {
   const _Filters({
     required this.showDhtClients,
     required this.showUnconnected,
-    required this.clientRows,
-    required this.unconnectedRows,
     required this.onShowDhtClients,
     required this.onShowUnconnected,
     required this.discoverProtocols,
@@ -1726,8 +1714,6 @@ class _Filters extends StatelessWidget {
 
   final bool showDhtClients;
   final bool showUnconnected;
-  final int clientRows;
-  final int unconnectedRows;
   final ValueChanged<bool> onShowDhtClients;
   final ValueChanged<bool> onShowUnconnected;
 
@@ -1748,29 +1734,24 @@ class _Filters extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final toggles = <Widget>[
-      if (unconnectedRows > 0 || showUnconnected)
-        FilterToggle(
-          label: 'Show unconnected',
-          tooltip:
-              'Peers in the DHT routing table this node holds no connection '
-              'to. Known addresses rather than live paths — worth showing '
-              'when you are asking who could be dialled, not who is.',
-          value: showUnconnected,
-          onChanged: onShowUnconnected,
-        ),
-      if (clientRows > 0 || showDhtClients)
-        FilterToggle(
-          label: 'Show DHT clients',
-          tooltip:
-              'Peers that query the DHT without serving it. They are never '
-              'routing hops — typically hivemind/Python processes, or nodes '
-              'reachable only via a relay.',
-          value: showDhtClients,
-          onChanged: onShowDhtClients,
-        ),
-      // Always offered, unlike the appear-when-useful checkboxes: whether
-      // there is anything to filter on is only knowable by running the
-      // discovery this control exists to defer.
+      FilterToggle(
+        label: 'Show unconnected',
+        tooltip:
+            'Peers in the DHT routing table this node holds no connection '
+            'to. Known addresses rather than live paths — worth showing '
+            'when you are asking who could be dialled, not who is.',
+        value: showUnconnected,
+        onChanged: onShowUnconnected,
+      ),
+      FilterToggle(
+        label: 'Show DHT clients',
+        tooltip:
+            'Peers that query the DHT without serving it. They are never '
+            'routing hops — typically hivemind/Python processes, or nodes '
+            'reachable only via a relay.',
+        value: showDhtClients,
+        onChanged: onShowDhtClients,
+      ),
       _ProtocolFilter(
         discover: discoverProtocols,
         selected: selectedProtocols,
@@ -1798,7 +1779,7 @@ class _Filters extends StatelessWidget {
 ///
 /// Sits on the caption bar beside the filter toggles rather than above the
 /// table, so it costs no table height — the bar is 28px and this field is
-/// sized to fit inside it rather than stretch it. That is also why it is not
+/// padded to sit inside it rather than stretch it. That is also why it is not
 /// [KwaaiTextField]: the app's input primitive is sized for forms and has no
 /// height knob, and at this size the borders are all that is shared.
 ///
@@ -1860,13 +1841,13 @@ class _SearchFieldState extends State<_SearchField> {
           'the middle the row abbreviates away.',
       child: SizedBox(
         width: 200,
-        height: 22,
         child: TextField(
           key: const Key('peer-search'),
           controller: _controller,
           onChanged: _onChanged,
           style: theme.textTheme.bodySmall,
           cursorHeight: 12,
+          textAlignVertical: TextAlignVertical.center,
           decoration: InputDecoration(
             hintText: 'Search peers',
             hintStyle: theme.textTheme.bodySmall?.copyWith(color: muted),
@@ -1874,9 +1855,13 @@ class _SearchFieldState extends State<_SearchField> {
             filled: true,
             fillColor: kwaai.inputBackground,
             hoverColor: Colors.transparent,
-            // Zero vertical padding: at 22px tall there is none to give, and
-            // any at all makes the field taller than the caption bar.
-            contentPadding: const EdgeInsets.symmetric(horizontal: 6),
+            // The padding is the height: an outline decorator draws its box
+            // at its own content size whatever it is constrained to, so a
+            // taller SizedBox only adds empty space beneath the border.
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 6,
+              vertical: 5,
+            ),
             prefixIcon: Icon(Icons.search, size: 13, color: muted),
             prefixIconConstraints: const BoxConstraints(minWidth: 22),
             suffixIcon: _hasText
@@ -1977,7 +1962,10 @@ class _ProtocolFilterState extends State<_ProtocolFilter> {
       controller: _menu,
       // Below the trigger, unlike KwaaiDropdown's selected-row-over-trigger
       // anchoring — this menu has no "current value" row to line up.
-      style: kwaaiMenuStyle(context, alignment: AlignmentDirectional.bottomStart),
+      style: kwaaiMenuStyle(
+        context,
+        alignment: AlignmentDirectional.bottomStart,
+      ),
       menuChildren: [
         KwaaiMenuSurface(
           children: [
@@ -2007,16 +1995,15 @@ class _ProtocolFilterState extends State<_ProtocolFilter> {
                 // Same gloss the connections panel shows, minus ids that only
                 // describe themselves.
                 tooltip: switch (_choices[family]) {
-                  final id? when describeProtocol(id) != id =>
-                    describeProtocol(id),
+                  final id? when describeProtocol(id) != id => describeProtocol(
+                    id,
+                  ),
                   _ => null,
                 },
                 // Not closing here is the point — picking two protocols
                 // should not cost two round trips through the drop-down.
-                onTap: () => widget.onToggle(
-                  family,
-                  !widget.selected.contains(family),
-                ),
+                onTap: () =>
+                    widget.onToggle(family, !widget.selected.contains(family)),
               ),
           ],
         ),
@@ -2100,9 +2087,7 @@ class _ProtocolMenuRowState extends State<_ProtocolMenuRow> {
       height: 1.0,
       color: fg,
       fontFamily: widget.mono ? 'Menlo' : null,
-      fontFamilyFallback: widget.mono
-          ? const ['Consolas', 'monospace']
-          : null,
+      fontFamilyFallback: widget.mono ? const ['Consolas', 'monospace'] : null,
     );
 
     final row = MouseRegion(
@@ -2163,6 +2148,10 @@ class _ProtocolMenuRowState extends State<_ProtocolMenuRow> {
 class _Caption extends StatelessWidget {
   const _Caption({required this.title, this.detail, this.trailing});
 
+  /// Width the summary keeps however wide the controls get: enough for the
+  /// three-part count before it starts ellipsising.
+  static const _summaryReserve = 280.0;
+
   final String title;
   final String? detail;
 
@@ -2181,44 +2170,48 @@ class _Caption extends StatelessWidget {
       height: _captionBarHeight,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       alignment: Alignment.centerLeft,
-      child: Row(
-        // Title (and any control) left, summary hard against the right edge —
-        // enforced by the Spacer below, not by spaceBetween, which would
-        // distribute the slack and push the control away from the title.
-        children: [
-          Text(title, style: style),
-          // Sits immediately after the title, with the Spacer pushing the
-          // summary to the right edge. The gap is fixed rather than flexible
-          // so the control keeps its position as the summary text changes.
-          //
-          // Flexible with an internal horizontal scroll, not bare: the filter
-          // controls are always present now, and on a narrow window they are
-          // wider than the bar. Scrolling within their slot keeps every
-          // control reachable where an overflow would just clip them.
-          if (trailing != null) ...[
-            const SizedBox(width: 12),
-            Flexible(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: trailing!,
+      child: LayoutBuilder(
+        builder: (context, constraints) => Row(
+          // Title and controls left at their own width, the summary in one
+          // Expanded claiming everything else so its right-aligned text lands
+          // on the bar's edge. Not a Flexible for the controls: any flex child
+          // is dealt a share of the slack, and the part of that share it does
+          // not use becomes dead space before the summary rather than going
+          // to it.
+          children: [
+            ConstrainedBox(
+              // Whatever the controls do not fit within scrolls, so the
+              // summary always keeps this much of the bar.
+              constraints: BoxConstraints(
+                maxWidth: math.max(0, constraints.maxWidth - _summaryReserve),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, style: style),
+                  if (trailing != null) ...[
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: trailing!,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Expanded(
+              child: Text(
+                detail ?? '',
+                style: theme.textTheme.bodySmall,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
               ),
             ),
           ],
-          // Expanded, and no Spacer: a Spacer takes flex 1 and a Flexible
-          // text takes another, so the slack was split between them and the
-          // summary sat mid-bar. One flexible child claiming all of it, with
-          // the text aligned inside, puts it on the right edge — and it still
-          // ellipsises when the bar is too narrow.
-          Expanded(
-            child: Text(
-              detail ?? '',
-              style: theme.textTheme.bodySmall,
-              softWrap: false,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.right,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

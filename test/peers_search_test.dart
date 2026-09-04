@@ -45,7 +45,7 @@ Widget _host(pb.NetworkUpdate update) => ProviderScope(
   child: MaterialApp(
     theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
     home: const Scaffold(
-      body: SizedBox(width: 1100, height: 700, child: PeersTab()),
+      body: SizedBox(width: 1300, height: 700, child: PeersTab()),
     ),
   ),
 );
@@ -55,6 +55,15 @@ Finder _textWith(String fragment) => find.byWidgetPredicate(
 );
 
 final _field = find.byKey(const Key('peer-search'));
+
+/// Pumps on a surface wide enough for the whole caption bar: on the default
+/// 800px one the filter slot scrolls, and the field sits out of view.
+Future<void> _pump(WidgetTester tester, Widget host) async {
+  tester.view.physicalSize = const Size(1400, 700);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(host);
+}
 
 Future<void> _search(WidgetTester tester, String query) async {
   await tester.enterText(_field, query);
@@ -134,7 +143,7 @@ void main() {
 
   group('search field', () {
     testWidgets('shows every peer until something is typed', (tester) async {
-      await tester.pumpWidget(_host(_update()));
+      await _pump(tester, _host(_update()));
       await tester.pumpAndSettle();
 
       expect(find.text('Search peers'), findsOneWidget);
@@ -146,7 +155,7 @@ void main() {
     testWidgets('narrows the table and counts what it withheld', (
       tester,
     ) async {
-      await tester.pumpWidget(_host(_update()));
+      await _pump(tester, _host(_update()));
       await tester.pumpAndSettle();
 
       await _search(tester, '0.6.7');
@@ -160,7 +169,7 @@ void main() {
     testWidgets('is case-insensitive and ignores surrounding space', (
       tester,
     ) async {
-      await tester.pumpWidget(_host(_update()));
+      await _pump(tester, _host(_update()));
       await tester.pumpAndSettle();
 
       await _search(tester, '  BBTWO02  ');
@@ -170,7 +179,7 @@ void main() {
     });
 
     testWidgets('clearing restores every peer', (tester) async {
-      await tester.pumpWidget(_host(_update()));
+      await _pump(tester, _host(_update()));
       await tester.pumpAndSettle();
 
       await _search(tester, '0.6.7');
@@ -196,7 +205,7 @@ void main() {
           child: MaterialApp(
             theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
             home: const Scaffold(
-              body: SizedBox(width: 1100, height: 700, child: PeersTab()),
+              body: SizedBox(width: 1300, height: 700, child: PeersTab()),
             ),
           ),
         ),
@@ -216,7 +225,7 @@ void main() {
     testWidgets('whitespace narrows nothing but is still clearable', (
       tester,
     ) async {
-      await tester.pumpWidget(_host(_update()));
+      await _pump(tester, _host(_update()));
       await tester.pumpAndSettle();
 
       await _search(tester, '   ');
@@ -237,7 +246,7 @@ void main() {
             '/ip4/198.18.0.40/tcp/8000',
           ]),
         );
-      await tester.pumpWidget(_host(update));
+      await _pump(tester, _host(update));
       await tester.pumpAndSettle();
 
       await _search(tester, '0.6.7');
@@ -249,7 +258,7 @@ void main() {
     testWidgets('hides the detail panel of a peer the query filters out', (
       tester,
     ) async {
-      await tester.pumpWidget(_host(_update()));
+      await _pump(tester, _host(_update()));
       await tester.pumpAndSettle();
 
       await tester.tap(_textWith('AAONE01'));
@@ -268,7 +277,7 @@ void main() {
     testWidgets('a query matching nothing says so rather than looking empty', (
       tester,
     ) async {
-      await tester.pumpWidget(_host(_update()));
+      await _pump(tester, _host(_update()));
       await tester.pumpAndSettle();
 
       await _search(tester, 'no-such-peer');
