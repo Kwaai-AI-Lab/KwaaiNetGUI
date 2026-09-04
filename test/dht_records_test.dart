@@ -9,6 +9,7 @@ import 'package:kwaainet_gui/src/chat/session_client.dart';
 import 'package:kwaainet_gui/src/daemon/dht_state.dart';
 import 'package:kwaainet_gui/src/ui/pages/dht_tab.dart';
 import 'package:kwaainet_gui/src/ui/theme/theme_variants.dart';
+import 'package:kwaainet_gui/src/ui/widgets/kwaai_dropdown.dart';
 
 pb.DhtRecord _record({
   required String keyId,
@@ -59,10 +60,13 @@ class _FakeClient extends KwaaiRpcClient {
   }
 
   final pb.DhtRecordsReply detail;
-  final pb.DhtLookupReply lookup;
+  pb.DhtLookupReply lookup;
 
   /// Thrown instead of [lookup] when set — e.g. a daemon-side CANCELLED.
   Object? lookupError;
+
+  /// Returned by every lookup after the first, when set.
+  pb.DhtLookupReply? lookupSecond;
   int detailCalls = 0;
   int lookupCalls = 0;
 
@@ -84,7 +88,7 @@ class _FakeClient extends KwaaiRpcClient {
     lookupCalls++;
     onOperationId(7);
     if (lookupError != null) throw lookupError!;
-    return lookup;
+    return lookupCalls > 1 ? lookupSecond ?? lookup : lookup;
   }
 }
 
@@ -161,6 +165,21 @@ final _refresh = find.widgetWithIcon(IconButton, Icons.refresh);
 bool _refreshEnabled(WidgetTester tester) =>
     tester.widget<IconButton>(_refresh).onPressed != null;
 
+final _peerPicker = find.byType(KwaaiDropdown<int>);
+
+/// Picks a peer from the open dropdown by (shortened) id.
+Future<void> _pickPeer(WidgetTester tester, String shortId) async {
+  await tester.tap(_peerPicker);
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.descendant(
+      of: find.byType(KwaaiMenuSurface),
+      matching: find.text(shortId),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 Future<void> _runLookup(WidgetTester tester) async {
   await tester.tap(find.text('Lookup'));
   await tester.pumpAndSettle();
@@ -205,22 +224,6 @@ void main() {
       expect(subkeyLabel('hex:deadbeef'), 'hex:deadbeef');
     },
   );
-
-  test('failureSummary counts by cause', () {
-    const refusal = 'remote does not support protocol DHTProtocol.rpc_find';
-    final peers = [
-      _peer('a', pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_NOT_FOUND),
-      _peer('b', pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_ERROR)..error = refusal,
-      _peer('c', pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_ERROR)..error = refusal,
-      _peer('d', pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_ERROR)
-        ..error = 'dial timed out',
-    ];
-    expect(
-      failureSummary(peers),
-      "4 peers gave no record (1 not found, 2 don't speak "
-      'DHTProtocol.rpc_find, 1 other errors)',
-    );
-  });
 
   group('recordLabel', () {
     test('prefers the plaintext name', () {
@@ -429,35 +432,98 @@ void main() {
       expect(listing.requests, 1);
     });
 
-    testWidgets('folds the peers that gave no record into one row', (
+    testWidgets('lists every peer asked in the picker, icon and RTT only', (
       tester,
     ) async {
       await tester.pumpWidget(_host(_reply([_record(keyId: 'ff01')])));
       await tester.pumpAndSettle();
       await _runLookup(tester);
 
-      expect(find.text('found'), findsOneWidget);
       expect(_textWith('1 found · 1 not found · 1 no answer'), findsOneWidget);
-      expect(
-        find.text('2 peers gave no record (1 not found, 1 other errors)'),
-        findsOneWidget,
-      );
-      expect(find.text('not found'), findsNothing);
-      expect(find.text('no answer'), findsNothing);
+      // The collapsed field shows the selected (freshest) peer.
+      expect(find.byIcon(Icons.check_circle), findsOneWidget);
       expect(find.byIcon(Icons.star), findsOneWidget);
 
-      await tester.tap(_textWith('gave no record'));
+      await tester.tap(_peerPicker);
       await tester.pumpAndSettle();
-      expect(find.text('not found'), findsOneWidget);
-      expect(find.text('no answer'), findsOneWidget);
+      final menu = find.byType(KwaaiMenuSurface);
+      expect(
+        find.descendant(of: menu, matching: find.byIcon(Icons.check_circle)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: menu,
+          matching: find.byIcon(Icons.remove_circle_outline),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: menu, matching: find.byIcon(Icons.error_outline)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: menu, matching: find.byIcon(Icons.star)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: menu, matching: find.text('12 ms')),
+        findsNWidgets(3),
+      );
+      expect(find.text('found'), findsNothing);
+      expect(find.text('not found'), findsNothing);
+      expect(find.text('no answer'), findsNothing);
 
-      await tester.ensureVisible(find.text('no answer'));
-      await tester.tap(find.text('no answer'));
+      await tester.tap(
+        find.descendant(of: menu, matching: find.text('12D3KooWDeadPeer')),
+      );
       await tester.pumpAndSettle();
       expect(
         _textWith('No answer from this peer: dial timed out'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('a refresh keeps the chosen peer while it still answers', (
+      tester,
+    ) async {
+      pb.DhtLookupPeer found(String id) =>
+          _peer(id, pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_FOUND)
+            ..record = (_named()..value = _value('{"from": "$id"}'));
+      pb.DhtLookupReply reply(pb.DhtLookupPeer second) => pb.DhtLookupReply()
+        ..key = '_petals.models'
+        ..keyId = 'ff01'
+        ..peers.addAll([found('12D3KooWFirstPeer'), second])
+        ..record = found('x').record;
+      final client = _fakeClient()
+        ..lookup = reply(found('12D3KooWOtherPeer'))
+        ..lookupSecond = reply(found('12D3KooWOtherPeer'));
+      await tester.pumpWidget(
+        _host(_reply([_record(keyId: 'ff01')]), client: client),
+      );
+      await tester.pumpAndSettle();
+      await _runLookup(tester);
+      expect(_textWith('ENTRIES — 12D3KooWFirstPee'), findsOneWidget);
+
+      await _pickPeer(tester, '12D3KooWOtherPee…');
+      expect(_textWith('ENTRIES — 12D3KooWOtherPee'), findsOneWidget);
+
+      await tester.tap(_refresh);
+      await tester.pumpAndSettle();
+      expect(client.lookupCalls, 2);
+      expect(_textWith('ENTRIES — 12D3KooWOtherPee'), findsOneWidget);
+
+      // Now that peer has no record: back to the freshest answer.
+      client.lookupSecond = reply(
+        _peer(
+          '12D3KooWOtherPeer',
+          pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_NOT_FOUND,
+        ),
+      );
+      await tester.tap(_refresh);
+      await tester.pumpAndSettle();
+      expect(client.lookupCalls, 3);
+      expect(_textWith('ENTRIES — 12D3KooWFirstPee'), findsOneWidget);
     });
 
     testWidgets('selects the freshest answer and lists its entries unasked', (
@@ -620,12 +686,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('{"llama": 32}'), findsNWidgets(2));
 
-      // The entry selection is cleared; the freshest peer is re-selected.
+      // The entry selection is cleared; the peer stays selected.
       await tester.tap(_refresh);
       await tester.pumpAndSettle();
       expect(client.lookupCalls, 2);
       expect(find.text('{"llama": 32}'), findsOneWidget);
-      expect(find.text('found'), findsOneWidget);
+      expect(find.byIcon(Icons.check_circle), findsOneWidget);
     });
   });
 
