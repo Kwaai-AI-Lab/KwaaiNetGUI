@@ -7,11 +7,13 @@ import '../../chat/kwaai_rpc_client.dart';
 import '../../chat/session_client.dart';
 import '../../daemon/daemon_state.dart';
 import '../../daemon/dht_state.dart';
+import '../../window/window_focus.dart';
 import '../theme/kwaai_theme.dart';
 import '../widgets/kwaai_button.dart';
 import '../widgets/kwaai_dropdown.dart';
 import '../widgets/kwaai_text_field.dart';
 import '../widgets/service_status_view.dart';
+import 'settings_page.dart' show kSelectedUnfocusedFill;
 
 /// Height of the table's caption bar. Fixed rather than intrinsic so the bar
 /// is identical whatever it contains. Mirrors the Peers and VPK tabs.
@@ -34,13 +36,19 @@ const _localStoreNote =
 /// hivemind store to enumerate.
 const _unimplemented = 6;
 
+/// Which of the two operations the tab is showing. One at a time: they answer
+/// different questions ("what is here" vs "what is out there") and a page
+/// showing both invited reading one as the other.
+enum DhtMode { local, lookup }
+
 /// Settings tab listing this node's hivemind DHT records and resolving a named
 /// key across the network — the two halves of `dht_records` / `dht_lookup`.
 ///
-/// Both are one-shot: the listing is fetched when the tab opens and on demand
-/// thereafter, and no subscription is held. Values are deliberately not part
-/// of the listing (they are the expensive half of the request) — selecting a
-/// row re-requests that one record with `include_values`.
+/// Three bands: a mode row, one table, and a detail panel for the selected
+/// row. Both operations are one-shot; no subscription is held. Values are
+/// deliberately not part of the listing (they are the expensive half of the
+/// request) — selecting a row re-requests that one record with
+/// `include_values`.
 ///
 /// Requires the daemon to be running the native p2p stack; the Go p2p daemon
 /// answers both operations UNIMPLEMENTED, which the page reports as an
@@ -53,7 +61,9 @@ class DhtTab extends ConsumerStatefulWidget {
 }
 
 class _DhtTabState extends ConsumerState<DhtTab> {
-  /// Row currently expanded, as [recordSelectionKey]. Null = nothing selected.
+  DhtMode _mode = DhtMode.local;
+
+  /// Local row currently expanded, as [recordSelectionKey]. Null = none.
   String? _selected;
 
   /// The selected record re-fetched with its values, and the state of that
@@ -69,8 +79,14 @@ class _DhtTabState extends ConsumerState<DhtTab> {
   final _lookupController = TextEditingController();
   bool _lookupRunning = false;
   int? _lookupOpId;
+
+  /// The key of the last lookup run, which is what Refresh re-runs.
+  String? _lastLookupKey;
   pb.DhtLookupReply? _lookupReply;
   Object? _lookupError;
+
+  /// Lookup row currently expanded, by peer id. Null = none.
+  String? _selectedPeer;
 
   @override
   void dispose() {
@@ -109,92 +125,158 @@ class _DhtTabState extends ConsumerState<DhtTab> {
       );
     }
 
-    final selected = _selected;
+    final local = _mode == DhtMode.local;
+    final divider = Divider(height: 1, color: context.kwaai.divider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-          child: _DhtHeader(
-            shown: reply.records.length,
-            total: reply.totalRecords,
-            serverTime: reply.serverTime,
-            refreshing: listing.isLoading,
-            onRefresh: () {
-              setState(_clearSelection);
-              ref.invalidate(dhtRecordsProvider);
-            },
-          ),
-        ),
-        Divider(height: 1, color: context.kwaai.divider),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-          child: _LookupBar(
-            knownKeys: reply.knownKeys,
-            controller: _lookupController,
-            running: _lookupRunning,
-            onRun: _runLookup,
-            onCancel: _cancelLookup,
-          ),
-        ),
-        if (_lookupReply != null || _lookupError != null) ...[
-          Divider(height: 1, color: context.kwaai.divider),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 220),
-            child: SingleChildScrollView(
-              child: _LookupResult(
-                reply: _lookupReply,
-                error: _lookupError,
-                onClose: () => setState(() {
-                  _lookupReply = null;
-                  _lookupError = null;
-                }),
-              ),
-            ),
-          ),
-        ],
-        Divider(height: 1, color: context.kwaai.divider),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Caption(title: 'LOCAL RECORDS', detail: _summary(reply)),
               Expanded(
-                child: reply.records.isEmpty
-                    ? const _EmptyRow(
-                        text: 'This node holds no DHT records right now.',
+                child: local
+                    ? _LocalHeader(
+                        shown: reply.records.length,
+                        total: reply.totalRecords,
+                        summary: _summary(reply),
                       )
-                    : _RecordTable(
-                        records: reply.records,
-                        selected: selected,
-                        onSelect: _select,
+                    : _LookupBar(
+                        knownKeys: reply.knownKeys,
+                        controller: _lookupController,
+                        running: _lookupRunning,
+                        onRun: _runLookup,
+                        onCancel: _cancelLookup,
                       ),
+              ),
+              const SizedBox(width: 12),
+              _ModeSegmented(mode: _mode, onChanged: _setMode),
+              const SizedBox(width: 4),
+              _RefreshButton(
+                onPressed: local
+                    ? (listing.isLoading ? null : _refreshLocal)
+                    : (_lookupRunning || _lastLookupKey == null
+                          ? null
+                          : _refreshLookup),
               ),
             ],
           ),
         ),
-        if (selected != null) ...[
-          Divider(height: 1, color: context.kwaai.divider),
-          // Bounded and scrollable: a dictionary with one subkey per serving
-          // peer is long, and the detail must not push the table off screen.
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 260),
-            child: SingleChildScrollView(
-              child: _RecordDetail(
-                summary: reply.records.firstWhere(
-                  (r) => recordSelectionKey(r) == selected,
-                  orElse: pb.DhtRecord.new,
-                ),
-                detail: _detail,
-                loading: _detailLoading,
-                error: _detailError,
-                onClose: () => setState(_clearSelection),
-              ),
-            ),
-          ),
-        ],
+        divider,
+        Expanded(child: local ? _localBand(reply) : _lookupBand()),
+        ..._detailBand(reply, divider),
       ],
     );
+  }
+
+  Widget _localBand(pb.DhtRecordsReply reply) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Caption(
+          title: 'LOCAL RECORDS',
+          detail: reply.serverTime.isEmpty
+              ? null
+              : 'Daemon time ${reply.serverTime}',
+        ),
+        Expanded(
+          child: reply.records.isEmpty
+              ? const _EmptyRow(
+                  text: 'This node holds no DHT records right now.',
+                )
+              : _RecordTable(
+                  records: reply.records,
+                  selected: _selected,
+                  onSelect: _select,
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _lookupBand() {
+    final reply = _lookupReply;
+    final error = _lookupError;
+    final Widget body;
+    if (_lookupRunning) {
+      body = const _EmptyRow(text: 'Asking peers…');
+    } else if (error != null) {
+      body = Center(child: _UnavailableDetail(error: error));
+    } else if (reply == null) {
+      body = const _EmptyRow(
+        text: 'Pick a known key or type one, then Look up.',
+      );
+    } else if (reply.peers.isEmpty) {
+      body = const _EmptyRow(text: 'No peers were asked.');
+    } else {
+      body = _LookupTable(
+        reply: reply,
+        freshestPeer: freshestPeer(reply),
+        selectedPeer: _selectedPeer,
+        onSelect: _selectPeer,
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Caption(
+          title: reply == null ? 'LOOKUP' : 'LOOKUP — ${reply.key}',
+          detail: reply == null ? null : _lookupSummary(reply),
+        ),
+        Expanded(child: body),
+      ],
+    );
+  }
+
+  /// Band 3: the selected local record, or the selected peer's answer.
+  List<Widget> _detailBand(pb.DhtRecordsReply reply, Widget divider) {
+    final Widget? panel;
+    if (_mode == DhtMode.local) {
+      final selected = _selected;
+      panel = selected == null
+          ? null
+          : _RecordDetail(
+              summary: reply.records.firstWhere(
+                (r) => recordSelectionKey(r) == selected,
+                orElse: pb.DhtRecord.new,
+              ),
+              detail: _detail,
+              loading: _detailLoading,
+              error: _detailError,
+              onClose: () => setState(_clearSelection),
+            );
+    } else {
+      final peer = _lookupReply?.peers
+          .where((p) => p.peerId == _selectedPeer)
+          .firstOrNull;
+      if (peer == null) {
+        panel = null;
+      } else if (peer.hasRecord()) {
+        panel = _RecordDetail(
+          summary: peer.record,
+          detail: peer.record,
+          loading: false,
+          error: null,
+          onClose: () => setState(_clearSelection),
+        );
+      } else {
+        panel = _NoRecordDetail(
+          peer: peer,
+          onClose: () => setState(_clearSelection),
+        );
+      }
+    }
+    if (panel == null) return const [];
+    return [
+      divider,
+      // Bounded and scrollable: a dictionary with one subkey per serving
+      // peer is long, and the detail must not push the table off screen.
+      ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 260),
+        child: SingleChildScrollView(child: panel),
+      ),
+    ];
   }
 
   String _summary(pb.DhtRecordsReply reply) {
@@ -209,11 +291,51 @@ class _DhtTabState extends ConsumerState<DhtTab> {
     return '$count · $dicts dictionaries · $cached cached';
   }
 
+  String _lookupSummary(pb.DhtLookupReply reply) {
+    var found = 0;
+    var missing = 0;
+    var failed = 0;
+    for (final p in reply.peers) {
+      switch (p.outcome) {
+        case pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_FOUND:
+          found++;
+        case pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_NOT_FOUND:
+          missing++;
+        default:
+          failed++;
+      }
+    }
+    return '$found found · $missing not found · $failed no answer';
+  }
+
+  /// Switching modes fires nothing: the listing is already held, and a lookup
+  /// only ever runs from its button.
+  void _setMode(DhtMode mode) {
+    if (mode == _mode) return;
+    setState(() {
+      _mode = mode;
+      _clearSelection();
+    });
+  }
+
   void _clearSelection() {
     _selected = null;
+    _selectedPeer = null;
     _detail = null;
     _detailError = null;
     _detailLoading = false;
+  }
+
+  void _refreshLocal() {
+    setState(_clearSelection);
+    ref.invalidate(dhtRecordsProvider);
+  }
+
+  void _refreshLookup() {
+    final key = _lastLookupKey;
+    if (key == null) return;
+    setState(_clearSelection);
+    _runLookup(key);
   }
 
   /// Expand a row, fetching that one record's values.
@@ -253,14 +375,20 @@ class _DhtTabState extends ConsumerState<DhtTab> {
     }
   }
 
+  void _selectPeer(String peerId) => setState(() {
+    _selectedPeer = _selectedPeer == peerId ? null : peerId;
+  });
+
   Future<void> _runLookup(String key) async {
     final trimmed = key.trim();
     if (trimmed.isEmpty || _lookupRunning) return;
     setState(() {
       _lookupRunning = true;
+      _lastLookupKey = trimmed;
       _lookupReply = null;
       _lookupError = null;
       _lookupOpId = null;
+      _selectedPeer = null;
     });
     try {
       final reply = await ref
@@ -309,6 +437,21 @@ String recordLabel(pb.DhtRecord r) =>
 String shortKeyId(String keyId) =>
     keyId.length <= 16 ? keyId : '${keyId.substring(0, 16)}…';
 
+/// The peer whose answer `DhtLookupReply.record` was taken from: the first
+/// FOUND peer whose record carries the merged record's expiration. Null when
+/// no peer had the key.
+String? freshestPeer(pb.DhtLookupReply reply) {
+  if (!reply.hasRecord()) return null;
+  for (final p in reply.peers) {
+    if (p.outcome == pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_FOUND &&
+        p.hasRecord() &&
+        p.record.expiration == reply.record.expiration) {
+      return p.peerId;
+    }
+  }
+  return null;
+}
+
 /// A countdown, from `expires_in_secs`.
 ///
 /// Negative is a real reading, not a bug: a local listing filters expired
@@ -350,16 +493,79 @@ String formatEpoch(double epochSecs) {
       '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
 }
 
-/// The tab's standing explanation of what is on screen, plus the refresh
-/// control. The note is not collapsible — it is the one thing about this view
-/// a reader can most easily get wrong.
-class _DhtHeader extends StatelessWidget {
-  const _DhtHeader({
+/// Local / Lookup switch. Same primitive and colours as the main page's tab
+/// selector, so the two read as one family of control.
+class _ModeSegmented extends StatelessWidget {
+  const _ModeSegmented({required this.mode, required this.onChanged});
+
+  final DhtMode mode;
+  final ValueChanged<DhtMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.kwaai.accentPrimary;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final focused = WindowFocusScope.of(context);
+    final selectedFill = focused ? accent : kSelectedUnfocusedFill;
+    final selectedFg = focused ? Colors.white : onSurface;
+    final unselectedFill = onSurface.withValues(alpha: 0.12);
+    final unselectedFg = onSurface.withValues(alpha: 0.6);
+
+    return SegmentedButton<DhtMode>(
+      style: ButtonStyle(
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? selectedFill
+              : unselectedFill,
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              states.contains(WidgetState.selected) ? selectedFg : unselectedFg,
+        ),
+        side: const WidgetStatePropertyAll(BorderSide.none),
+        visualDensity: VisualDensity.compact,
+        padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        ),
+      ),
+      showSelectedIcon: false,
+      segments: const [
+        ButtonSegment(value: DhtMode.local, label: Text('Local')),
+        ButtonSegment(value: DhtMode.lookup, label: Text('Lookup')),
+      ],
+      selected: {mode},
+      onSelectionChanged: (s) => onChanged(s.first),
+    );
+  }
+}
+
+/// Re-runs whichever operation the current mode shows. Disabled while that
+/// operation is in flight, and in Lookup mode until a lookup has been run.
+class _RefreshButton extends StatelessWidget {
+  const _RefreshButton({required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.refresh, size: 18),
+      iconSize: 18,
+      visualDensity: VisualDensity.compact,
+      tooltip: 'Refresh',
+      onPressed: onPressed,
+    );
+  }
+}
+
+/// Band 1 in Local mode: what the listing is, how much of it is shown, and
+/// the summary. The note is not collapsible — it is the one thing about this
+/// view a reader can most easily get wrong.
+class _LocalHeader extends StatelessWidget {
+  const _LocalHeader({
     required this.shown,
     required this.total,
-    required this.serverTime,
-    required this.refreshing,
-    required this.onRefresh,
+    required this.summary,
   });
 
   final int shown;
@@ -367,9 +573,7 @@ class _DhtHeader extends StatelessWidget {
   /// `total_records` — what matched before the daemon's limit was applied.
   final int total;
 
-  final String serverTime;
-  final bool refreshing;
-  final VoidCallback onRefresh;
+  final String summary;
 
   @override
   Widget build(BuildContext context) {
@@ -379,80 +583,51 @@ class _DhtHeader extends StatelessWidget {
     );
     final truncated = total > shown;
 
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              size: 14,
+              color: context.kwaai.semanticInfo,
+            ),
+            const SizedBox(width: 6),
+            Text('This node’s own store', style: theme.textTheme.labelLarge),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(_localStoreNote, style: muted),
+        const SizedBox(height: 6),
+        // A cut-short listing that reads as a whole one is the same failure
+        // as implying the local store is the network.
+        if (truncated)
+          Row(
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 14,
-                    color: context.kwaai.semanticInfo,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'This node’s own store',
-                    style: theme.textTheme.labelLarge,
-                  ),
-                ],
+              Icon(
+                Icons.warning_amber_outlined,
+                size: 14,
+                color: context.kwaai.semanticWarning,
               ),
-              const SizedBox(height: 4),
-              Text(_localStoreNote, style: muted),
-              // A cut-short listing that reads as a whole one is the same
-              // failure as implying the local store is the network.
-              if (truncated) ...[
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber_outlined,
-                      size: 14,
-                      color: context.kwaai.semanticWarning,
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        'Showing $shown of $total records — the listing was '
-                        'cut short at the daemon\u2019s limit.',
-                        style: muted?.copyWith(
-                          color: context.kwaai.semanticWarning,
-                        ),
-                      ),
-                    ),
-                  ],
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  'Showing $shown of $total records — the listing was '
+                  'cut short at the daemon’s limit.',
+                  style: muted?.copyWith(color: context.kwaai.semanticWarning),
                 ),
-              ],
-              if (serverTime.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Text('Daemon time $serverTime', style: muted),
-              ],
+              ),
             ],
           ),
-        ),
-        const SizedBox(width: 12),
-        if (refreshing)
-          const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
-        else
-          KwaaiButton(
-            label: 'Refresh',
-            icon: Icons.refresh,
-            variant: KwaaiButtonVariant.secondary,
-            onPressed: onRefresh,
-          ),
+        Text(summary, style: theme.textTheme.bodySmall),
       ],
     );
   }
 }
 
-/// Pick a known key or type any key name, and resolve it across the network.
+/// Band 1 in Lookup mode: pick a known key or type any key name, and resolve
+/// it across the network.
 ///
 /// The dropdown is the reverse table the daemon sends with the listing: an id
 /// is SHA1(msgpack(name)) and cannot be inverted, so a key can only be looked
@@ -474,11 +649,8 @@ class _LookupBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Row(
       children: [
-        Text('Look up', style: theme.textTheme.bodySmall),
-        const SizedBox(width: 10),
         if (knownKeys.isNotEmpty) ...[
           KwaaiDropdown<String>(
             items: [
@@ -522,87 +694,134 @@ class _LookupBar extends StatelessWidget {
   }
 }
 
-/// What each peer said, and the freshest record among them.
-class _LookupResult extends StatelessWidget {
-  const _LookupResult({
+/// Band 2 in Lookup mode: one row per peer asked, in the order asked.
+///
+/// The three outcomes stay visually distinct: a peer that answered NOT_FOUND
+/// is a result, and folding it in with an unreachable peer would erase the
+/// difference between "nobody has this" and "nobody answered".
+class _LookupTable extends StatelessWidget {
+  const _LookupTable({
     required this.reply,
-    required this.error,
-    required this.onClose,
+    required this.freshestPeer,
+    required this.selectedPeer,
+    required this.onSelect,
   });
 
-  final pb.DhtLookupReply? reply;
-  final Object? error;
-  final VoidCallback onClose;
+  final pb.DhtLookupReply reply;
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final muted = theme.textTheme.bodySmall?.copyWith(
-      color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.75),
-    );
-    final r = reply;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  r == null ? 'Lookup failed' : 'Lookup — ${r.key}',
-                  style: theme.textTheme.labelLarge,
-                ),
-              ),
-              _CloseButton(onPressed: onClose),
-            ],
-          ),
-          if (r == null)
-            Text(_errorText(error), style: muted)
-          else ...[
-            const SizedBox(height: 2),
-            Text('key id ${r.keyId}', style: _mono(context, muted)),
-            const SizedBox(height: 8),
-            if (r.peers.isEmpty)
-              Text('No peers were asked.', style: muted)
-            else
-              for (final p in r.peers) _LookupPeerLine(peer: p),
-            const SizedBox(height: 8),
-            if (r.hasRecord()) ...[
-              Text('Freshest answer', style: theme.textTheme.labelSmall),
-              const SizedBox(height: 4),
-              _RecordFacts(record: r.record),
-              if (r.record.hasValue()) ...[
-                const SizedBox(height: 6),
-                _ValueView(value: r.record.value),
-              ],
-              if (r.record.subkeys.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                _SubkeyList(subkeys: r.record.subkeys),
-              ],
-            ] else
-              Text('No peer held this key.', style: muted),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// One peer's answer. The three outcomes stay visually distinct: a peer that
-/// answered NOT_FOUND is a result, and folding it in with an unreachable peer
-/// would erase the difference between "nobody has this" and "nobody answered".
-class _LookupPeerLine extends StatelessWidget {
-  const _LookupPeerLine({required this.peer});
-
-  final pb.DhtLookupPeer peer;
+  /// The peer whose answer the reply's merged record came from, marked on
+  /// its row rather than shown as a separate panel.
+  final String? freshestPeer;
+  final String? selectedPeer;
+  final ValueChanged<String> onSelect;
 
   @override
   Widget build(BuildContext context) {
     final kwaai = context.kwaai;
     final theme = Theme.of(context);
-    final (icon, color, label) = switch (peer.outcome) {
+    final headStyle = theme.textTheme.labelSmall?.copyWith(letterSpacing: 0.6);
+    final cellStyle = theme.textTheme.bodySmall;
+    final monoStyle = _mono(context, cellStyle);
+    final selectedFill = kwaai.accentPrimary.withValues(alpha: 0.16);
+
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: DataTable(
+              headingRowHeight: 32,
+              dataRowMinHeight: 30,
+              dataRowMaxHeight: 34,
+              columnSpacing: 24,
+              horizontalMargin: 16,
+              showCheckboxColumn: false,
+              columns: [
+                DataColumn(label: Text('OUTCOME', style: headStyle)),
+                DataColumn(label: Text('PEER', style: headStyle)),
+                DataColumn(label: Text('RTT', style: headStyle), numeric: true),
+                DataColumn(label: Text('KIND', style: headStyle)),
+                DataColumn(label: Text('EXPIRES', style: headStyle)),
+                DataColumn(label: Text('DETAIL', style: headStyle)),
+              ],
+              rows: [
+                for (final p in reply.peers)
+                  DataRow(
+                    key: ValueKey(p.peerId),
+                    selected: p.peerId == selectedPeer,
+                    color: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.selected)
+                          ? selectedFill
+                          : null,
+                    ),
+                    onSelectChanged: (_) => onSelect(p.peerId),
+                    cells: [
+                      DataCell(_OutcomeCell(outcome: p.outcome)),
+                      DataCell(
+                        Row(
+                          children: [
+                            Text(shortKeyId(p.peerId), style: monoStyle),
+                            _CopyButton(text: p.peerId, label: 'Peer id'),
+                          ],
+                        ),
+                      ),
+                      DataCell(Text('${p.elapsedMs} ms', style: cellStyle)),
+                      DataCell(
+                        Text(
+                          p.hasRecord() ? kindLabel(p.record.kind) : '—',
+                          style: cellStyle,
+                        ),
+                      ),
+                      DataCell(
+                        Text(
+                          p.hasRecord()
+                              ? formatExpiry(p.record.expiresInSecs)
+                              : '—',
+                          style: cellStyle,
+                        ),
+                      ),
+                      DataCell(
+                        p.peerId == freshestPeer
+                            ? Row(
+                                children: [
+                                  Icon(
+                                    Icons.star,
+                                    size: 13,
+                                    color: kwaai.semanticSuccess,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text('freshest answer', style: cellStyle),
+                                ],
+                              )
+                            : Text(
+                                p.error,
+                                style: cellStyle,
+                                softWrap: false,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OutcomeCell extends StatelessWidget {
+  const _OutcomeCell({required this.outcome});
+
+  final pb.DhtLookupOutcome outcome;
+
+  @override
+  Widget build(BuildContext context) {
+    final kwaai = context.kwaai;
+    final theme = Theme.of(context);
+    final (icon, color, label) = switch (outcome) {
       pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_FOUND => (
         Icons.check_circle,
         kwaai.semanticSuccess,
@@ -620,32 +839,55 @@ class _LookupPeerLine extends StatelessWidget {
       ),
       _ => (Icons.help_outline, theme.dividerColor, 'unknown'),
     };
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 6),
+        Text(label, style: theme.textTheme.bodySmall?.copyWith(color: color)),
+      ],
+    );
+  }
+}
 
+/// Band 3 for a lookup row that carries no record: says why.
+class _NoRecordDetail extends StatelessWidget {
+  const _NoRecordDetail({required this.peer, required this.onClose});
+
+  final pb.DhtLookupPeer peer;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.75),
+    );
+    final reason = switch (peer.outcome) {
+      pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_NOT_FOUND =>
+        'This peer answered and does not hold the key.',
+      pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_ERROR =>
+        'No answer from this peer: ${peer.error}',
+      _ => 'This peer returned no record.',
+    };
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          SizedBox(
-            width: 74,
-            child: Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(color: color),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  shortKeyId(peer.peerId),
+                  style: _mono(context, theme.textTheme.labelLarge),
+                ),
+              ),
+              _CloseButton(onPressed: onClose),
+            ],
           ),
-          Expanded(
-            child: Text(
-              peer.error.isEmpty
-                  ? peer.peerId
-                  : '${peer.peerId} — ${peer.error}',
-              style: _mono(context, theme.textTheme.bodySmall),
-              softWrap: false,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text('${peer.elapsedMs} ms', style: theme.textTheme.bodySmall),
+          Text(peer.peerId, style: _mono(context, muted)),
+          const SizedBox(height: 8),
+          Text(reason, style: muted),
         ],
       ),
     );
@@ -848,9 +1090,9 @@ class _RecordDetail extends StatelessWidget {
           // A dictionary carries no top-level value — its values live per
           // subkey, which is how N peers announce under one key.
           else if (isDict)
-            _SubkeyList(subkeys: detail!.subkeys)
+            _SubkeyList(title: recordLabel(record), subkeys: detail!.subkeys)
           else if (detail!.hasValue())
-            _ValueView(value: detail!.value)
+            _ValueView(title: recordLabel(record), value: detail!.value)
           else
             Text('The daemon returned no value for this record.', style: muted),
         ],
@@ -907,8 +1149,10 @@ class _RecordFacts extends StatelessWidget {
 /// too: nothing prunes them, so their own countdown is what says they are
 /// gone.
 class _SubkeyList extends StatelessWidget {
-  const _SubkeyList({required this.subkeys});
+  const _SubkeyList({required this.title, required this.subkeys});
 
+  /// The record's label, which each subkey's viewer titles itself with.
+  final String title;
   final List<pb.DhtSubkey> subkeys;
 
   @override
@@ -930,7 +1174,7 @@ class _SubkeyList extends StatelessWidget {
             style: _mono(context, muted),
           ),
           const SizedBox(height: 2),
-          _ValueView(value: s.value),
+          _ValueView(title: '$title · ${s.subkey}', value: s.value),
           const SizedBox(height: 8),
         ],
       ],
@@ -945,8 +1189,10 @@ class _SubkeyList extends StatelessWidget {
 /// under a block key is a petals ServerInfo. When it could not decode at all,
 /// the bytes are labelled as opaque rather than dressed up as meaningful.
 class _ValueView extends StatelessWidget {
-  const _ValueView({required this.value});
+  const _ValueView({required this.title, required this.value});
 
+  /// What the full-size viewer is titled — the record, plus the subkey.
+  final String title;
   final pb.DhtValueView value;
 
   @override
@@ -977,6 +1223,16 @@ class _ValueView extends StatelessWidget {
                 style: muted?.copyWith(color: kwaai.semanticWarning),
               ),
             ],
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.open_in_full, size: 13),
+              iconSize: 13,
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+              tooltip: 'Open value',
+              onPressed: () => showValueDialog(context, title, value),
+            ),
           ],
         ),
         const SizedBox(height: 4),
@@ -998,6 +1254,99 @@ class _ValueView extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Full-size viewer for a rendered value: the whole `rendered` string,
+/// word-wrapped in a squarish box, with the same type / size / not-decoded
+/// facts the inline preview shows so the dialog claims no more than it does.
+Future<void> showValueDialog(
+  BuildContext context,
+  String title,
+  pb.DhtValueView value,
+) {
+  return showDialog<void>(
+    context: context,
+    builder: (context) => _ValueDialog(title: title, value: value),
+  );
+}
+
+class _ValueDialog extends StatelessWidget {
+  const _ValueDialog({required this.title, required this.value});
+
+  final String title;
+  final pb.DhtValueView value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final kwaai = context.kwaai;
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.75),
+    );
+    final size = MediaQuery.sizeOf(context);
+    // Squarish: the shorter viewport side bounds both axes.
+    final side = 0.8 * (size.width < size.height ? size.width : size.height);
+    final ext = value.hasExtCode() ? ' (ext ${value.extCode})' : '';
+
+    return Dialog(
+      backgroundColor: kwaai.cardBackground,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: kwaai.divider),
+      ),
+      child: SizedBox(
+        width: side,
+        height: side,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: theme.textTheme.titleSmall,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  _CopyButton(text: value.rendered, label: 'Value'),
+                  _CloseButton(onPressed: () => Navigator.of(context).pop()),
+                ],
+              ),
+              Text(
+                'msgpack ${value.msgpackType}$ext · '
+                '${formatValueBytes(value.rawBytes.toInt())} stored'
+                '${value.decoded ? '' : ' · not decoded, shown as hex'}',
+                style: value.decoded
+                    ? muted
+                    : muted?.copyWith(color: kwaai.semanticWarning),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: kwaai.inputBackground,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: kwaai.divider),
+                  ),
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      value.rendered,
+                      style: _mono(context, theme.textTheme.bodySmall),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
