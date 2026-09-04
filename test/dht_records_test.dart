@@ -197,6 +197,31 @@ void main() {
     expect(previewOf(long).endsWith('…'), isTrue);
   });
 
+  test(
+    'subkeyLabel strips the quotes of a JSON string, else keeps the text',
+    () {
+      expect(subkeyLabel('"12D3KooWServer"'), '12D3KooWServer');
+      expect(subkeyLabel('42'), '42');
+      expect(subkeyLabel('hex:deadbeef'), 'hex:deadbeef');
+    },
+  );
+
+  test('failureSummary counts by cause', () {
+    const refusal = 'remote does not support protocol DHTProtocol.rpc_find';
+    final peers = [
+      _peer('a', pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_NOT_FOUND),
+      _peer('b', pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_ERROR)..error = refusal,
+      _peer('c', pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_ERROR)..error = refusal,
+      _peer('d', pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_ERROR)
+        ..error = 'dial timed out',
+    ];
+    expect(
+      failureSummary(peers),
+      "4 peers gave no record (1 not found, 2 don't speak "
+      'DHTProtocol.rpc_find, 1 other errors)',
+    );
+  });
+
   group('recordLabel', () {
     test('prefers the plaintext name', () {
       expect(
@@ -404,44 +429,98 @@ void main() {
       expect(listing.requests, 1);
     });
 
-    testWidgets('lookup fills one table with all three outcomes', (
+    testWidgets('folds the peers that gave no record into one row', (
       tester,
     ) async {
-      await tester.pumpWidget(
-        _host(_reply([_record(keyId: 'ff01')]), client: _fakeClient()),
-      );
+      await tester.pumpWidget(_host(_reply([_record(keyId: 'ff01')])));
       await tester.pumpAndSettle();
       await _runLookup(tester);
 
       expect(find.text('found'), findsOneWidget);
+      expect(_textWith('1 found · 1 not found · 1 no answer'), findsOneWidget);
+      expect(
+        find.text('2 peers gave no record (1 not found, 1 other errors)'),
+        findsOneWidget,
+      );
+      expect(find.text('not found'), findsNothing);
+      expect(find.text('no answer'), findsNothing);
+      expect(find.byIcon(Icons.star), findsOneWidget);
+
+      await tester.tap(_textWith('gave no record'));
+      await tester.pumpAndSettle();
       expect(find.text('not found'), findsOneWidget);
       expect(find.text('no answer'), findsOneWidget);
-      expect(find.text('dial timed out'), findsOneWidget);
-      expect(find.text('freshest answer'), findsOneWidget);
-      expect(_textWith('1 found · 1 not found · 1 no answer'), findsOneWidget);
 
-      await tester.tap(find.text('found'));
-      await tester.pumpAndSettle();
-      expect(find.text('{"llama": 32}'), findsOneWidget);
-
+      await tester.ensureVisible(find.text('no answer'));
       await tester.tap(find.text('no answer'));
       await tester.pumpAndSettle();
-      expect(find.text('{"llama": 32}'), findsNothing);
       expect(
         _textWith('No answer from this peer: dial timed out'),
         findsOneWidget,
       );
     });
 
-    // `in_cache` is meaningless in a lookup reply; nothing was stored here.
-    testWidgets('a lookup answer claims no tier', (tester) async {
+    testWidgets('selects the freshest answer and lists its entries unasked', (
+      tester,
+    ) async {
       await tester.pumpWidget(_host(_reply([_record(keyId: 'ff01')])));
       await tester.pumpAndSettle();
       await _runLookup(tester);
-      await tester.tap(find.text('found'));
+
+      expect(_textWith('ENTRIES — 12D3KooWFoundPee'), findsOneWidget);
+      // A regular record is one entry, with no subkey.
+      expect(find.text('{"llama": 32}'), findsOneWidget);
+      expect(find.text('—'), findsOneWidget);
+
+      await tester.tap(find.text('{"llama": 32}'));
       await tester.pumpAndSettle();
+      // The slim detail: identity line and the value, no tier, no subkey list.
+      expect(find.text('Expires in 5m · 2.0 KB'), findsOneWidget);
+      expect(find.text('{"llama": 32}'), findsNWidgets(2));
       expect(_textWith('· primary'), findsNothing);
-      expect(_textWith('value · 2.0 KB'), findsOneWidget);
+      expect(find.byTooltip('Open value'), findsOneWidget);
+    });
+
+    testWidgets('lists a dictionary answer one subkey per row, unquoted', (
+      tester,
+    ) async {
+      final client = _fakeClient(
+        detailRecord:
+            _record(
+                keyId: 'ff02',
+                keyName: '_kwaai.vpk.nodes',
+                kind: pb.DhtRecordKind.DHT_RECORD_KIND_DICTIONARY,
+                subkeyCount: 2,
+              )
+              ..subkeys.addAll([
+                pb.DhtSubkey()
+                  ..subkey = '"12D3KooWEveOne"'
+                  ..expiresInSecs = 120
+                  ..valueBytes = Int64(40)
+                  ..value = _value('{"capacity_gb": 100}'),
+                pb.DhtSubkey()
+                  ..subkey = '"12D3KooWEveTwo"'
+                  ..expiresInSecs = -30
+                  ..valueBytes = Int64(41)
+                  ..value = _value('{"capacity_gb": 200}'),
+              ]),
+      );
+      await tester.pumpWidget(
+        _host(_reply([_record(keyId: 'ff02')]), client: client),
+      );
+      await tester.pumpAndSettle();
+      await _runLookup(tester);
+
+      expect(find.text('12D3KooWEveOne'), findsOneWidget);
+      expect(find.text('12D3KooWEveTwo'), findsOneWidget);
+      expect(find.text('"12D3KooWEveOne"'), findsNothing);
+      expect(find.text('expired 30s ago'), findsOneWidget);
+      expect(find.text('{"capacity_gb": 200}'), findsOneWidget);
+
+      await tester.tap(find.text('12D3KooWEveTwo'));
+      await tester.pumpAndSettle();
+      expect(find.text('_kwaai.vpk.nodes · 12D3KooWEveTwo'), findsOneWidget);
+      expect(find.text('Expired 30s ago · 41 B'), findsOneWidget);
     });
 
     testWidgets('a lookup answer without subkey values says so', (
@@ -460,8 +539,6 @@ void main() {
       );
       await tester.pumpAndSettle();
       await _runLookup(tester);
-      await tester.tap(find.text('found'));
-      await tester.pumpAndSettle();
       expect(_textWith('did not include its 3 subkey values'), findsOneWidget);
       expect(_textWith('holds no subkeys'), findsNothing);
     });
@@ -539,14 +616,15 @@ void main() {
       expect(client.lookupCalls, 1);
       expect(_refreshEnabled(tester), isTrue);
 
-      await tester.tap(find.text('found'));
+      await tester.tap(find.text('{"llama": 32}'));
       await tester.pumpAndSettle();
-      expect(find.text('{"llama": 32}'), findsOneWidget);
+      expect(find.text('{"llama": 32}'), findsNWidgets(2));
 
+      // The entry selection is cleared; the freshest peer is re-selected.
       await tester.tap(_refresh);
       await tester.pumpAndSettle();
       expect(client.lookupCalls, 2);
-      expect(find.text('{"llama": 32}'), findsNothing);
+      expect(find.text('{"llama": 32}'), findsOneWidget);
       expect(find.text('found'), findsOneWidget);
     });
   });
