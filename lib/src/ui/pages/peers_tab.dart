@@ -737,6 +737,10 @@ class _TableSectionState extends State<_TableSection> {
   /// a protocol we advertise still matches.
   final Set<String> _protocolFilter = {};
 
+  /// Free-text narrowing, lower-cased on entry so the per-row match does not
+  /// re-normalise it. Empty means no narrowing.
+  String _search = '';
+
   @override
   Widget build(BuildContext context) {
     final allRows = mergePeerRows(widget.connected, widget.routing);
@@ -747,7 +751,8 @@ class _TableSectionState extends State<_TableSection> {
           (r) =>
               (_showDhtClients || !r.isDhtClient) &&
               (_showUnconnected || r.isConnected) &&
-              (_protocolFilter.isEmpty || r.advertisesAny(_protocolFilter)),
+              (_protocolFilter.isEmpty || r.advertisesAny(_protocolFilter)) &&
+              r.matches(_search),
         )
         .toList();
     // What the table is actually withholding — zero once everything is shown.
@@ -793,6 +798,8 @@ class _TableSectionState extends State<_TableSection> {
               on ? _protocolFilter.add(family) : _protocolFilter.remove(family);
             }),
             onClearProtocols: () => setState(_protocolFilter.clear),
+            search: _search,
+            onSearch: (q) => setState(() => _search = q.trim().toLowerCase()),
           ),
         ),
         Expanded(
@@ -946,6 +953,27 @@ class PeerRow {
   bool advertisesAny(Set<String> families) => connections.any(
     (c) => c.protocols.any((p) => families.contains(protocolFamily(p))),
   );
+
+  /// Whether this peer's identifying text contains [needle], which the caller
+  /// has already lower-cased — normalising once per build rather than once per
+  /// row per field.
+  ///
+  /// Identity and reachability text only: peer id, agent version, and every
+  /// address or relay we hold, live or routing-table. The state columns are
+  /// deliberately not searched — CONN/DHT/PATH have their own toggles, and a
+  /// substring match on them would quietly overlap those controls.
+  ///
+  /// The peer id is matched whole while the row shows it truncated, so a
+  /// pasted id matches on the middle the row does not display.
+  bool matches(String needle) {
+    if (needle.isEmpty) return true;
+    bool has(String s) => s.toLowerCase().contains(needle);
+    if (has(peerId)) return true;
+    for (final c in connections) {
+      if (has(c.agentVersion) || has(c.addr) || has(c.via)) return true;
+    }
+    return routingAddrs.any(has);
+  }
 }
 
 /// Merge the two peer sets into one row per peer, in display order.
@@ -1637,6 +1665,8 @@ class _Filters extends StatelessWidget {
     required this.selectedProtocols,
     required this.onToggleProtocol,
     required this.onClearProtocols,
+    required this.search,
+    required this.onSearch,
   });
 
   final bool showDhtClients;
@@ -1654,6 +1684,11 @@ class _Filters extends StatelessWidget {
   final Set<String> selectedProtocols;
   final void Function(String family, bool selected) onToggleProtocol;
   final VoidCallback onClearProtocols;
+
+  /// The active query, already normalised. Passed in only so the field can
+  /// show whether it is narrowing; the text itself is owned by [_SearchField].
+  final String search;
+  final ValueChanged<String> onSearch;
 
   @override
   Widget build(BuildContext context) {
@@ -1687,6 +1722,10 @@ class _Filters extends StatelessWidget {
         onToggle: onToggleProtocol,
         onClear: onClearProtocols,
       ),
+      // Last, so it sits between the filters and the caption's summary: the
+      // summary is what says how much the query narrowed things, and reading
+      // the two together is the point.
+      _SearchField(filtering: search.isNotEmpty, onChanged: onSearch),
     ];
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1698,6 +1737,113 @@ class _Filters extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Free-text narrowing of the peer table.
+///
+/// Sits on the caption bar beside the filter toggles rather than above the
+/// table, so it costs no table height — the bar is 28px and this field is
+/// sized to fit inside it rather than stretch it. That is also why it is not
+/// [KwaaiTextField]: the app's input primitive is sized for forms and has no
+/// height knob, and at this size the borders are all that is shared.
+///
+/// The text lives here, not in `_TableSectionState`: the page rebuilds on
+/// every snapshot, and a controller owned above would have to be recreated or
+/// carefully preserved across those rebuilds.
+class _SearchField extends StatefulWidget {
+  const _SearchField({required this.filtering, required this.onChanged});
+
+  /// Whether the parent is actually narrowing on this query — drives the
+  /// accent border, so a field hiding rows is visibly the reason. Distinct
+  /// from holding text: a whitespace-only query filters nothing.
+  final bool filtering;
+
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_SearchField> createState() => _SearchFieldState();
+}
+
+class _SearchFieldState extends State<_SearchField> {
+  final _controller = TextEditingController();
+
+  /// Whether the field holds anything at all. Read from here rather than from
+  /// [_SearchField.filtering] so whitespace, which narrows nothing, can still
+  /// be cleared by the button instead of only by backspacing.
+  bool _hasText = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String value) {
+    final hasText = value.isNotEmpty;
+    if (hasText != _hasText) setState(() => _hasText = hasText);
+    widget.onChanged(value);
+  }
+
+  void _clear() {
+    _controller.clear();
+    _onChanged('');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final kwaai = context.kwaai;
+    final muted = theme.textTheme.labelSmall?.color;
+    final border = widget.filtering
+        ? kwaai.accentPrimary
+        : theme.colorScheme.outline.withValues(alpha: 0.4);
+
+    return Tooltip(
+      message:
+          'Narrows the table to peers whose id, agent version, addresses or '
+          'relay contain the text. The peer id is matched in full, including '
+          'the middle the row abbreviates away.',
+      child: SizedBox(
+        width: 200,
+        height: 22,
+        child: TextField(
+          key: const Key('peer-search'),
+          controller: _controller,
+          onChanged: _onChanged,
+          style: theme.textTheme.bodySmall,
+          cursorHeight: 12,
+          decoration: InputDecoration(
+            hintText: 'Search peers',
+            hintStyle: theme.textTheme.bodySmall?.copyWith(color: muted),
+            isDense: true,
+            filled: true,
+            fillColor: kwaai.inputBackground,
+            hoverColor: Colors.transparent,
+            // Zero vertical padding: at 22px tall there is none to give, and
+            // any at all makes the field taller than the caption bar.
+            contentPadding: const EdgeInsets.symmetric(horizontal: 6),
+            prefixIcon: Icon(Icons.search, size: 13, color: muted),
+            prefixIconConstraints: const BoxConstraints(minWidth: 22),
+            suffixIcon: _hasText
+                ? InkWell(
+                    onTap: _clear,
+                    child: Icon(Icons.clear, size: 13, color: muted),
+                  )
+                : null,
+            suffixIconConstraints: const BoxConstraints(minWidth: 20),
+            border: _outline(border),
+            enabledBorder: _outline(border),
+            focusedBorder: _outline(kwaai.accentPrimary),
+          ),
+        ),
+      ),
+    );
+  }
+
+  OutlineInputBorder _outline(Color color) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(4),
+    borderSide: BorderSide(color: color),
+  );
 }
 
 /// Drop-down narrowing the table to peers advertising selected protocols.
