@@ -351,13 +351,8 @@ class SessionClient {
     return NetworkOperation(id: id, updates: updates);
   }
 
-  /// `dht_records` — one-shot listing of the hivemind DHT records this node
-  /// holds in its own store. There is no network-wide listing to ask for:
-  /// Kademlia has no key-enumeration operation, so this is the whole of what
-  /// can be enumerated. [includeValues] fills in each record's decoded value
-  /// and subkeys and *requires* [keyIds]: values run to a megabyte each, so a
-  /// whole-store listing carrying them could not fit one frame, and the daemon
-  /// rejects the combination with INVALID_ARGUMENT.
+  /// `dht_records` — one-shot listing of this node's own hivemind store.
+  /// [includeValues] requires [keyIds]; the daemon rejects it otherwise.
   Future<pb.DhtRecordsReply> dhtRecords({
     bool includeValues = false,
     List<String> keyIds = const [],
@@ -381,11 +376,8 @@ class SessionClient {
     return reply;
   }
 
-  /// `dht_lookup` — resolve one key across the network, by name.
-  ///
-  /// Returns the operation id alongside the reply because the daemon asks each
-  /// peer in turn and honours [cancel]: a lookup against an unresponsive peer
-  /// set runs for its whole budget, and the user must be able to stop it.
+  /// `dht_lookup` — resolve one key across the network, by name. Returns the
+  /// id alongside the reply: the daemon honours [cancel] mid-lookup.
   DhtLookupOperation dhtLookupOp(String key, {int timeoutSecs = 0}) {
     ensureOpen();
     if (_closed || _outbound == null) {
