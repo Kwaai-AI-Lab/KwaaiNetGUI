@@ -19,18 +19,19 @@ import 'settings_page.dart' show kSelectedUnfocusedFill;
 /// is identical whatever it contains. Mirrors the Peers and VPK tabs.
 const _captionBarHeight = 28.0;
 
-/// What the listing is, in the proto's own words.
-///
-/// Kept close to the wording of `DhtRecordsRequest` in kwaai.proto rather than
-/// paraphrased: a table of DHT keys invites the reading that it is the
-/// network's key space, and nothing else on this page contradicts that.
-const _localStoreNote =
+/// What the listing is, close to `DhtRecordsRequest`'s own wording. Claims
+/// completeness only when the daemon did not cut the listing short.
+String localStoreNote({required bool truncated}) =>
     'These are the records this node holds. The local store is the only thing '
     'that can be enumerated — hivemind is a Kademlia DHT and Kademlia has no '
     'key-listing operation. What a node holds is whatever replication, caching '
-    'and its own announces happened to land on it, so this is a true and '
-    'complete answer about this node and says nothing about the network’s '
-    'key space. To reach elsewhere, look up a key by name.';
+    'and its own announces happened to land on it, so this is a true'
+    '${truncated ? '' : ' and complete'} answer about this node and says '
+    'nothing about the network’s key space. To reach elsewhere, look up a key '
+    'by name.';
+
+/// `Error.Code.CANCELLED` from kwaai.proto.
+const _cancelled = 4;
 
 /// `Error.Code.UNIMPLEMENTED` from kwaai.proto — the Go p2p path, which has no
 /// hivemind store to enumerate.
@@ -41,18 +42,8 @@ const _unimplemented = 6;
 /// showing both invited reading one as the other.
 enum DhtMode { local, lookup }
 
-/// Settings tab listing this node's hivemind DHT records and resolving a named
-/// key across the network — the two halves of `dht_records` / `dht_lookup`.
-///
-/// Three bands: a mode row, one table, and a detail panel for the selected
-/// row. Both operations are one-shot; no subscription is held. Values are
-/// deliberately not part of the listing (they are the expensive half of the
-/// request) — selecting a row re-requests that one record with
-/// `include_values`.
-///
-/// Requires the daemon to be running the native p2p stack; the Go p2p daemon
-/// answers both operations UNIMPLEMENTED, which the page reports as an
-/// unavailable view rather than an error.
+/// Settings tab for `dht_records` / `dht_lookup`: a mode row, one table, and
+/// a detail panel. Both operations are one-shot; values are fetched per row.
 class DhtTab extends ConsumerStatefulWidget {
   const DhtTab({super.key});
 
@@ -76,9 +67,18 @@ class _DhtTabState extends ConsumerState<DhtTab> {
   /// blank out while the new one is in flight.
   pb.DhtRecordsReply? _last;
 
+  /// When [_last] arrived, for the stale banner.
+  DateTime? _lastArrived;
+
   final _lookupController = TextEditingController();
   bool _lookupRunning = false;
+  bool _lookupCancelled = false;
   int? _lookupOpId;
+
+  /// Cancel pressed before the daemon had allocated an id; honoured on arrival.
+  bool _cancelRequested = false;
+
+  late final KwaaiRpcClient _client;
 
   /// The key of the last lookup run, which is what Refresh re-runs.
   String? _lastLookupKey;
@@ -89,7 +89,15 @@ class _DhtTabState extends ConsumerState<DhtTab> {
   String? _selectedPeer;
 
   @override
+  void initState() {
+    super.initState();
+    _client = ref.read(kwaaiRpcClientProvider);
+  }
+
+  @override
   void dispose() {
+    // The lazy-mount contract: nothing keeps dialling once the tab is gone.
+    if (_lookupRunning) _cancelLookup();
     _lookupController.dispose();
     super.dispose();
   }
@@ -100,6 +108,7 @@ class _DhtTabState extends ConsumerState<DhtTab> {
     final fresh = listing.valueOrNull;
     if (fresh != null && !identical(fresh, _last)) {
       _last = fresh;
+      _lastArrived = DateTime.now();
     }
     final reply = _last;
 
@@ -127,6 +136,12 @@ class _DhtTabState extends ConsumerState<DhtTab> {
 
     final local = _mode == DhtMode.local;
     final divider = Divider(height: 1, color: context.kwaai.divider);
+    final connected =
+        ref.watch(kwaaiRpcConnectionProvider).valueOrNull ==
+        RpcConnection.connected;
+    // A refresh that failed, or a daemon that went away, must not leave the
+    // old rows reading as current.
+    final stale = !connected || listing.hasError;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -141,6 +156,7 @@ class _DhtTabState extends ConsumerState<DhtTab> {
                         shown: reply.records.length,
                         total: reply.totalRecords,
                         summary: _summary(reply),
+                        truncated: reply.totalRecords > reply.records.length,
                       )
                     : _LookupBar(
                         knownKeys: reply.knownKeys,
@@ -163,6 +179,11 @@ class _DhtTabState extends ConsumerState<DhtTab> {
             ],
           ),
         ),
+        if (stale)
+          _StaleBanner(
+            arrived: _lastArrived,
+            error: connected ? listing.error : null,
+          ),
         divider,
         Expanded(child: local ? _localBand(reply) : _lookupBand()),
         ..._detailBand(reply, divider),
@@ -201,6 +222,8 @@ class _DhtTabState extends ConsumerState<DhtTab> {
     final Widget body;
     if (_lookupRunning) {
       body = const _EmptyRow(text: 'Asking peers…');
+    } else if (_lookupCancelled) {
+      body = const _EmptyRow(text: 'Lookup cancelled.');
     } else if (error != null) {
       body = Center(child: _UnavailableDetail(error: error));
     } else if (reply == null) {
@@ -258,6 +281,7 @@ class _DhtTabState extends ConsumerState<DhtTab> {
           detail: peer.record,
           loading: false,
           error: null,
+          local: false,
           onClose: () => setState(_clearSelection),
         );
       } else {
@@ -338,11 +362,8 @@ class _DhtTabState extends ConsumerState<DhtTab> {
     _runLookup(key);
   }
 
-  /// Expand a row, fetching that one record's values.
-  ///
-  /// The listing is metadata-only by design, so the values are a second
-  /// request scoped to this key — and to this *tier*, since a key held in both
-  /// the primary store and the cache comes back twice.
+  /// Expand a row, fetching its values — scoped to this key *and* tier, since
+  /// a key held in both store and cache comes back twice.
   Future<void> _select(pb.DhtRecord record) async {
     final key = recordSelectionKey(record);
     if (_selected == key) {
@@ -384,6 +405,8 @@ class _DhtTabState extends ConsumerState<DhtTab> {
     if (trimmed.isEmpty || _lookupRunning) return;
     setState(() {
       _lookupRunning = true;
+      _lookupCancelled = false;
+      _cancelRequested = false;
       _lastLookupKey = trimmed;
       _lookupReply = null;
       _lookupError = null;
@@ -391,9 +414,13 @@ class _DhtTabState extends ConsumerState<DhtTab> {
       _selectedPeer = null;
     });
     try {
-      final reply = await ref
-          .read(kwaaiRpcClientProvider)
-          .dhtLookup(trimmed, onOperationId: (id) => _lookupOpId = id);
+      final reply = await _client.dhtLookup(
+        trimmed,
+        onOperationId: (id) {
+          _lookupOpId = id;
+          if (_cancelRequested && id != null) _client.cancelOperation(id);
+        },
+      );
       if (!mounted) return;
       setState(() {
         _lookupReply = reply;
@@ -402,35 +429,29 @@ class _DhtTabState extends ConsumerState<DhtTab> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _lookupError = e;
+        _lookupCancelled = e is SessionOpError && e.code == _cancelled;
+        _lookupError = _lookupCancelled ? null : e;
         _lookupRunning = false;
       });
     }
   }
 
-  /// Abort a running lookup daemon-side. Without the id there is nothing to
-  /// cancel — dropping our own await would leave the daemon dialling peers.
-  Future<void> _cancelLookup() async {
+  /// Abort a running lookup daemon-side — dropping our own await alone would
+  /// leave the daemon dialling peers.
+  void _cancelLookup() {
+    _cancelRequested = true;
     final id = _lookupOpId;
-    if (id == null) return;
-    await ref.read(kwaaiRpcClientProvider).cancelOperation(id);
+    if (id != null) _client.cancelOperation(id);
   }
 }
 
-/// Identifies a record among the listing's rows.
-///
-/// The tier is part of the identity: a key held in both the primary store and
-/// the cache appears twice with independent expirations, and those are two
-/// genuine records rather than a duplicate to fold away.
+/// Row identity. The tier is part of it: a key held in both store and cache
+/// is two records, not a duplicate.
 String recordSelectionKey(pb.DhtRecord r) =>
     '${r.keyId}:${r.inCache ? 'cache' : 'primary'}';
 
-/// How a record is named in the table: its plaintext name when this node can
-/// derive one, otherwise a shortened id.
-///
-/// Most records have no name and that is normal — a DHT id is SHA1(msgpack of
-/// the name) and cannot be inverted, so anything replicated onto us for a
-/// model we do not serve arrives as a hash and stays one.
+/// The plaintext name when this node can derive one, else a shortened id —
+/// an id is a hash and cannot be inverted, so unnamed is the normal case.
 String recordLabel(pb.DhtRecord r) =>
     r.keyName.isNotEmpty ? r.keyName : shortKeyId(r.keyId);
 
@@ -452,15 +473,20 @@ String? freshestPeer(pb.DhtLookupReply reply) {
   return null;
 }
 
-/// A countdown, from `expires_in_secs`.
-///
-/// Negative is a real reading, not a bug: a local listing filters expired
-/// records, but a lookup answer is stamped with the answering peer's clock,
-/// and a dictionary keeps subkeys that have expired.
+/// A countdown from `expires_in_secs`. Negative is real: lookup answers carry
+/// the peer's clock, and dictionaries keep expired subkeys.
 String formatExpiry(double secs) {
   final rounded = secs.round();
   final magnitude = _magnitude(rounded.abs());
   return rounded < 0 ? 'expired $magnitude ago' : 'in $magnitude';
+}
+
+/// The expiry as a sentence: "Expires in 4m" or "Expired 1m ago".
+String expiryLine(double secs) {
+  final countdown = formatExpiry(secs);
+  return secs.round() < 0
+      ? '${countdown[0].toUpperCase()}${countdown.substring(1)}'
+      : 'Expires $countdown';
 }
 
 String _magnitude(int secs) {
@@ -566,7 +592,10 @@ class _LocalHeader extends StatelessWidget {
     required this.shown,
     required this.total,
     required this.summary,
+    required this.truncated,
   });
+
+  final bool truncated;
 
   final int shown;
 
@@ -581,8 +610,6 @@ class _LocalHeader extends StatelessWidget {
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.75),
     );
-    final truncated = total > shown;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -594,11 +621,17 @@ class _LocalHeader extends StatelessWidget {
               color: context.kwaai.semanticInfo,
             ),
             const SizedBox(width: 6),
-            Text('This node’s own store', style: theme.textTheme.labelLarge),
+            Flexible(
+              child: Text(
+                'This node’s own store',
+                style: theme.textTheme.labelLarge,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 4),
-        Text(_localStoreNote, style: muted),
+        Text(localStoreNote(truncated: truncated), style: muted),
         const SizedBox(height: 6),
         // A cut-short listing that reads as a whole one is the same failure
         // as implying the local store is the network.
@@ -626,12 +659,8 @@ class _LocalHeader extends StatelessWidget {
   }
 }
 
-/// Band 1 in Lookup mode: pick a known key or type any key name, and resolve
-/// it across the network.
-///
-/// The dropdown is the reverse table the daemon sends with the listing: an id
-/// is SHA1(msgpack(name)) and cannot be inverted, so a key can only be looked
-/// up by a name someone already knows.
+/// Band 1 in Lookup mode. The dropdown is the daemon's `known_keys` reverse
+/// table — a key can only be looked up by name.
 class _LookupBar extends StatelessWidget {
   const _LookupBar({
     required this.knownKeys,
@@ -649,10 +678,9 @@ class _LookupBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        if (knownKeys.isNotEmpty) ...[
-          KwaaiDropdown<String>(
+    final dropdown = knownKeys.isEmpty
+        ? null
+        : KwaaiDropdown<String>(
             items: [
               for (final k in knownKeys)
                 KwaaiDropdownItem(value: k.name, label: k.name),
@@ -667,38 +695,56 @@ class _LookupBar extends StatelessWidget {
               controller.text = v;
               onRun(v);
             },
-          ),
-          const SizedBox(width: 8),
-        ],
-        Expanded(
-          child: KwaaiTextField(
-            controller: controller,
-            hintText: 'or any key name, e.g. _petals.models',
-            enabled: !running,
-            onSubmitted: onRun,
-          ),
-        ),
-        const SizedBox(width: 8),
-        running
-            ? KwaaiButton(
-                label: 'Cancel',
-                variant: KwaaiButtonVariant.secondary,
-                onPressed: onCancel,
-              )
-            : KwaaiButton(
-                label: 'Look up',
-                onPressed: () => onRun(controller.text),
-              ),
-      ],
+          );
+    final field = Expanded(
+      child: KwaaiTextField(
+        controller: controller,
+        hintText: 'or any key name, e.g. _petals.models',
+        enabled: !running,
+        onSubmitted: onRun,
+      ),
+    );
+    final run = running
+        ? KwaaiButton(
+            label: 'Cancel',
+            variant: KwaaiButtonVariant.secondary,
+            onPressed: onCancel,
+          )
+        : KwaaiButton(
+            label: 'Look up',
+            onPressed: () => onRun(controller.text),
+          );
+
+    // Below the side-rail breakpoint the three controls no longer fit one
+    // row beside the mode switch; the dropdown takes a row of its own.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < 420;
+        if (narrow && dropdown != null) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              dropdown,
+              const SizedBox(height: 6),
+              Row(children: [field, const SizedBox(width: 8), run]),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            if (dropdown != null) ...[dropdown, const SizedBox(width: 8)],
+            field,
+            const SizedBox(width: 8),
+            run,
+          ],
+        );
+      },
     );
   }
 }
 
-/// Band 2 in Lookup mode: one row per peer asked, in the order asked.
-///
-/// The three outcomes stay visually distinct: a peer that answered NOT_FOUND
-/// is a result, and folding it in with an unreachable peer would erase the
-/// difference between "nobody has this" and "nobody answered".
+/// Band 2 in Lookup mode: one row per peer asked. NOT_FOUND is a result, and
+/// stays visually distinct from a peer that never answered.
 class _LookupTable extends StatelessWidget {
   const _LookupTable({
     required this.reply,
@@ -746,9 +792,11 @@ class _LookupTable extends StatelessWidget {
                 DataColumn(label: Text('DETAIL', style: headStyle)),
               ],
               rows: [
-                for (final p in reply.peers)
+                for (final (i, p) in reply.peers.indexed)
                   DataRow(
-                    key: ValueKey(p.peerId),
+                    // A peer can be listed twice (configured and in the
+                    // routing table); the id alone would collide.
+                    key: ValueKey('$i:${p.peerId}'),
                     selected: p.peerId == selectedPeer,
                     color: WidgetStateProperty.resolveWith(
                       (states) => states.contains(WidgetState.selected)
@@ -778,7 +826,11 @@ class _LookupTable extends StatelessWidget {
                           p.hasRecord()
                               ? formatExpiry(p.record.expiresInSecs)
                               : '—',
-                          style: cellStyle,
+                          style: cellStyle?.copyWith(
+                            color: p.hasRecord() && p.record.expiresInSecs < 0
+                                ? kwaai.semanticWarning
+                                : null,
+                          ),
                         ),
                       ),
                       DataCell(
@@ -1030,6 +1082,7 @@ class _RecordDetail extends StatelessWidget {
     required this.detail,
     required this.loading,
     required this.error,
+    this.local = true,
     required this.onClose,
   });
 
@@ -1039,6 +1092,9 @@ class _RecordDetail extends StatelessWidget {
   final pb.DhtRecord? detail;
   final bool loading;
   final Object? error;
+
+  /// False for a lookup answer, which was never stored here and has no tier.
+  final bool local;
   final VoidCallback onClose;
 
   @override
@@ -1069,7 +1125,7 @@ class _RecordDetail extends StatelessWidget {
           ),
           Text(record.keyId, style: _mono(context, muted)),
           const SizedBox(height: 8),
-          _RecordFacts(record: record),
+          _RecordFacts(record: record, showTier: local),
           const SizedBox(height: 8),
           if (loading)
             Row(
@@ -1090,7 +1146,11 @@ class _RecordDetail extends StatelessWidget {
           // A dictionary carries no top-level value — its values live per
           // subkey, which is how N peers announce under one key.
           else if (isDict)
-            _SubkeyList(title: recordLabel(record), subkeys: detail!.subkeys)
+            _SubkeyList(
+              title: recordLabel(record),
+              subkeyCount: detail!.subkeyCount,
+              subkeys: detail!.subkeys,
+            )
           else if (detail!.hasValue())
             _ValueView(title: recordLabel(record), value: detail!.value)
           else
@@ -1103,9 +1163,10 @@ class _RecordDetail extends StatelessWidget {
 
 /// The record's metadata line: tier, kind, size and both expirations.
 class _RecordFacts extends StatelessWidget {
-  const _RecordFacts({required this.record});
+  const _RecordFacts({required this.record, required this.showTier});
 
   final pb.DhtRecord record;
+  final bool showTier;
 
   @override
   Widget build(BuildContext context) {
@@ -1120,15 +1181,15 @@ class _RecordFacts extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${kindLabel(r.kind)} · ${r.inCache ? 'cache' : 'primary'} '
-          '· ${formatValueBytes(r.valueBytes.toInt())}'
+          '${kindLabel(r.kind)}'
+          '${showTier ? ' · ${r.inCache ? 'cache' : 'primary'}' : ''}'
+          ' · ${formatValueBytes(r.valueBytes.toInt())}'
           '${isDict ? ' · ${r.subkeyCount} subkeys' : ''}'
           '${r.hasDictMaxsize() ? ' of at most ${r.dictMaxsize}' : ''}',
           style: muted,
         ),
         Text(
-          'Expires ${formatExpiry(r.expiresInSecs)} '
-          '(${formatEpoch(r.expiration)})',
+          '${expiryLine(r.expiresInSecs)} (${formatEpoch(r.expiration)})',
           style: muted,
         ),
         // Hivemind never recomputes this on subkey expiry, so a value well
@@ -1144,15 +1205,18 @@ class _RecordFacts extends StatelessWidget {
   }
 }
 
-/// A dictionary's subkeys, each with its own expiration — independent of the
-/// record's, which is the point of a dictionary. Expired subkeys are listed
-/// too: nothing prunes them, so their own countdown is what says they are
-/// gone.
+/// A dictionary's subkeys, each with its own expiration. Expired ones are
+/// listed too — nothing prunes them.
 class _SubkeyList extends StatelessWidget {
-  const _SubkeyList({required this.title, required this.subkeys});
+  const _SubkeyList({
+    required this.title,
+    required this.subkeyCount,
+    required this.subkeys,
+  });
 
   /// The record's label, which each subkey's viewer titles itself with.
   final String title;
+  final int subkeyCount;
   final List<pb.DhtSubkey> subkeys;
 
   @override
@@ -1161,8 +1225,14 @@ class _SubkeyList extends StatelessWidget {
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.75),
     );
+    // A lookup answer may omit the per-subkey values it counted.
     if (subkeys.isEmpty) {
-      return Text('This dictionary holds no subkeys.', style: muted);
+      return Text(
+        subkeyCount > 0
+            ? 'This answer did not include its $subkeyCount subkey values.'
+            : 'This dictionary holds no subkeys.',
+        style: muted,
+      );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1182,12 +1252,8 @@ class _SubkeyList extends StatelessWidget {
   }
 }
 
-/// A decoded msgpack value.
-///
-/// Preformatted because the rendering is structural, not semantic: the daemon
-/// decodes msgpack and shows what is there, without knowing that an Ext(64)
-/// under a block key is a petals ServerInfo. When it could not decode at all,
-/// the bytes are labelled as opaque rather than dressed up as meaningful.
+/// A rendered msgpack value: structural, not semantic, so shown preformatted;
+/// undecodable bytes are labelled opaque, not dressed up.
 class _ValueView extends StatelessWidget {
   const _ValueView({required this.title, required this.value});
 
@@ -1247,16 +1313,30 @@ class _ValueView extends StatelessWidget {
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Text(
-              value.rendered,
+              previewOf(value.rendered),
               style: _mono(context, theme.textTheme.bodySmall),
               softWrap: false,
             ),
           ),
         ),
+        if (value.rendered.length > kValuePreviewChars)
+          Text(
+            'Preview of ${value.rendered.length} characters — open to read '
+            'it all.',
+            style: muted,
+          ),
       ],
     );
   }
 }
+
+/// How much of a rendered value the inline preview lays out. Values run to a
+/// megabyte, and laying that out unwrapped is seconds of jank per selection.
+const kValuePreviewChars = 2048;
+
+String previewOf(String rendered) => rendered.length <= kValuePreviewChars
+    ? rendered
+    : '${rendered.substring(0, kValuePreviewChars)}…';
 
 /// Full-size viewer for a rendered value: the whole `rendered` string,
 /// word-wrapped in a squarish box, with the same type / size / not-decoded
@@ -1346,6 +1426,53 @@ class _ValueDialog extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Says the rows on screen are a snapshot the daemon can no longer vouch
+/// for, and why.
+class _StaleBanner extends StatelessWidget {
+  const _StaleBanner({required this.arrived, required this.error});
+
+  final DateTime? arrived;
+
+  /// The failed refresh, when the daemon is reachable but answered badly.
+  final Object? error;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final kwaai = context.kwaai;
+    final since = arrived == null
+        ? ''
+        : ' from ${_magnitude(DateTime.now().difference(arrived!).inSeconds)} '
+              'ago';
+    final why = error == null
+        ? 'The daemon is unreachable'
+        : 'The last refresh failed: ${_errorText(error)}';
+    return Container(
+      color: kwaai.semanticWarning.withValues(alpha: 0.12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          Icon(
+            Icons.warning_amber_outlined,
+            size: 14,
+            color: kwaai.semanticWarning,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              '$why — showing the listing$since. It may no longer match the '
+              'store.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: kwaai.semanticWarning,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

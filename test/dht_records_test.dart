@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kwaainet_gui/src/chat/generated/kwaai.pb.dart' as pb;
 import 'package:kwaainet_gui/src/chat/kwaai_rpc_client.dart';
+import 'package:kwaainet_gui/src/chat/session_client.dart';
 import 'package:kwaainet_gui/src/daemon/dht_state.dart';
 import 'package:kwaainet_gui/src/ui/pages/dht_tab.dart';
 import 'package:kwaainet_gui/src/ui/theme/theme_variants.dart';
@@ -59,6 +60,9 @@ class _FakeClient extends KwaaiRpcClient {
 
   final pb.DhtRecordsReply detail;
   final pb.DhtLookupReply lookup;
+
+  /// Thrown instead of [lookup] when set — e.g. a daemon-side CANCELLED.
+  Object? lookupError;
   int detailCalls = 0;
   int lookupCalls = 0;
 
@@ -79,6 +83,7 @@ class _FakeClient extends KwaaiRpcClient {
   }) async {
     lookupCalls++;
     onOperationId(7);
+    if (lookupError != null) throw lookupError!;
     return lookup;
   }
 }
@@ -110,36 +115,42 @@ _FakeClient _fakeClient({pb.DhtRecord? detailRecord}) {
   return client;
 }
 
-/// Counts how many times the listing was (re)requested.
+/// Counts how many times the listing was (re)requested, and can make every
+/// request after the first fail.
 class _Listing {
-  _Listing(this.reply);
-  final pb.DhtRecordsReply reply;
   int requests = 0;
+  Object? errorAfterFirst;
 }
 
 Widget _host(
   pb.DhtRecordsReply reply, {
   _Listing? listing,
   _FakeClient? client,
+  bool connected = true,
+  double width = 1100,
 }) => ProviderScope(
   overrides: [
     dhtRecordsProvider.overrideWith((ref) {
-      listing?.requests++;
-      return Stream.value(reply);
+      final n = ++(listing ?? _Listing()).requests;
+      final err = listing?.errorAfterFirst;
+      return n > 1 && err != null ? Stream.error(err) : Stream.value(reply);
     }),
-    if (client != null)
-      kwaaiRpcClientProvider.overrideWith((ref) {
-        ref.onDispose(client.close);
-        return client;
-      }),
+    kwaaiRpcConnectionProvider.overrideWith(
+      (ref) => Stream.value(
+        connected ? RpcConnection.connected : RpcConnection.disconnected,
+      ),
+    ),
+    kwaaiRpcClientProvider.overrideWithValue(client ?? _fakeClient()),
   ],
   child: MaterialApp(
     theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
-    home: const Scaffold(
-      body: SizedBox(width: 1100, height: 800, child: DhtTab()),
+    home: Scaffold(
+      body: SizedBox(width: width, height: 800, child: const DhtTab()),
     ),
   ),
 );
+
+pb.DhtRecord _named() => _record(keyId: 'ff01', keyName: '_petals.models');
 
 Finder _textWith(String fragment) => find.byWidgetPredicate(
   (w) => w is Text && (w.data ?? '').contains(fragment),
@@ -172,6 +183,18 @@ void main() {
     test('reads an expired record as expired, not as a negative countdown', () {
       expect(formatExpiry(-90), 'expired 1m ago');
     });
+  });
+
+  test('expiryLine reads as a sentence either side of now', () {
+    expect(expiryLine(240), 'Expires in 4m');
+    expect(expiryLine(-90), 'Expired 1m ago');
+  });
+
+  test('previewOf bounds what the inline preview lays out', () {
+    final long = 'x' * (kValuePreviewChars + 10);
+    expect(previewOf('short'), 'short');
+    expect(previewOf(long).length, kValuePreviewChars + 1);
+    expect(previewOf(long).endsWith('…'), isTrue);
   });
 
   group('recordLabel', () {
@@ -256,6 +279,9 @@ void main() {
 
       expect(_textWith('Showing 1 of 812 records'), findsOneWidget);
       expect(_textWith('1 of 812 records · '), findsOneWidget);
+      // The note must not call a cut-short listing complete.
+      expect(_textWith('true answer about this node'), findsOneWidget);
+      expect(_textWith('complete answer'), findsNothing);
     });
 
     testWidgets('claims no truncation when the listing is whole', (
@@ -266,6 +292,80 @@ void main() {
 
       expect(_textWith('cut short'), findsNothing);
       expect(_textWith('1 records · '), findsOneWidget);
+      expect(_textWith('true and complete answer'), findsOneWidget);
+    });
+
+    testWidgets('marks an expired record in the table and the detail', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(
+          _reply([_named()..expiresInSecs = -90]),
+          client: _fakeClient(detailRecord: _named()..expiresInSecs = -90),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('expired 1m ago'), findsOneWidget);
+
+      await tester.tap(find.text('_petals.models'));
+      await tester.pumpAndSettle();
+      expect(_textWith('Expired 1m ago ('), findsOneWidget);
+      expect(_textWith('Expires expired'), findsNothing);
+    });
+
+    testWidgets('labels an undecoded value opaque in panel and dialog', (
+      tester,
+    ) async {
+      final blob = _value('hex:deadbeef')..decoded = false;
+      await tester.pumpWidget(
+        _host(
+          _reply([_named()]),
+          client: _fakeClient(detailRecord: _named()..value = blob),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('_petals.models'));
+      await tester.pumpAndSettle();
+      expect(find.text('opaque — shown as hex'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Open value'));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byType(Dialog),
+          matching: _textWith('not decoded, shown as hex'),
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('stale listing', () {
+    testWidgets('a failed refresh keeps the rows but says so', (tester) async {
+      final listing = _Listing()
+        ..errorAfterFirst = SessionOpError(
+          code: 6,
+          message: 'dht_records is not available on this p2p backend',
+        );
+      await tester.pumpWidget(_host(_reply([_named()]), listing: listing));
+      await tester.pumpAndSettle();
+      expect(_textWith('The last refresh failed'), findsNothing);
+
+      await tester.tap(_refresh);
+      await tester.pumpAndSettle();
+      expect(listing.requests, 2);
+      expect(find.text('_petals.models'), findsOneWidget);
+      expect(_textWith('The last refresh failed'), findsOneWidget);
+      expect(_textWith('showing the listing from'), findsOneWidget);
+    });
+
+    testWidgets('a lost daemon is said, not implied by silence', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_host(_reply([_named()]), connected: false));
+      await tester.pumpAndSettle();
+      expect(find.text('_petals.models'), findsOneWidget);
+      expect(_textWith('The daemon is unreachable'), findsOneWidget);
     });
   });
 
@@ -274,11 +374,9 @@ void main() {
       tester,
     ) async {
       final client = _fakeClient();
+      final listing = _Listing();
       await tester.pumpWidget(
-        _host(
-          _reply([_record(keyId: 'ff01', keyName: '_petals.models')]),
-          client: client,
-        ),
+        _host(_reply([_named()]), listing: listing, client: client),
       );
       await tester.pumpAndSettle();
 
@@ -296,12 +394,14 @@ void main() {
       expect(find.text('{"llama": 32}'), findsNothing);
       expect(client.detailCalls, 1);
       expect(client.lookupCalls, 0);
+      expect(listing.requests, 1);
 
       await tester.tap(find.text('Local'));
       await tester.pumpAndSettle();
       expect(_textWith('The local store is the only thing'), findsOneWidget);
       expect(find.text('KEY'), findsOneWidget);
       expect(find.text('{"llama": 32}'), findsNothing);
+      expect(listing.requests, 1);
     });
 
     testWidgets('lookup fills one table with all three outcomes', (
@@ -332,14 +432,72 @@ void main() {
         findsOneWidget,
       );
     });
+
+    // `in_cache` is meaningless in a lookup reply; nothing was stored here.
+    testWidgets('a lookup answer claims no tier', (tester) async {
+      await tester.pumpWidget(_host(_reply([_record(keyId: 'ff01')])));
+      await tester.pumpAndSettle();
+      await _runLookup(tester);
+      await tester.tap(find.text('found'));
+      await tester.pumpAndSettle();
+      expect(_textWith('· primary'), findsNothing);
+      expect(_textWith('value · 2.0 KB'), findsOneWidget);
+    });
+
+    testWidgets('a lookup answer without subkey values says so', (
+      tester,
+    ) async {
+      final client = _fakeClient(
+        detailRecord: _record(
+          keyId: 'ff02',
+          keyName: '_petals.models',
+          kind: pb.DhtRecordKind.DHT_RECORD_KIND_DICTIONARY,
+          subkeyCount: 3,
+        ),
+      );
+      await tester.pumpWidget(
+        _host(_reply([_record(keyId: 'ff02')]), client: client),
+      );
+      await tester.pumpAndSettle();
+      await _runLookup(tester);
+      await tester.tap(find.text('found'));
+      await tester.pumpAndSettle();
+      expect(_textWith('did not include its 3 subkey values'), findsOneWidget);
+      expect(_textWith('holds no subkeys'), findsNothing);
+    });
+
+    testWidgets('a cancelled lookup is not an error', (tester) async {
+      final client = _fakeClient()
+        ..lookupError = SessionOpError(code: 4, message: 'cancelled');
+      await tester.pumpWidget(
+        _host(_reply([_record(keyId: 'ff01')]), client: client),
+      );
+      await tester.pumpAndSettle();
+      await _runLookup(tester);
+      expect(find.text('Lookup cancelled.'), findsOneWidget);
+      expect(find.text('cancelled'), findsNothing);
+      expect(_refreshEnabled(tester), isTrue);
+    });
+
+    testWidgets('band 1 fits a 560px window', (tester) async {
+      await tester.pumpWidget(
+        _host(_reply([_record(keyId: 'ff01')]), width: 560),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('Lookup'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('Look up'), findsOneWidget);
+    });
   });
 
   group('refresh', () {
     testWidgets('re-requests the listing and clears the selection', (
       tester,
     ) async {
-      final reply = _reply([_record(keyId: 'ff01', keyName: '_petals.models')]);
-      final listing = _Listing(reply);
+      final reply = _reply([_named()]);
+      final listing = _Listing();
       await tester.pumpWidget(
         _host(reply, listing: listing, client: _fakeClient()),
       );
