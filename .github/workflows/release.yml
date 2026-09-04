@@ -79,7 +79,7 @@ jobs:
           echo "version=$ver" >> "$GITHUB_OUTPUT"
           echo "Bundling kwaainet $ver"
 
-      - name: Download & bundle kwaainet + p2pd (Unix)
+      - name: Download & bundle kwaainet (Unix)
         if: matrix.target != 'windows'
         shell: bash
         run: |
@@ -94,9 +94,8 @@ jobs:
           tar -xf "$asset"
           src="${asset%.tar.xz}"
           install -m 0755 "$src/kwaainet" "$dest/kwaainet"
-          install -m 0755 "$src/p2pd" "$dest/p2pd"
 
-      - name: Download & bundle kwaainet + p2pd (Windows)
+      - name: Download & bundle kwaainet (Windows)
         if: matrix.target == 'windows'
         shell: pwsh
         run: |
@@ -113,9 +112,8 @@ jobs:
           Expand-Archive -Path $asset -DestinationPath kw -Force
           Pop-Location
           Copy-Item "$env:TEMP\kw\kw\kwaainet.exe" "$dest\kwaainet.exe" -Force
-          Copy-Item "$env:TEMP\kw\kw\p2pd.exe"     "$dest\p2pd.exe"     -Force
 
-      # Re-seal the ad-hoc signature broken by injecting kwaainet/p2pd, so
+      # Re-seal the ad-hoc signature broken by injecting kwaainet, so
       # macOS doesn't reject the app as "damaged". (See ci.yml for detail.)
       - name: Re-sign app bundle (macOS)
         if: matrix.target == 'macos'

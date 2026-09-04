@@ -3,7 +3,7 @@
 # Build the macOS release bundle exactly as CI does, without publishing.
 #
 # The release workflow does three things beyond `flutter build`: it installs
-# the pinned kwaainet + p2pd into Contents/Resources, re-signs the bundle,
+# the pinned kwaainet into Contents/Resources, re-signs the bundle,
 # and packages it with ditto. A plain `flutter build macos` produces none of
 # that, which is how v0.3.0 shipped a bundle that fork-bombed on open.
 #
@@ -42,7 +42,6 @@ fi
 
 echo "==> bundling daemon into Contents/Resources"
 install -m 0755 "$CACHE/kwaainet" "$APP/Contents/Resources/kwaainet"
-install -m 0755 "$CACHE/p2pd"     "$APP/Contents/Resources/p2pd"
 codesign --force --deep --sign - "$APP"
 
 # The v0.3.0 regression: on case-insensitive APFS a daemon named `kwaainet`
@@ -84,4 +83,4 @@ echo "--- daemon resolution (full log: $LOG) ---"
 grep -E 'daemon-controller|not found|No such|Exception' "$LOG" | head -8 || \
   echo "(no daemon-controller lines — did the node already run?)"
 osascript -e 'quit app "KwaaiNet"' 2>/dev/null || true
-sleep 3; pkill -f "$APP" 2>/dev/null || true; pkill -f "Resources/p2pd" 2>/dev/null || true
+sleep 3; pkill -f "$APP" 2>/dev/null || true

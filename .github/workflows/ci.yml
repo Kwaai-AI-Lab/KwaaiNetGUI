@@ -107,7 +107,7 @@ jobs:
           echo "version=$ver" >> "$GITHUB_OUTPUT"
           echo "Bundling kwaainet $ver"
 
-      - name: Download & bundle kwaainet + p2pd (Unix)
+      - name: Download & bundle kwaainet (Unix)
         if: matrix.target != 'windows'
         shell: bash
         run: |
@@ -120,15 +120,13 @@ jobs:
           cd /tmp/kw
           # cargo-dist .sha256 files are "<hash>  <name>" — verify it.
           shasum -a 256 -c "$asset.sha256"
-          # The archive unpacks into a "<target>/" subdir containing both
-          # kwaainet and the p2pd helper it spawns at runtime.
+          # The archive unpacks into a "<target>/" subdir.
           tar -xf "$asset"
           src="${asset%.tar.xz}"
           install -m 0755 "$src/kwaainet" "$dest/kwaainet"
-          install -m 0755 "$src/p2pd" "$dest/p2pd"
-          echo "Bundled kwaainet + p2pd into ${{ matrix.bundle_dir }}"
+          echo "Bundled kwaainet into ${{ matrix.bundle_dir }}"
 
-      - name: Download & bundle kwaainet + p2pd (Windows)
+      - name: Download & bundle kwaainet (Windows)
         if: matrix.target == 'windows'
         shell: pwsh
         run: |
@@ -142,18 +140,17 @@ jobs:
           $expected = (Get-Content "$asset.sha256").Split(' ')[0].Trim()
           $actual = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLower()
           if ($expected -ne $actual) { throw "sha256 mismatch for $asset" }
-          # The Windows zip is flat (kwaainet.exe + p2pd.exe at the top level).
+          # The Windows zip is flat (kwaainet.exe at the top level).
           Expand-Archive -Path $asset -DestinationPath kw -Force
           Pop-Location
           Copy-Item "$env:TEMP\kw\kw\kwaainet.exe" "$dest\kwaainet.exe" -Force
-          Copy-Item "$env:TEMP\kw\kw\p2pd.exe"     "$dest\p2pd.exe"     -Force
-          Write-Host "Bundled kwaainet.exe + p2pd.exe into ${{ matrix.bundle_dir }}"
+          Write-Host "Bundled kwaainet.exe into ${{ matrix.bundle_dir }}"
 
       # ── Package into a single archive that preserves the bundle ────────────
       # We archive ourselves (rather than letting upload-artifact zip the
       # folder) so macOS .app symlinks and Unix exec bits survive the round
       # trip. The artifact is then a single, ready-to-extract file.
-      # Re-sign after injecting kwaainet/p2pd: Flutter ad-hoc signs the .app at
+      # Re-sign after injecting kwaainet: Flutter ad-hoc signs the .app at
       # build time, and adding files breaks that seal — macOS then refuses to
       # launch it as "damaged". Re-sealing ad-hoc fixes that (users still clear
       # quarantine via right-click → Open until we have a Developer ID).
@@ -178,7 +175,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # tar preserves the exec bits on kwaainet_gui, kwaainet, and p2pd.
+          # tar preserves the exec bits on kwaainet_gui and kwaainet.
           tar -C "$(dirname "${{ matrix.artifact_path }}")" \
             -czf "$GITHUB_WORKSPACE/kwaainet-gui-linux.tar.gz" \
             "$(basename "${{ matrix.artifact_path }}")"
