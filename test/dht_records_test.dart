@@ -553,7 +553,7 @@ void main() {
 
   group('value dialog', () {
     testWidgets('shows the whole rendered value', (tester) async {
-      final long = '{"x": "${'y' * 400}"}';
+      final long = '{"x":"${'y' * 400}"}';
       final client = _fakeClient(
         detailRecord: _record(keyId: 'ff01', keyName: '_petals.models')
           ..value = _value(long),
@@ -571,6 +571,10 @@ void main() {
       await tester.tap(find.byTooltip('Open value'));
       await tester.pumpAndSettle();
       expect(find.byType(Dialog), findsOneWidget);
+      // Pretty by default; Raw is the compact string as sent.
+      expect(find.textContaining('  "x": "yyyy'), findsOneWidget);
+      await tester.tap(find.text('Raw'));
+      await tester.pumpAndSettle();
       expect(
         find.descendant(of: find.byType(Dialog), matching: find.text(long)),
         findsOneWidget,
@@ -627,13 +631,68 @@ void main() {
         ),
         findsOneWidget,
       );
+      expect(find.text('[\n  1,\n  2,\n  3\n]'), findsOneWidget);
+    });
+
+    testWidgets('pretty-prints a nested ext wrapper', (tester) async {
+      final client = _fakeClient(
+        detailRecord: _named()
+          ..value = (_value('{"\$ext":64,"value":[2,10,{"start_block":0}]}')
+            ..extCode = 64),
+      );
+      await tester.pumpWidget(_host(_reply([_named()]), client: client));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('_petals.models'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Open value'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('  "value": [\n'), findsOneWidget);
+      expect(find.textContaining('    "start_block": 0'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byType(Dialog),
-          matching: find.text('[1, 2, 3]'),
+          matching: _textWith('(ext 64)'),
         ),
         findsOneWidget,
       );
+    });
+
+    testWidgets('falls back to raw when a decoded value is not JSON', (
+      tester,
+    ) async {
+      const old = 'ext(64)[2, 10, {start_block: 0}]';
+      final client = _fakeClient(detailRecord: _named()..value = _value(old));
+      await tester.pumpWidget(_host(_reply([_named()]), client: client));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('_petals.models'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Open value'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(
+        find.descendant(of: find.byType(Dialog), matching: find.text(old)),
+        findsOneWidget,
+      );
+      expect(find.text('Raw'), findsNothing);
+    });
+
+    testWidgets('never parses an undecoded value', (tester) async {
+      // Hex that is also a JSON number: it must stay hex text.
+      final client = _fakeClient(
+        detailRecord: _named()..value = (_value('12')..decoded = false),
+      );
+      await tester.pumpWidget(_host(_reply([_named()]), client: client));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('_petals.models'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Open value'));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: find.byType(Dialog), matching: find.text('12')),
+        findsOneWidget,
+      );
+      expect(_textWith('not decoded, shown as hex'), findsOneWidget);
+      expect(find.text('Raw'), findsNothing);
     });
   });
 }

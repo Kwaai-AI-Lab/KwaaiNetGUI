@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1352,16 +1354,37 @@ Future<void> showValueDialog(
   );
 }
 
-class _ValueDialog extends StatelessWidget {
+/// `rendered` pretty-printed, or null when it is not JSON. Only for a decoded
+/// value — an undecoded one is raw hex and must never be parsed.
+String? prettyJson(pb.DhtValueView value) {
+  if (!value.decoded) return null;
+  try {
+    return const JsonEncoder.withIndent('  ')
+        .convert(jsonDecode(value.rendered));
+  } on FormatException {
+    return null;
+  }
+}
+
+class _ValueDialog extends StatefulWidget {
   const _ValueDialog({required this.title, required this.value});
 
   final String title;
   final pb.DhtValueView value;
 
   @override
+  State<_ValueDialog> createState() => _ValueDialogState();
+}
+
+class _ValueDialogState extends State<_ValueDialog> {
+  late final String? _pretty = prettyJson(widget.value);
+  bool _raw = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final kwaai = context.kwaai;
+    final value = widget.value;
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.75),
     );
@@ -1369,6 +1392,8 @@ class _ValueDialog extends StatelessWidget {
     // Squarish: the shorter viewport side bounds both axes.
     final side = 0.8 * (size.width < size.height ? size.width : size.height);
     final ext = value.hasExtCode() ? ' (ext ${value.extCode})' : '';
+    final pretty = _pretty;
+    final shown = pretty == null || _raw ? value.rendered : pretty;
 
     return Dialog(
       backgroundColor: kwaai.cardBackground,
@@ -1388,12 +1413,19 @@ class _ValueDialog extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      title,
+                      widget.title,
                       style: theme.textTheme.titleSmall,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  _CopyButton(text: value.rendered, label: 'Value'),
+                  if (pretty != null) ...[
+                    _RawToggle(
+                      raw: _raw,
+                      onChanged: (v) => setState(() => _raw = v),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  _CopyButton(text: shown, label: 'Value'),
                   _CloseButton(onPressed: () => Navigator.of(context).pop()),
                 ],
               ),
@@ -1417,7 +1449,7 @@ class _ValueDialog extends StatelessWidget {
                   ),
                   child: SingleChildScrollView(
                     child: SelectableText(
-                      value.rendered,
+                      shown,
                       style: _mono(context, theme.textTheme.bodySmall),
                     ),
                   ),
@@ -1427,6 +1459,48 @@ class _ValueDialog extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Pretty / Raw switch for a value that parsed as JSON.
+class _RawToggle extends StatelessWidget {
+  const _RawToggle({required this.raw, required this.onChanged});
+
+  final bool raw;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return SegmentedButton<bool>(
+      style: ButtonStyle(
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? context.kwaai.accentPrimary
+              : onSurface.withValues(alpha: 0.12),
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? Colors.white
+              : onSurface.withValues(alpha: 0.6),
+        ),
+        side: const WidgetStatePropertyAll(BorderSide.none),
+        visualDensity: VisualDensity.compact,
+        padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        ),
+        textStyle: WidgetStatePropertyAll(
+          Theme.of(context).textTheme.labelSmall,
+        ),
+      ),
+      showSelectedIcon: false,
+      segments: const [
+        ButtonSegment(value: false, label: Text('Pretty')),
+        ButtonSegment(value: true, label: Text('Raw')),
+      ],
+      selected: {raw},
+      onSelectionChanged: (s) => onChanged(s.first),
     );
   }
 }
