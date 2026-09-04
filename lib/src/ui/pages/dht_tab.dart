@@ -87,8 +87,13 @@ class _DhtTabState extends ConsumerState<DhtTab> {
   pb.DhtLookupReply? _lookupReply;
   Object? _lookupError;
 
-  /// Lookup row currently expanded, by peer id. Null = none.
+  /// Lookup peer currently selected, by peer id, and the selected entry of
+  /// its record (a subkey index, or 0 for a regular value). Null = none.
   String? _selectedPeer;
+  int? _selectedEntry;
+
+  /// Whether the peers that returned no record are listed individually.
+  bool _showFailedPeers = false;
 
   @override
   void initState() {
@@ -221,38 +226,84 @@ class _DhtTabState extends ConsumerState<DhtTab> {
   Widget _lookupBand() {
     final reply = _lookupReply;
     final error = _lookupError;
-    final Widget body;
+    final Widget? notice;
     if (_lookupRunning) {
-      body = const _EmptyRow(text: 'Asking peers…');
+      notice = const _EmptyRow(text: 'Asking peers…');
     } else if (_lookupCancelled) {
-      body = const _EmptyRow(text: 'Lookup cancelled.');
+      notice = const _EmptyRow(text: 'Lookup cancelled.');
     } else if (error != null) {
-      body = Center(child: _UnavailableDetail(error: error));
+      notice = Center(child: _UnavailableDetail(error: error));
     } else if (reply == null) {
-      body = const _EmptyRow(
+      notice = const _EmptyRow(
         text: 'Pick a known key or type one, then Look up.',
       );
     } else if (reply.peers.isEmpty) {
-      body = const _EmptyRow(text: 'No peers were asked.');
+      notice = const _EmptyRow(text: 'No peers were asked.');
     } else {
-      body = _LookupTable(
-        reply: reply,
-        freshestPeer: freshestPeer(reply),
-        selectedPeer: _selectedPeer,
-        onSelect: _selectPeer,
+      notice = null;
+    }
+    final caption = _Caption(
+      title: reply == null ? 'LOOKUP' : 'LOOKUP — ${reply.key}',
+      detail: reply == null ? null : _lookupSummary(reply),
+    );
+    if (notice != null || reply == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          caption,
+          Expanded(child: notice ?? const SizedBox()),
+        ],
       );
     }
+
+    final peer = _selectedLookupPeer;
+    final record = peer != null && peer.hasRecord() ? peer.record : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Caption(
-          title: reply == null ? 'LOOKUP' : 'LOOKUP — ${reply.key}',
-          detail: reply == null ? null : _lookupSummary(reply),
+        caption,
+        // Band 2a, kept short: the answers are the content, not the peers.
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 150),
+          child: _PeerTable(
+            peers: reply.peers,
+            freshestPeer: freshestPeer(reply),
+            selectedPeer: _selectedPeer,
+            showFailed: _showFailedPeers,
+            onToggleFailed: () =>
+                setState(() => _showFailedPeers = !_showFailedPeers),
+            onSelect: _selectPeer,
+          ),
         ),
-        Expanded(child: body),
+        Divider(height: 1, color: context.kwaai.divider),
+        _Caption(
+          title: peer == null
+              ? 'ENTRIES'
+              : 'ENTRIES — ${shortKeyId(peer.peerId)}',
+          detail: record == null ? null : _recordSummary(record),
+        ),
+        Expanded(
+          child: record == null
+              ? const _EmptyRow(text: 'Select a peer that found the key.')
+              : _EntryTable(
+                  entries: lookupEntries(record),
+                  emptyText: entriesEmptyText(record),
+                  selected: _selectedEntry,
+                  onSelect: _selectEntry,
+                ),
+        ),
       ],
     );
   }
+
+  pb.DhtLookupPeer? get _selectedLookupPeer =>
+      _lookupReply?.peers.where((p) => p.peerId == _selectedPeer).firstOrNull;
+
+  String _recordSummary(pb.DhtRecord r) =>
+      r.kind == pb.DhtRecordKind.DHT_RECORD_KIND_DICTIONARY
+      ? 'dictionary · ${r.subkeyCount} subkeys · '
+            '${formatValueBytes(r.valueBytes.toInt())}'
+      : 'value · ${formatValueBytes(r.valueBytes.toInt())}';
 
   /// Band 3: the selected local record, or the selected peer's answer.
   List<Widget> _detailBand(pb.DhtRecordsReply reply, Widget divider) {
@@ -272,25 +323,26 @@ class _DhtTabState extends ConsumerState<DhtTab> {
               onClose: () => setState(_clearSelection),
             );
     } else {
-      final peer = _lookupReply?.peers
-          .where((p) => p.peerId == _selectedPeer)
-          .firstOrNull;
+      final peer = _selectedLookupPeer;
+      final entry = _selectedEntry;
       if (peer == null) {
         panel = null;
-      } else if (peer.hasRecord()) {
-        panel = _RecordDetail(
-          summary: peer.record,
-          detail: peer.record,
-          loading: false,
-          error: null,
-          local: false,
-          onClose: () => setState(_clearSelection),
-        );
-      } else {
+      } else if (!peer.hasRecord()) {
         panel = _NoRecordDetail(
           peer: peer,
           onClose: () => setState(_clearSelection),
         );
+      } else if (entry == null) {
+        panel = null;
+      } else {
+        final entries = lookupEntries(peer.record);
+        panel = entry >= entries.length
+            ? null
+            : _EntryDetail(
+                keyName: peer.record.keyName,
+                entry: entries[entry],
+                onClose: () => setState(() => _selectedEntry = null),
+              );
       }
     }
     if (panel == null) return const [];
@@ -347,6 +399,7 @@ class _DhtTabState extends ConsumerState<DhtTab> {
   void _clearSelection() {
     _selected = null;
     _selectedPeer = null;
+    _selectedEntry = null;
     _detail = null;
     _detailError = null;
     _detailLoading = false;
@@ -400,6 +453,11 @@ class _DhtTabState extends ConsumerState<DhtTab> {
 
   void _selectPeer(String peerId) => setState(() {
     _selectedPeer = _selectedPeer == peerId ? null : peerId;
+    _selectedEntry = null;
+  });
+
+  void _selectEntry(int index) => setState(() {
+    _selectedEntry = _selectedEntry == index ? null : index;
   });
 
   Future<void> _runLookup(String key) async {
@@ -414,6 +472,7 @@ class _DhtTabState extends ConsumerState<DhtTab> {
       _lookupError = null;
       _lookupOpId = null;
       _selectedPeer = null;
+      _selectedEntry = null;
     });
     try {
       final reply = await _client.dhtLookup(
@@ -427,6 +486,9 @@ class _DhtTabState extends ConsumerState<DhtTab> {
       setState(() {
         _lookupReply = reply;
         _lookupRunning = false;
+        // Content without a click: the freshest answer is what a reader
+        // came for.
+        _selectedPeer = freshestPeer(reply);
       });
     } catch (e) {
       if (!mounted) return;
@@ -473,6 +535,96 @@ String? freshestPeer(pb.DhtLookupReply reply) {
     }
   }
   return null;
+}
+
+/// A subkey as a label. It is rendered like a value, so a peer id arrives as
+/// a quoted JSON string; the quotes are not part of the name.
+String subkeyLabel(String rendered) {
+  try {
+    final v = jsonDecode(rendered);
+    if (v is String) return v;
+  } on FormatException {
+    // Not JSON: an older daemon, or a subkey that is not a string.
+  }
+  return rendered;
+}
+
+/// One row of a lookup answer: a subkey of a dictionary, or the value itself.
+class LookupEntry {
+  const LookupEntry({
+    required this.subkey,
+    required this.expiresInSecs,
+    required this.bytes,
+    required this.value,
+  });
+
+  /// Null for a regular record.
+  final String? subkey;
+  final double expiresInSecs;
+  final int bytes;
+  final pb.DhtValueView value;
+}
+
+List<LookupEntry> lookupEntries(pb.DhtRecord r) {
+  if (r.kind == pb.DhtRecordKind.DHT_RECORD_KIND_DICTIONARY) {
+    return [
+      for (final s in r.subkeys)
+        LookupEntry(
+          subkey: subkeyLabel(s.subkey),
+          expiresInSecs: s.expiresInSecs,
+          bytes: s.valueBytes.toInt(),
+          value: s.value,
+        ),
+    ];
+  }
+  if (!r.hasValue()) return const [];
+  return [
+    LookupEntry(
+      subkey: null,
+      expiresInSecs: r.expiresInSecs,
+      bytes: r.valueBytes.toInt(),
+      value: r.value,
+    ),
+  ];
+}
+
+/// Why [lookupEntries] is empty — a lookup answer may omit the values it
+/// counted, and that is different from there being none.
+String entriesEmptyText(pb.DhtRecord r) {
+  if (r.kind == pb.DhtRecordKind.DHT_RECORD_KIND_DICTIONARY) {
+    return r.subkeyCount > 0
+        ? 'This answer did not include its ${r.subkeyCount} subkey values.'
+        : 'This dictionary holds no subkeys.';
+  }
+  return 'This answer did not include its value.';
+}
+
+/// One line for the peers that returned no record, by cause: NOT_FOUND is
+/// its own count, and a protocol refusal is named rather than lumped in.
+String failureSummary(List<pb.DhtLookupPeer> peers) {
+  var notFound = 0;
+  var other = 0;
+  final unsupported = <String, int>{};
+  for (final p in peers) {
+    if (p.outcome == pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_NOT_FOUND) {
+      notFound++;
+      continue;
+    }
+    final m = RegExp(r'does not support protocol (\S+)').firstMatch(p.error);
+    if (m != null) {
+      unsupported.update(m.group(1)!, (n) => n + 1, ifAbsent: () => 1);
+    } else {
+      other++;
+    }
+  }
+  final parts = [
+    if (notFound > 0) '$notFound not found',
+    for (final e in unsupported.entries) "${e.value} don't speak ${e.key}",
+    if (other > 0) '$other other errors',
+  ];
+  final n = peers.length;
+  return '$n ${n == 1 ? 'peer' : 'peers'} gave no record '
+      '(${parts.join(', ')})';
 }
 
 /// A countdown from `expires_in_secs`. Negative is real: lookup answers carry
@@ -745,26 +897,146 @@ class _LookupBar extends StatelessWidget {
   }
 }
 
-/// Band 2 in Lookup mode: one row per peer asked. NOT_FOUND is a result, and
-/// stays visually distinct from a peer that never answered.
-class _LookupTable extends StatelessWidget {
-  const _LookupTable({
-    required this.reply,
+/// Band 2a: the peers that found the key, one row each, and the rest folded
+/// into a summary row that expands on demand.
+class _PeerTable extends StatelessWidget {
+  const _PeerTable({
+    required this.peers,
     required this.freshestPeer,
     required this.selectedPeer,
+    required this.showFailed,
+    required this.onToggleFailed,
     required this.onSelect,
   });
 
-  final pb.DhtLookupReply reply;
+  final List<pb.DhtLookupPeer> peers;
 
-  /// The peer whose answer the reply's merged record came from, marked on
-  /// its row rather than shown as a separate panel.
+  /// The peer whose answer became the reply's merged record.
   final String? freshestPeer;
   final String? selectedPeer;
+  final bool showFailed;
+  final VoidCallback onToggleFailed;
   final ValueChanged<String> onSelect;
 
   @override
   Widget build(BuildContext context) {
+    final kwaai = context.kwaai;
+    final theme = Theme.of(context);
+    final headStyle = theme.textTheme.labelSmall?.copyWith(letterSpacing: 0.6);
+    final cellStyle = theme.textTheme.bodySmall;
+    final monoStyle = _mono(context, cellStyle);
+    final selectedFill = kwaai.accentPrimary.withValues(alpha: 0.16);
+    final failed = peers
+        .where((p) => p.outcome != pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_FOUND)
+        .toList();
+
+    DataRow peerRow(int i, pb.DhtLookupPeer p) => DataRow(
+      // A peer can be listed twice (configured and in the routing table);
+      // the id alone would collide.
+      key: ValueKey('$i:${p.peerId}'),
+      selected: p.peerId == selectedPeer,
+      color: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected) ? selectedFill : null,
+      ),
+      onSelectChanged: (_) => onSelect(p.peerId),
+      cells: [
+        DataCell(
+          Tooltip(
+            message: p.error,
+            child: _OutcomeCell(outcome: p.outcome),
+          ),
+        ),
+        DataCell(
+          Row(
+            children: [
+              Text(shortKeyId(p.peerId), style: monoStyle),
+              _CopyButton(text: p.peerId, label: 'Peer id'),
+              if (p.peerId == freshestPeer) ...[
+                const SizedBox(width: 4),
+                Tooltip(
+                  message: 'Freshest answer',
+                  child: Icon(
+                    Icons.star,
+                    size: 13,
+                    color: kwaai.semanticSuccess,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        DataCell(Text('${p.elapsedMs} ms', style: cellStyle)),
+      ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: DataTable(
+              headingRowHeight: 32,
+              dataRowMinHeight: 30,
+              dataRowMaxHeight: 34,
+              columnSpacing: 24,
+              horizontalMargin: 16,
+              showCheckboxColumn: false,
+              columns: [
+                DataColumn(label: Text('OUTCOME', style: headStyle)),
+                DataColumn(label: Text('PEER', style: headStyle)),
+                DataColumn(label: Text('RTT', style: headStyle), numeric: true),
+              ],
+              rows: [
+                for (final (i, p) in peers.indexed)
+                  if (p.outcome == pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_FOUND)
+                    peerRow(i, p),
+                if (failed.isNotEmpty)
+                  DataRow(
+                    key: const ValueKey('failed'),
+                    onSelectChanged: (_) => onToggleFailed(),
+                    cells: [
+                      DataCell(
+                        Icon(
+                          showFailed ? Icons.expand_less : Icons.expand_more,
+                          size: 16,
+                        ),
+                      ),
+                      DataCell(Text(failureSummary(failed), style: cellStyle)),
+                      const DataCell(SizedBox()),
+                    ],
+                  ),
+                if (showFailed)
+                  for (final (i, p) in peers.indexed)
+                    if (p.outcome !=
+                        pb.DhtLookupOutcome.DHT_LOOKUP_OUTCOME_FOUND)
+                      peerRow(i, p),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Band 2b: the selected answer's entries — one per subkey, or the value.
+class _EntryTable extends StatelessWidget {
+  const _EntryTable({
+    required this.entries,
+    required this.emptyText,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<LookupEntry> entries;
+  final String emptyText;
+  final int? selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) return _EmptyRow(text: emptyText);
     final kwaai = context.kwaai;
     final theme = Theme.of(context);
     final headStyle = theme.textTheme.labelSmall?.copyWith(letterSpacing: 0.6);
@@ -786,74 +1058,50 @@ class _LookupTable extends StatelessWidget {
               horizontalMargin: 16,
               showCheckboxColumn: false,
               columns: [
-                DataColumn(label: Text('OUTCOME', style: headStyle)),
-                DataColumn(label: Text('PEER', style: headStyle)),
-                DataColumn(label: Text('RTT', style: headStyle), numeric: true),
-                DataColumn(label: Text('KIND', style: headStyle)),
+                DataColumn(label: Text('SUBKEY', style: headStyle)),
                 DataColumn(label: Text('EXPIRES', style: headStyle)),
-                DataColumn(label: Text('DETAIL', style: headStyle)),
+                DataColumn(
+                  label: Text('SIZE', style: headStyle),
+                  numeric: true,
+                ),
+                DataColumn(label: Text('VALUE', style: headStyle)),
               ],
               rows: [
-                for (final (i, p) in reply.peers.indexed)
+                for (final (i, e) in entries.indexed)
                   DataRow(
-                    // A peer can be listed twice (configured and in the
-                    // routing table); the id alone would collide.
-                    key: ValueKey('$i:${p.peerId}'),
-                    selected: p.peerId == selectedPeer,
+                    key: ValueKey(i),
+                    selected: i == selected,
                     color: WidgetStateProperty.resolveWith(
                       (states) => states.contains(WidgetState.selected)
                           ? selectedFill
                           : null,
                     ),
-                    onSelectChanged: (_) => onSelect(p.peerId),
+                    onSelectChanged: (_) => onSelect(i),
                     cells: [
-                      DataCell(_OutcomeCell(outcome: p.outcome)),
-                      DataCell(
-                        Row(
-                          children: [
-                            Text(shortKeyId(p.peerId), style: monoStyle),
-                            _CopyButton(text: p.peerId, label: 'Peer id'),
-                          ],
-                        ),
-                      ),
-                      DataCell(Text('${p.elapsedMs} ms', style: cellStyle)),
+                      DataCell(Text(e.subkey ?? '—', style: monoStyle)),
                       DataCell(
                         Text(
-                          p.hasRecord() ? kindLabel(p.record.kind) : '—',
-                          style: cellStyle,
-                        ),
-                      ),
-                      DataCell(
-                        Text(
-                          p.hasRecord()
-                              ? formatExpiry(p.record.expiresInSecs)
-                              : '—',
+                          formatExpiry(e.expiresInSecs),
                           style: cellStyle?.copyWith(
-                            color: p.hasRecord() && p.record.expiresInSecs < 0
+                            color: e.expiresInSecs < 0
                                 ? kwaai.semanticWarning
                                 : null,
                           ),
                         ),
                       ),
                       DataCell(
-                        p.peerId == freshestPeer
-                            ? Row(
-                                children: [
-                                  Icon(
-                                    Icons.star,
-                                    size: 13,
-                                    color: kwaai.semanticSuccess,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text('freshest answer', style: cellStyle),
-                                ],
-                              )
-                            : Text(
-                                p.error,
-                                style: cellStyle,
-                                softWrap: false,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                        Text(formatValueBytes(e.bytes), style: cellStyle),
+                      ),
+                      DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 420),
+                          child: Text(
+                            previewOf(e.value.rendered, kEntryPreviewChars),
+                            style: monoStyle,
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -861,6 +1109,60 @@ class _LookupTable extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// How much of a value the entries table shows per row.
+const kEntryPreviewChars = 160;
+
+/// Band 3 in Lookup mode: one entry's identity line and its value.
+class _EntryDetail extends StatelessWidget {
+  const _EntryDetail({
+    required this.keyName,
+    required this.entry,
+    required this.onClose,
+  });
+
+  final String keyName;
+  final LookupEntry entry;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.75),
+    );
+    final subkey = entry.subkey;
+    final title = subkey == null ? keyName : '$keyName · $subkey';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: _mono(context, theme.textTheme.labelLarge),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (subkey != null) _CopyButton(text: subkey, label: 'Subkey'),
+              _CloseButton(onPressed: onClose),
+            ],
+          ),
+          Text(
+            '${expiryLine(entry.expiresInSecs)} · '
+            '${formatValueBytes(entry.bytes)}',
+            style: muted,
+          ),
+          const SizedBox(height: 8),
+          _ValueView(title: title, value: entry.value, wrap: true),
+        ],
       ),
     );
   }
@@ -1084,7 +1386,6 @@ class _RecordDetail extends StatelessWidget {
     required this.detail,
     required this.loading,
     required this.error,
-    this.local = true,
     required this.onClose,
   });
 
@@ -1094,9 +1395,6 @@ class _RecordDetail extends StatelessWidget {
   final pb.DhtRecord? detail;
   final bool loading;
   final Object? error;
-
-  /// False for a lookup answer, which was never stored here and has no tier.
-  final bool local;
   final VoidCallback onClose;
 
   @override
@@ -1127,7 +1425,7 @@ class _RecordDetail extends StatelessWidget {
           ),
           Text(record.keyId, style: _mono(context, muted)),
           const SizedBox(height: 8),
-          _RecordFacts(record: record, showTier: local),
+          _RecordFacts(record: record),
           const SizedBox(height: 8),
           if (loading)
             Row(
@@ -1165,10 +1463,9 @@ class _RecordDetail extends StatelessWidget {
 
 /// The record's metadata line: tier, kind, size and both expirations.
 class _RecordFacts extends StatelessWidget {
-  const _RecordFacts({required this.record, required this.showTier});
+  const _RecordFacts({required this.record});
 
   final pb.DhtRecord record;
-  final bool showTier;
 
   @override
   Widget build(BuildContext context) {
@@ -1183,8 +1480,7 @@ class _RecordFacts extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${kindLabel(r.kind)}'
-          '${showTier ? ' · ${r.inCache ? 'cache' : 'primary'}' : ''}'
+          '${kindLabel(r.kind)} · ${r.inCache ? 'cache' : 'primary'}'
           ' · ${formatValueBytes(r.valueBytes.toInt())}'
           '${isDict ? ' · ${r.subkeyCount} subkeys' : ''}'
           '${r.hasDictMaxsize() ? ' of at most ${r.dictMaxsize}' : ''}',
@@ -1227,7 +1523,6 @@ class _SubkeyList extends StatelessWidget {
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.75),
     );
-    // A lookup answer may omit the per-subkey values it counted.
     if (subkeys.isEmpty) {
       return Text(
         subkeyCount > 0
@@ -1241,12 +1536,15 @@ class _SubkeyList extends StatelessWidget {
       children: [
         for (final s in subkeys) ...[
           Text(
-            '${s.subkey} · ${formatExpiry(s.expiresInSecs)} · '
+            '${subkeyLabel(s.subkey)} · ${formatExpiry(s.expiresInSecs)} · '
             '${formatValueBytes(s.valueBytes.toInt())}',
             style: _mono(context, muted),
           ),
           const SizedBox(height: 2),
-          _ValueView(title: '$title · ${s.subkey}', value: s.value),
+          _ValueView(
+            title: '$title · ${subkeyLabel(s.subkey)}',
+            value: s.value,
+          ),
           const SizedBox(height: 8),
         ],
       ],
@@ -1257,11 +1555,18 @@ class _SubkeyList extends StatelessWidget {
 /// A rendered msgpack value: structural, not semantic, so shown preformatted;
 /// undecodable bytes are labelled opaque, not dressed up.
 class _ValueView extends StatelessWidget {
-  const _ValueView({required this.title, required this.value});
+  const _ValueView({
+    required this.title,
+    required this.value,
+    this.wrap = false,
+  });
 
   /// What the full-size viewer is titled — the record, plus the subkey.
   final String title;
   final pb.DhtValueView value;
+
+  /// Soft-wrap the preview instead of scrolling it sideways.
+  final bool wrap;
 
   @override
   Widget build(BuildContext context) {
@@ -1312,14 +1617,19 @@ class _ValueView extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
             border: Border.all(color: kwaai.divider),
           ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Text(
-              previewOf(value.rendered),
-              style: _mono(context, theme.textTheme.bodySmall),
-              softWrap: false,
-            ),
-          ),
+          child: wrap
+              ? Text(
+                  previewOf(value.rendered),
+                  style: _mono(context, theme.textTheme.bodySmall),
+                )
+              : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Text(
+                    previewOf(value.rendered),
+                    style: _mono(context, theme.textTheme.bodySmall),
+                    softWrap: false,
+                  ),
+                ),
         ),
         if (value.rendered.length > kValuePreviewChars)
           Text(
@@ -1336,9 +1646,8 @@ class _ValueView extends StatelessWidget {
 /// megabyte, and laying that out unwrapped is seconds of jank per selection.
 const kValuePreviewChars = 2048;
 
-String previewOf(String rendered) => rendered.length <= kValuePreviewChars
-    ? rendered
-    : '${rendered.substring(0, kValuePreviewChars)}…';
+String previewOf(String rendered, [int limit = kValuePreviewChars]) =>
+    rendered.length <= limit ? rendered : '${rendered.substring(0, limit)}…';
 
 /// Full-size viewer for a rendered value: the whole `rendered` string,
 /// word-wrapped in a squarish box, with the same type / size / not-decoded
