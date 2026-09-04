@@ -15,22 +15,6 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
-@$core.Deprecated('Use storageReachabilityDescriptor instead')
-const StorageReachability$json = {
-  '1': 'StorageReachability',
-  '2': [
-    {'1': 'STORAGE_REACHABILITY_UNKNOWN', '2': 0},
-    {'1': 'STORAGE_REACHABILITY_REACHABLE', '2': 1},
-    {'1': 'STORAGE_REACHABILITY_UNREACHABLE', '2': 2},
-  ],
-};
-
-/// Descriptor for `StorageReachability`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List storageReachabilityDescriptor = $convert.base64Decode(
-    'ChNTdG9yYWdlUmVhY2hhYmlsaXR5EiAKHFNUT1JBR0VfUkVBQ0hBQklMSVRZX1VOS05PV04QAB'
-    'IiCh5TVE9SQUdFX1JFQUNIQUJJTElUWV9SRUFDSEFCTEUQARIkCiBTVE9SQUdFX1JFQUNIQUJJ'
-    'TElUWV9VTlJFQUNIQUJMRRAC');
-
 @$core.Deprecated('Use updateReasonDescriptor instead')
 const UpdateReason$json = {
   '1': 'UpdateReason',
@@ -76,6 +60,22 @@ const DhtRole$json = {
 final $typed_data.Uint8List dhtRoleDescriptor = $convert.base64Decode(
     'CgdEaHRSb2xlEhQKEERIVF9ST0xFX1VOS05PV04QABITCg9ESFRfUk9MRV9TRVJWRVIQARITCg'
     '9ESFRfUk9MRV9DTElFTlQQAg==');
+
+@$core.Deprecated('Use storageReachabilityDescriptor instead')
+const StorageReachability$json = {
+  '1': 'StorageReachability',
+  '2': [
+    {'1': 'STORAGE_REACHABILITY_UNKNOWN', '2': 0},
+    {'1': 'STORAGE_REACHABILITY_REACHABLE', '2': 1},
+    {'1': 'STORAGE_REACHABILITY_UNREACHABLE', '2': 2},
+  ],
+};
+
+/// Descriptor for `StorageReachability`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List storageReachabilityDescriptor = $convert.base64Decode(
+    'ChNTdG9yYWdlUmVhY2hhYmlsaXR5EiAKHFNUT1JBR0VfUkVBQ0hBQklMSVRZX1VOS05PV04QAB'
+    'IiCh5TVE9SQUdFX1JFQUNIQUJJTElUWV9SRUFDSEFCTEUQARIkCiBTVE9SQUdFX1JFQUNIQUJJ'
+    'TElUWV9VTlJFQUNIQUJMRRAC');
 
 @$core.Deprecated('Use clientFrameDescriptor instead')
 const ClientFrame$json = {
@@ -137,15 +137,6 @@ const ClientFrame$json = {
       '10': 'blockCoverage'
     },
     {
-      '1': 'storage_discovery',
-      '3': 16,
-      '4': 1,
-      '5': 11,
-      '6': '.kwaai.v1.StorageDiscoveryRequest',
-      '9': 0,
-      '10': 'storageDiscovery'
-    },
-    {
       '1': 'network',
       '3': 17,
       '4': 1,
@@ -163,6 +154,15 @@ const ClientFrame$json = {
       '9': 0,
       '10': 'connect'
     },
+    {
+      '1': 'storage_discovery',
+      '3': 16,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.StorageDiscoveryRequest',
+      '9': 0,
+      '10': 'storageDiscovery'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -177,10 +177,10 @@ final $typed_data.Uint8List clientFrameDescriptor = $convert.base64Decode(
     'RSdW5SZXF1ZXN0SABSCHNoYXJkUnVuEjEKBnN0YXR1cxgNIAEoCzIXLmt3YWFpLnYxLlN0YXR1'
     'c1JlcXVlc3RIAFIGc3RhdHVzEioKBmNhbmNlbBgOIAEoCzIQLmt3YWFpLnYxLkNhbmNlbEgAUg'
     'ZjYW5jZWwSRwoOYmxvY2tfY292ZXJhZ2UYDyABKAsyHi5rd2FhaS52MS5CbG9ja0NvdmVyYWdl'
-    'UmVxdWVzdEgAUg1ibG9ja0NvdmVyYWdlElAKEXN0b3JhZ2VfZGlzY292ZXJ5GBAgASgLMiEua3'
-    'dhYWkudjEuU3RvcmFnZURpc2NvdmVyeVJlcXVlc3RIAFIQc3RvcmFnZURpc2NvdmVyeRI0Cgdu'
-    'ZXR3b3JrGBEgASgLMhgua3dhYWkudjEuTmV0d29ya1JlcXVlc3RIAFIHbmV0d29yaxI0Cgdjb2'
-    '5uZWN0GBIgASgLMhgua3dhYWkudjEuQ29ubmVjdFJlcXVlc3RIAFIHY29ubmVjdEIGCgRib2R5');
+    'UmVxdWVzdEgAUg1ibG9ja0NvdmVyYWdlEjQKB25ldHdvcmsYESABKAsyGC5rd2FhaS52MS5OZX'
+    'R3b3JrUmVxdWVzdEgAUgduZXR3b3JrEjQKB2Nvbm5lY3QYEiABKAsyGC5rd2FhaS52MS5Db25u'
+    'ZWN0UmVxdWVzdEgAUgdjb25uZWN0ElAKEXN0b3JhZ2VfZGlzY292ZXJ5GBAgASgLMiEua3dhYW'
+    'kudjEuU3RvcmFnZURpc2NvdmVyeVJlcXVlc3RIAFIQc3RvcmFnZURpc2NvdmVyeUIGCgRib2R5');
 
 @$core.Deprecated('Use serverFrameDescriptor instead')
 const ServerFrame$json = {
@@ -242,15 +242,6 @@ const ServerFrame$json = {
       '10': 'blockCoverage'
     },
     {
-      '1': 'storage',
-      '3': 16,
-      '4': 1,
-      '5': 11,
-      '6': '.kwaai.v1.StorageUpdate',
-      '9': 0,
-      '10': 'storage'
-    },
-    {
       '1': 'network',
       '3': 17,
       '4': 1,
@@ -268,6 +259,15 @@ const ServerFrame$json = {
       '9': 0,
       '10': 'connect'
     },
+    {
+      '1': 'storage',
+      '3': 16,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.StorageUpdate',
+      '9': 0,
+      '10': 'storage'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -281,10 +281,10 @@ final $typed_data.Uint8List serverFrameDescriptor = $convert.base64Decode(
     'BXRva2VuEiQKBGRvbmUYDCABKAsyDi5rd2FhaS52MS5Eb25lSABSBGRvbmUSJwoFZXJyb3IYDS'
     'ABKAsyDy5rd2FhaS52MS5FcnJvckgAUgVlcnJvchIvCgZzdGF0dXMYDiABKAsyFS5rd2FhaS52'
     'MS5TdGF0dXNSZXBseUgAUgZzdGF0dXMSRgoOYmxvY2tfY292ZXJhZ2UYDyABKAsyHS5rd2FhaS'
-    '52MS5CbG9ja0NvdmVyYWdlVXBkYXRlSABSDWJsb2NrQ292ZXJhZ2USMwoHc3RvcmFnZRgQIAEo'
-    'CzIXLmt3YWFpLnYxLlN0b3JhZ2VVcGRhdGVIAFIHc3RvcmFnZRIzCgduZXR3b3JrGBEgASgLMh'
-    'cua3dhYWkudjEuTmV0d29ya1VwZGF0ZUgAUgduZXR3b3JrEjIKB2Nvbm5lY3QYEiABKAsyFi5r'
-    'd2FhaS52MS5Db25uZWN0UmVwbHlIAFIHY29ubmVjdEIGCgRib2R5');
+    '52MS5CbG9ja0NvdmVyYWdlVXBkYXRlSABSDWJsb2NrQ292ZXJhZ2USMwoHbmV0d29yaxgRIAEo'
+    'CzIXLmt3YWFpLnYxLk5ldHdvcmtVcGRhdGVIAFIHbmV0d29yaxIyCgdjb25uZWN0GBIgASgLMh'
+    'Yua3dhYWkudjEuQ29ubmVjdFJlcGx5SABSB2Nvbm5lY3QSMwoHc3RvcmFnZRgQIAEoCzIXLmt3'
+    'YWFpLnYxLlN0b3JhZ2VVcGRhdGVIAFIHc3RvcmFnZUIGCgRib2R5');
 
 @$core.Deprecated('Use cancelDescriptor instead')
 const Cancel$json = {
@@ -556,79 +556,6 @@ final $typed_data.Uint8List blockCoverageUpdateDescriptor = $convert.base64Decod
     'INY292ZXJlZEJsb2NrcxIjCg1mdWxsX2NvdmVyYWdlGAYgASgIUgxmdWxsQ292ZXJhZ2USKQoF'
     'cGVlcnMYByADKAsyEy5rd2FhaS52MS5CbG9ja1BlZXJSBXBlZXJz');
 
-@$core.Deprecated('Use storageDiscoveryRequestDescriptor instead')
-const StorageDiscoveryRequest$json = {
-  '1': 'StorageDiscoveryRequest',
-  '2': [
-    {'1': 'subscribe', '3': 1, '4': 1, '5': 8, '10': 'subscribe'},
-    {'1': 'interval_secs', '3': 2, '4': 1, '5': 13, '10': 'intervalSecs'},
-    {'1': 'skip_probes', '3': 3, '4': 1, '5': 8, '10': 'skipProbes'},
-  ],
-};
-
-/// Descriptor for `StorageDiscoveryRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List storageDiscoveryRequestDescriptor = $convert.base64Decode(
-    'ChdTdG9yYWdlRGlzY292ZXJ5UmVxdWVzdBIcCglzdWJzY3JpYmUYASABKAhSCXN1YnNjcmliZR'
-    'IjCg1pbnRlcnZhbF9zZWNzGAIgASgNUgxpbnRlcnZhbFNlY3MSHwoLc2tpcF9wcm9iZXMYAyAB'
-    'KAhSCnNraXBQcm9iZXM=');
-
-@$core.Deprecated('Use storagePeerDescriptor instead')
-const StoragePeer$json = {
-  '1': 'StoragePeer',
-  '2': [
-    {'1': 'peer_id', '3': 1, '4': 1, '5': 9, '10': 'peerId'},
-    {'1': 'public_name', '3': 2, '4': 1, '5': 9, '10': 'publicName'},
-    {'1': 'mode', '3': 3, '4': 1, '5': 9, '10': 'mode'},
-    {'1': 'vpk_version', '3': 4, '4': 1, '5': 9, '10': 'vpkVersion'},
-    {'1': 'capacity_gb', '3': 5, '4': 1, '5': 1, '10': 'capacityGb'},
-    {'1': 'tenant_count', '3': 6, '4': 1, '5': 13, '10': 'tenantCount'},
-    {
-      '1': 'reachability',
-      '3': 7,
-      '4': 1,
-      '5': 14,
-      '6': '.kwaai.v1.StorageReachability',
-      '10': 'reachability'
-    },
-    {'1': 'capacity_gb_free', '3': 8, '4': 1, '5': 1, '10': 'capacityGbFree'},
-    {'1': 'trust_score', '3': 9, '4': 1, '5': 1, '10': 'trustScore'},
-    {'1': 'trust_tier', '3': 10, '4': 1, '5': 9, '10': 'trustTier'},
-  ],
-};
-
-/// Descriptor for `StoragePeer`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List storagePeerDescriptor = $convert.base64Decode(
-    'CgtTdG9yYWdlUGVlchIXCgdwZWVyX2lkGAEgASgJUgZwZWVySWQSHwoLcHVibGljX25hbWUYAi'
-    'ABKAlSCnB1YmxpY05hbWUSEgoEbW9kZRgDIAEoCVIEbW9kZRIfCgt2cGtfdmVyc2lvbhgEIAEo'
-    'CVIKdnBrVmVyc2lvbhIfCgtjYXBhY2l0eV9nYhgFIAEoAVIKY2FwYWNpdHlHYhIhCgx0ZW5hbn'
-    'RfY291bnQYBiABKA1SC3RlbmFudENvdW50EkEKDHJlYWNoYWJpbGl0eRgHIAEoDjIdLmt3YWFp'
-    'LnYxLlN0b3JhZ2VSZWFjaGFiaWxpdHlSDHJlYWNoYWJpbGl0eRIoChBjYXBhY2l0eV9nYl9mcm'
-    'VlGAggASgBUg5jYXBhY2l0eUdiRnJlZRIfCgt0cnVzdF9zY29yZRgJIAEoAVIKdHJ1c3RTY29y'
-    'ZRIdCgp0cnVzdF90aWVyGAogASgJUgl0cnVzdFRpZXI=');
-
-@$core.Deprecated('Use storageUpdateDescriptor instead')
-const StorageUpdate$json = {
-  '1': 'StorageUpdate',
-  '2': [
-    {'1': 'server_time', '3': 1, '4': 1, '5': 9, '10': 'serverTime'},
-    {'1': 'probes_pending', '3': 2, '4': 1, '5': 8, '10': 'probesPending'},
-    {
-      '1': 'peers',
-      '3': 3,
-      '4': 3,
-      '5': 11,
-      '6': '.kwaai.v1.StoragePeer',
-      '10': 'peers'
-    },
-  ],
-};
-
-/// Descriptor for `StorageUpdate`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List storageUpdateDescriptor = $convert.base64Decode(
-    'Cg1TdG9yYWdlVXBkYXRlEh8KC3NlcnZlcl90aW1lGAEgASgJUgpzZXJ2ZXJUaW1lEiUKDnByb2'
-    'Jlc19wZW5kaW5nGAIgASgIUg1wcm9iZXNQZW5kaW5nEisKBXBlZXJzGAMgAygLMhUua3dhYWku'
-    'djEuU3RvcmFnZVBlZXJSBXBlZXJz');
-
 @$core.Deprecated('Use networkRequestDescriptor instead')
 const NetworkRequest$json = {
   '1': 'NetworkRequest',
@@ -722,6 +649,7 @@ const SelfStatus$json = {
     {'1': 'observed_addrs', '3': 7, '4': 3, '5': 9, '10': 'observedAddrs'},
     {'1': 'relay_addrs', '3': 8, '4': 3, '5': 9, '10': 'relayAddrs'},
     {'1': 'local_protocols', '3': 9, '4': 3, '5': 9, '10': 'localProtocols'},
+    {'1': 'ipv6', '3': 10, '4': 1, '5': 9, '10': 'ipv6'},
   ],
 };
 
@@ -733,7 +661,7 @@ final $typed_data.Uint8List selfStatusDescriptor = $convert.base64Decode(
     'VhYmxlGAUgASgIUgxhbm5vdW5jZWFibGUSIQoMbGlzdGVuX2FkZHJzGAYgAygJUgtsaXN0ZW5B'
     'ZGRycxIlCg5vYnNlcnZlZF9hZGRycxgHIAMoCVINb2JzZXJ2ZWRBZGRycxIfCgtyZWxheV9hZG'
     'RycxgIIAMoCVIKcmVsYXlBZGRycxInCg9sb2NhbF9wcm90b2NvbHMYCSADKAlSDmxvY2FsUHJv'
-    'dG9jb2xz');
+    'dG9jb2xzEhIKBGlwdjYYCiABKAlSBGlwdjY=');
 
 @$core.Deprecated('Use networkUpdateDescriptor instead')
 const NetworkUpdate$json = {
@@ -792,6 +720,79 @@ final $typed_data.Uint8List networkUpdateDescriptor = $convert.base64Decode(
     'CzIVLmt3YWFpLnYxLlJvdXRpbmdQZWVyUgdyb3V0aW5nEicKD2Jvb3RzdHJhcF90b3RhbBgGIA'
     'EoDVIOYm9vdHN0cmFwVG90YWwSLwoTYm9vdHN0cmFwX3JlYWNoYWJsZRgHIAEoDVISYm9vdHN0'
     'cmFwUmVhY2hhYmxl');
+
+@$core.Deprecated('Use storageDiscoveryRequestDescriptor instead')
+const StorageDiscoveryRequest$json = {
+  '1': 'StorageDiscoveryRequest',
+  '2': [
+    {'1': 'subscribe', '3': 1, '4': 1, '5': 8, '10': 'subscribe'},
+    {'1': 'interval_secs', '3': 2, '4': 1, '5': 13, '10': 'intervalSecs'},
+    {'1': 'skip_probes', '3': 3, '4': 1, '5': 8, '10': 'skipProbes'},
+  ],
+};
+
+/// Descriptor for `StorageDiscoveryRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List storageDiscoveryRequestDescriptor = $convert.base64Decode(
+    'ChdTdG9yYWdlRGlzY292ZXJ5UmVxdWVzdBIcCglzdWJzY3JpYmUYASABKAhSCXN1YnNjcmliZR'
+    'IjCg1pbnRlcnZhbF9zZWNzGAIgASgNUgxpbnRlcnZhbFNlY3MSHwoLc2tpcF9wcm9iZXMYAyAB'
+    'KAhSCnNraXBQcm9iZXM=');
+
+@$core.Deprecated('Use storagePeerDescriptor instead')
+const StoragePeer$json = {
+  '1': 'StoragePeer',
+  '2': [
+    {'1': 'peer_id', '3': 1, '4': 1, '5': 9, '10': 'peerId'},
+    {'1': 'public_name', '3': 2, '4': 1, '5': 9, '10': 'publicName'},
+    {'1': 'mode', '3': 3, '4': 1, '5': 9, '10': 'mode'},
+    {'1': 'vpk_version', '3': 4, '4': 1, '5': 9, '10': 'vpkVersion'},
+    {'1': 'capacity_gb', '3': 5, '4': 1, '5': 1, '10': 'capacityGb'},
+    {'1': 'tenant_count', '3': 6, '4': 1, '5': 13, '10': 'tenantCount'},
+    {
+      '1': 'reachability',
+      '3': 7,
+      '4': 1,
+      '5': 14,
+      '6': '.kwaai.v1.StorageReachability',
+      '10': 'reachability'
+    },
+    {'1': 'capacity_gb_free', '3': 8, '4': 1, '5': 1, '10': 'capacityGbFree'},
+    {'1': 'trust_score', '3': 9, '4': 1, '5': 1, '10': 'trustScore'},
+    {'1': 'trust_tier', '3': 10, '4': 1, '5': 9, '10': 'trustTier'},
+  ],
+};
+
+/// Descriptor for `StoragePeer`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List storagePeerDescriptor = $convert.base64Decode(
+    'CgtTdG9yYWdlUGVlchIXCgdwZWVyX2lkGAEgASgJUgZwZWVySWQSHwoLcHVibGljX25hbWUYAi'
+    'ABKAlSCnB1YmxpY05hbWUSEgoEbW9kZRgDIAEoCVIEbW9kZRIfCgt2cGtfdmVyc2lvbhgEIAEo'
+    'CVIKdnBrVmVyc2lvbhIfCgtjYXBhY2l0eV9nYhgFIAEoAVIKY2FwYWNpdHlHYhIhCgx0ZW5hbn'
+    'RfY291bnQYBiABKA1SC3RlbmFudENvdW50EkEKDHJlYWNoYWJpbGl0eRgHIAEoDjIdLmt3YWFp'
+    'LnYxLlN0b3JhZ2VSZWFjaGFiaWxpdHlSDHJlYWNoYWJpbGl0eRIoChBjYXBhY2l0eV9nYl9mcm'
+    'VlGAggASgBUg5jYXBhY2l0eUdiRnJlZRIfCgt0cnVzdF9zY29yZRgJIAEoAVIKdHJ1c3RTY29y'
+    'ZRIdCgp0cnVzdF90aWVyGAogASgJUgl0cnVzdFRpZXI=');
+
+@$core.Deprecated('Use storageUpdateDescriptor instead')
+const StorageUpdate$json = {
+  '1': 'StorageUpdate',
+  '2': [
+    {'1': 'server_time', '3': 1, '4': 1, '5': 9, '10': 'serverTime'},
+    {'1': 'probes_pending', '3': 2, '4': 1, '5': 8, '10': 'probesPending'},
+    {
+      '1': 'peers',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.kwaai.v1.StoragePeer',
+      '10': 'peers'
+    },
+  ],
+};
+
+/// Descriptor for `StorageUpdate`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List storageUpdateDescriptor = $convert.base64Decode(
+    'Cg1TdG9yYWdlVXBkYXRlEh8KC3NlcnZlcl90aW1lGAEgASgJUgpzZXJ2ZXJUaW1lEiUKDnByb2'
+    'Jlc19wZW5kaW5nGAIgASgIUg1wcm9iZXNQZW5kaW5nEisKBXBlZXJzGAMgAygLMhUua3dhYWku'
+    'djEuU3RvcmFnZVBlZXJSBXBlZXJz');
 
 @$core.Deprecated('Use connectRequestDescriptor instead')
 const ConnectRequest$json = {

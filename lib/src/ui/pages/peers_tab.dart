@@ -366,6 +366,10 @@ class _SelfStatusHeader extends StatelessWidget {
                   Text('This node', style: theme.textTheme.titleSmall),
                   if (s != null)
                     _ReachabilityBadge(self: s, holePunched: holePunched),
+                  // Only added when it has something to say — an empty child
+                  // would still take the Wrap's spacing and leave a gap.
+                  if (s != null && ipv6Chip(s.ipv6) != null)
+                    _Ipv6Chip(ipv6: s.ipv6),
                 ],
               ),
             ),
@@ -443,6 +447,57 @@ class _SelfStatusHeader extends StatelessWidget {
 /// rather than as relaying being the ceiling. It used to read "relayed", which
 /// claimed the degraded case for a node that simply had no punched connection
 /// live at that moment.
+/// The chip to show for `SelfStatus.ipv6`, or null for nothing at all.
+///
+/// Empty is what a daemon too old to carry the field sends, and it has to read
+/// exactly like an explicit "off": no chip. A chip there would be a claim
+/// about something the daemon never reported. Anything unrecognised is
+/// treated the same way, so a future state cannot render a bogus badge.
+///
+/// Public for `test/peers_ipv6_chip_test.dart`.
+({String label, bool warn})? ipv6Chip(String ipv6) => switch (ipv6) {
+  'active' => (label: 'IPv6', warn: false),
+  'unavailable' => (label: 'IPv6 unavailable', warn: true),
+  _ => null,
+};
+
+/// IPv6 state, beside the reachability badge. Silent unless the node actually
+/// has an IPv6 listener, or asked for one and did not get it.
+class _Ipv6Chip extends StatelessWidget {
+  const _Ipv6Chip({required this.ipv6});
+
+  final String ipv6;
+
+  @override
+  Widget build(BuildContext context) {
+    final chip = ipv6Chip(ipv6);
+    if (chip == null) return const SizedBox.shrink();
+    final kwaai = context.kwaai;
+    final color = chip.warn ? kwaai.semanticWarning : kwaai.statusRunning;
+
+    return Tooltip(
+      message: chip.warn
+          ? 'The daemon asked for an IPv6 listener and the host could not '
+                'provide one; it is running IPv4-only.'
+          : 'This node is listening on IPv6 as well as IPv4.',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          chip.label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ReachabilityBadge extends StatelessWidget {
   const _ReachabilityBadge({required this.self, required this.holePunched});
 
@@ -623,7 +678,7 @@ class _AddressLineState extends State<_AddressLine> {
                       // being pushed to the far edge with a gap between.
                       Flexible(
                         child: Text(
-                          shown[i],
+                          shortenAddrPeerIds(shown[i]),
                           style: monoStyle,
                           softWrap: false,
                           overflow: TextOverflow.ellipsis,
@@ -2355,6 +2410,9 @@ AddrScope scopeOf(String addr) {
 
   if (parts[ipIdx] == 'ip6') {
     final h = host.toLowerCase();
+    // An IPv4-mapped address reaches exactly as far as the v4 inside it, so a
+    // mapped loopback is local rather than a public address nobody can use.
+    if (h.startsWith('::ffff:')) return _scopeOfIPv4Host(h.substring(7));
     // fc00::/7 unique-local, fe80::/10 link-local.
     if (h.startsWith('fc') ||
         h.startsWith('fd') ||
@@ -2366,6 +2424,14 @@ AddrScope scopeOf(String addr) {
     }
     return AddrScope.public;
   }
+
+  return _scopeOfIPv4Host(host);
+}
+
+/// Classify a bare IPv4 host — shared by `/ip4/` addresses and by the v4
+/// embedded in an IPv4-mapped `::ffff:a.b.c.d`.
+AddrScope _scopeOfIPv4Host(String host) {
+  if (host == '0.0.0.0' || host.startsWith('127.')) return AddrScope.local;
 
   final octets = host.split('.');
   if (octets.length != 4) return AddrScope.public;
@@ -2423,7 +2489,7 @@ List<String> sortByScope(List<String> addrs) {
 List<String> summariseObservedAddrs(List<String> addrs) {
   // Insertion-ordered: the daemon sorts most-confirmed first, and that ranking
   // is worth preserving.
-  final byHost = <String, List<int>>{};
+  final byGroup = <(String, String, String), List<int>>{};
   final circuits = <String>[];
   final unparsed = <String>[];
 
@@ -2433,32 +2499,40 @@ List<String> summariseObservedAddrs(List<String> addrs) {
       continue;
     }
     final parts = addr.split('/')..removeWhere((p) => p.isEmpty);
-    // Expect [ip4, <host>, tcp, <port>, …]; anything else passes through
-    // unchanged rather than being silently dropped.
-    final tcp = parts.indexOf('tcp');
-    if (parts.length < 2 || tcp < 0 || tcp + 1 >= parts.length) {
+    // Expect [ip4|ip6, <host>, tcp|udp, <port>, …]; anything else passes
+    // through unchanged rather than being silently dropped.
+    final ti = parts.indexWhere((p) => p == 'tcp' || p == 'udp');
+    if (parts.length < 2 || ti < 0 || ti + 1 >= parts.length) {
       if (!unparsed.contains(addr)) unparsed.add(addr);
       continue;
     }
-    final port = int.tryParse(parts[tcp + 1]);
+    final port = int.tryParse(parts[ti + 1]);
     if (port == null) {
       if (!unparsed.contains(addr)) unparsed.add(addr);
       continue;
     }
-    final host = '/${parts.sublist(0, tcp).join('/')}';
-    (byHost[host] ??= []).add(port);
+    final host = '/${parts.sublist(0, ti).join('/')}';
+    // Whatever follows the port — '/quic-v1', '/ws' — names the transport,
+    // not the port, so it is part of the key: QUIC and raw UDP on one host
+    // are two listeners, not one with two ports.
+    final suffix = ti + 2 < parts.length
+        ? '/${parts.sublist(ti + 2).join('/')}'
+        : '';
+    (byGroup[(host, parts[ti], suffix)] ??= []).add(port);
   }
 
   final out = <String>[];
-  byHost.forEach((host, ports) {
+  byGroup.forEach((group, ports) {
+    final (host, transport, suffix) = group;
     final unique = ports.toSet().toList()..sort();
+    final first = '$host/$transport/${unique.first}$suffix';
     if (unique.length == 1) {
-      out.add('$host/tcp/${unique.first}');
+      out.add(first);
     } else {
       // The count is the useful signal — that these are many short-lived
       // source ports rather than several distinct listeners.
       out.add(
-        '$host/tcp/${unique.first} '
+        '$first '
         '(+${unique.length - 1} more ephemeral ${unique.length == 2 ? 'port' : 'ports'})',
       );
     }
@@ -2466,6 +2540,18 @@ List<String> summariseObservedAddrs(List<String> addrs) {
 
   return [...out, ...circuits, ...unparsed];
 }
+
+/// Shorten every `/p2p/<peer id>` inside a multiaddr, leaving the rest whole.
+///
+/// The address row ellipsises on the right, and an IPv6 multiaddr with a
+/// peer-id tail is long enough that the elision eats the port — the part
+/// actually worth reading. Display only; the copy button keeps the full text.
+///
+/// Public for `test/peers_address_summary_test.dart`.
+String shortenAddrPeerIds(String addr) => addr.replaceAllMapped(
+  RegExp(r'(/p2p/)([^/]{20,})'),
+  (m) => '${m[1]}${_shortPeerId(m[2]!)}',
+);
 
 /// Peer ids are 52 characters and every one in a list shares a prefix; the
 /// tail is what distinguishes them, so keep both ends and elide the middle.

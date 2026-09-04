@@ -185,9 +185,11 @@ void main() {
     await tester.pump();
 
     // Expanded: all five present, and the count matches what is rendered.
+    // Rendered in display form — embedded peer ids are elided so the address
+    // itself survives the row's single-line ellipsis.
     for (final addr in update.selfStatus.listenAddrs) {
       expect(
-        find.text(addr),
+        find.text(shortenAddrPeerIds(addr)),
         findsOneWidget,
         reason: '$addr was counted by the toggle but never rendered',
       );
