@@ -31,6 +31,7 @@ enum ClientFrame_Body {
   storageDiscovery,
   network,
   connect,
+  dhtRecords,
   notSet
 }
 
@@ -59,6 +60,7 @@ class ClientFrame extends $pb.GeneratedMessage {
     StorageDiscoveryRequest? storageDiscovery,
     NetworkRequest? network,
     ConnectRequest? connect,
+    DhtRecordsRequest? dhtRecords,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -71,6 +73,7 @@ class ClientFrame extends $pb.GeneratedMessage {
     if (storageDiscovery != null) result.storageDiscovery = storageDiscovery;
     if (network != null) result.network = network;
     if (connect != null) result.connect = connect;
+    if (dhtRecords != null) result.dhtRecords = dhtRecords;
     return result;
   }
 
@@ -93,13 +96,14 @@ class ClientFrame extends $pb.GeneratedMessage {
     16: ClientFrame_Body.storageDiscovery,
     17: ClientFrame_Body.network,
     18: ClientFrame_Body.connect,
+    26: ClientFrame_Body.dhtRecords,
     0: ClientFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ClientFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 26])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingRequest>(10, _omitFieldNames ? '' : 'ping',
@@ -121,6 +125,8 @@ class ClientFrame extends $pb.GeneratedMessage {
         subBuilder: NetworkRequest.create)
     ..aOM<ConnectRequest>(18, _omitFieldNames ? '' : 'connect',
         subBuilder: ConnectRequest.create)
+    ..aOM<DhtRecordsRequest>(26, _omitFieldNames ? '' : 'dhtRecords',
+        subBuilder: DhtRecordsRequest.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -151,6 +157,7 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
+  @$pb.TagNumber(26)
   ClientFrame_Body whichBody() => _ClientFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
@@ -161,6 +168,7 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
+  @$pb.TagNumber(26)
   void clearBody() => $_clearField($_whichOneof(0));
 
   /// Operation correlation id. Pick any non-zero value unused by an
@@ -295,6 +303,20 @@ class ClientFrame extends $pb.GeneratedMessage {
   void clearConnect() => $_clearField(18);
   @$pb.TagNumber(18)
   ConnectRequest ensureConnect() => $_ensure(9);
+
+  /// Hivemind DHT records this node holds locally. One
+  /// DhtRecordsReply, then Done. Reads the local store only — see
+  /// DhtRecordsRequest for why there is no network-wide listing.
+  @$pb.TagNumber(26)
+  DhtRecordsRequest get dhtRecords => $_getN(10);
+  @$pb.TagNumber(26)
+  set dhtRecords(DhtRecordsRequest value) => $_setField(26, value);
+  @$pb.TagNumber(26)
+  $core.bool hasDhtRecords() => $_has(10);
+  @$pb.TagNumber(26)
+  void clearDhtRecords() => $_clearField(26);
+  @$pb.TagNumber(26)
+  DhtRecordsRequest ensureDhtRecords() => $_ensure(10);
 }
 
 enum ServerFrame_Body {
@@ -307,6 +329,7 @@ enum ServerFrame_Body {
   storage,
   network,
   connect,
+  dhtRecords,
   notSet
 }
 
@@ -325,6 +348,7 @@ class ServerFrame extends $pb.GeneratedMessage {
     StorageUpdate? storage,
     NetworkUpdate? network,
     ConnectReply? connect,
+    DhtRecordsReply? dhtRecords,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -337,6 +361,7 @@ class ServerFrame extends $pb.GeneratedMessage {
     if (storage != null) result.storage = storage;
     if (network != null) result.network = network;
     if (connect != null) result.connect = connect;
+    if (dhtRecords != null) result.dhtRecords = dhtRecords;
     return result;
   }
 
@@ -359,13 +384,14 @@ class ServerFrame extends $pb.GeneratedMessage {
     16: ServerFrame_Body.storage,
     17: ServerFrame_Body.network,
     18: ServerFrame_Body.connect,
+    26: ServerFrame_Body.dhtRecords,
     0: ServerFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ServerFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 26])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingReply>(10, _omitFieldNames ? '' : 'pong',
@@ -384,6 +410,8 @@ class ServerFrame extends $pb.GeneratedMessage {
         subBuilder: NetworkUpdate.create)
     ..aOM<ConnectReply>(18, _omitFieldNames ? '' : 'connect',
         subBuilder: ConnectReply.create)
+    ..aOM<DhtRecordsReply>(26, _omitFieldNames ? '' : 'dhtRecords',
+        subBuilder: DhtRecordsReply.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -414,6 +442,7 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
+  @$pb.TagNumber(26)
   ServerFrame_Body whichBody() => _ServerFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
@@ -424,6 +453,7 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
+  @$pb.TagNumber(26)
   void clearBody() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -550,6 +580,18 @@ class ServerFrame extends $pb.GeneratedMessage {
   void clearConnect() => $_clearField(18);
   @$pb.TagNumber(18)
   ConnectReply ensureConnect() => $_ensure(9);
+
+  /// Reply to a DhtRecordsRequest.
+  @$pb.TagNumber(26)
+  DhtRecordsReply get dhtRecords => $_getN(10);
+  @$pb.TagNumber(26)
+  set dhtRecords(DhtRecordsReply value) => $_setField(26, value);
+  @$pb.TagNumber(26)
+  $core.bool hasDhtRecords() => $_has(10);
+  @$pb.TagNumber(26)
+  void clearDhtRecords() => $_clearField(26);
+  @$pb.TagNumber(26)
+  DhtRecordsReply ensureDhtRecords() => $_ensure(10);
 }
 
 /// Sent from client → server to abort an in-flight operation by id.
@@ -2921,6 +2963,721 @@ class ConnectReply extends $pb.GeneratedMessage {
   $core.bool hasError() => $_has(1);
   @$pb.TagNumber(2)
   void clearError() => $_clearField(2);
+}
+
+/// List the DHT records this node holds locally — the only listing that
+/// exists. Kademlia has no key-enumeration operation, so what a node
+/// holds is answerable in full while "what is in the DHT" is not.
+class DhtRecordsRequest extends $pb.GeneratedMessage {
+  factory DhtRecordsRequest({
+    $core.bool? includeValues,
+    $core.Iterable<$core.String>? keyIds,
+    $core.int? limit,
+  }) {
+    final result = create();
+    if (includeValues != null) result.includeValues = includeValues;
+    if (keyIds != null) result.keyIds.addAll(keyIds);
+    if (limit != null) result.limit = limit;
+    return result;
+  }
+
+  DhtRecordsRequest._();
+
+  factory DhtRecordsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DhtRecordsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DhtRecordsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'includeValues')
+    ..pPS(2, _omitFieldNames ? '' : 'keyIds')
+    ..aI(3, _omitFieldNames ? '' : 'limit', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtRecordsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtRecordsRequest copyWith(void Function(DhtRecordsRequest) updates) =>
+      super.copyWith((message) => updates(message as DhtRecordsRequest))
+          as DhtRecordsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DhtRecordsRequest create() => DhtRecordsRequest._();
+  @$core.override
+  DhtRecordsRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DhtRecordsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DhtRecordsRequest>(create);
+  static DhtRecordsRequest? _defaultInstance;
+
+  /// Fill in `value` and `subkeys`. Requires a non-empty `key_ids`:
+  /// values run to a megabyte each, so a whole-store listing carrying
+  /// them could not fit one frame. INVALID_ARGUMENT otherwise.
+  @$pb.TagNumber(1)
+  $core.bool get includeValues => $_getBF(0);
+  @$pb.TagNumber(1)
+  set includeValues($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasIncludeValues() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearIncludeValues() => $_clearField(1);
+
+  /// Restrict the listing to these DHT ids (hex, as reported in
+  /// DhtRecord.key_id). Empty lists everything.
+  @$pb.TagNumber(2)
+  $pb.PbList<$core.String> get keyIds => $_getList(1);
+
+  /// Maximum records to return. 0 uses the daemon's default (500);
+  /// above its ceiling (5000) it is clamped, not rejected.
+  @$pb.TagNumber(3)
+  $core.int get limit => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set limit($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasLimit() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearLimit() => $_clearField(3);
+}
+
+class DhtRecordsReply extends $pb.GeneratedMessage {
+  factory DhtRecordsReply({
+    $core.String? serverTime,
+    $core.Iterable<DhtRecord>? records,
+    $core.Iterable<DhtKnownKey>? knownKeys,
+    $core.int? totalRecords,
+  }) {
+    final result = create();
+    if (serverTime != null) result.serverTime = serverTime;
+    if (records != null) result.records.addAll(records);
+    if (knownKeys != null) result.knownKeys.addAll(knownKeys);
+    if (totalRecords != null) result.totalRecords = totalRecords;
+    return result;
+  }
+
+  DhtRecordsReply._();
+
+  factory DhtRecordsReply.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DhtRecordsReply.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DhtRecordsReply',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'serverTime')
+    ..pPM<DhtRecord>(2, _omitFieldNames ? '' : 'records',
+        subBuilder: DhtRecord.create)
+    ..pPM<DhtKnownKey>(3, _omitFieldNames ? '' : 'knownKeys',
+        subBuilder: DhtKnownKey.create)
+    ..aI(4, _omitFieldNames ? '' : 'totalRecords',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtRecordsReply clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtRecordsReply copyWith(void Function(DhtRecordsReply) updates) =>
+      super.copyWith((message) => updates(message as DhtRecordsReply))
+          as DhtRecordsReply;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DhtRecordsReply create() => DhtRecordsReply._();
+  @$core.override
+  DhtRecordsReply createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DhtRecordsReply getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DhtRecordsReply>(create);
+  static DhtRecordsReply? _defaultInstance;
+
+  /// Daemon wall-clock time of this snapshot, RFC 3339.
+  @$pb.TagNumber(1)
+  $core.String get serverTime => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set serverTime($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasServerTime() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearServerTime() => $_clearField(1);
+
+  /// Live records, primary tier first, then cache, each tier in key
+  /// order. A key held in both appears twice: the copies carry their
+  /// own expirations and values, and a find serves whichever expires
+  /// later, so they are genuinely two records.
+  @$pb.TagNumber(2)
+  $pb.PbList<DhtRecord> get records => $_getList(1);
+
+  /// The keys this node can name: the registries plus one per block of
+  /// its configured prefix. The reverse table for DhtRecord.key_name:
+  /// a DHT id is SHA1(msgpack(name)) and cannot be inverted.
+  @$pb.TagNumber(3)
+  $pb.PbList<DhtKnownKey> get knownKeys => $_getList(2);
+
+  /// Records matching the filter before `limit` was applied. Greater
+  /// than `records.len()` means the listing was cut short.
+  @$pb.TagNumber(4)
+  $core.int get totalRecords => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set totalRecords($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTotalRecords() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTotalRecords() => $_clearField(4);
+}
+
+/// A plaintext key name and the DHT id it hashes to.
+class DhtKnownKey extends $pb.GeneratedMessage {
+  factory DhtKnownKey({
+    $core.String? name,
+    $core.String? keyId,
+  }) {
+    final result = create();
+    if (name != null) result.name = name;
+    if (keyId != null) result.keyId = keyId;
+    return result;
+  }
+
+  DhtKnownKey._();
+
+  factory DhtKnownKey.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DhtKnownKey.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DhtKnownKey',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..aOS(2, _omitFieldNames ? '' : 'keyId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtKnownKey clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtKnownKey copyWith(void Function(DhtKnownKey) updates) =>
+      super.copyWith((message) => updates(message as DhtKnownKey))
+          as DhtKnownKey;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DhtKnownKey create() => DhtKnownKey._();
+  @$core.override
+  DhtKnownKey createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DhtKnownKey getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DhtKnownKey>(create);
+  static DhtKnownKey? _defaultInstance;
+
+  /// e.g. `_petals.models`, `_kwaai.vpk.nodes`, `Qwen3-8B.0`.
+  @$pb.TagNumber(1)
+  $core.String get name => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set name($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearName() => $_clearField(1);
+
+  /// SHA1(msgpack(name)), hex.
+  @$pb.TagNumber(2)
+  $core.String get keyId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set keyId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKeyId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKeyId() => $_clearField(2);
+}
+
+/// One DHT record: a stored value plus everything known about it that is
+/// not the value itself.
+class DhtRecord extends $pb.GeneratedMessage {
+  factory DhtRecord({
+    $core.String? keyId,
+    $core.String? keyName,
+    DhtRecordKind? kind,
+    $core.bool? inCache,
+    $core.int? subkeyCount,
+    $fixnum.Int64? valueBytes,
+    $core.double? expiration,
+    $core.double? expiresInSecs,
+    $core.double? latestExpiration,
+    $fixnum.Int64? dictMaxsize,
+    DhtValueView? value,
+    $core.Iterable<DhtSubkey>? subkeys,
+  }) {
+    final result = create();
+    if (keyId != null) result.keyId = keyId;
+    if (keyName != null) result.keyName = keyName;
+    if (kind != null) result.kind = kind;
+    if (inCache != null) result.inCache = inCache;
+    if (subkeyCount != null) result.subkeyCount = subkeyCount;
+    if (valueBytes != null) result.valueBytes = valueBytes;
+    if (expiration != null) result.expiration = expiration;
+    if (expiresInSecs != null) result.expiresInSecs = expiresInSecs;
+    if (latestExpiration != null) result.latestExpiration = latestExpiration;
+    if (dictMaxsize != null) result.dictMaxsize = dictMaxsize;
+    if (value != null) result.value = value;
+    if (subkeys != null) result.subkeys.addAll(subkeys);
+    return result;
+  }
+
+  DhtRecord._();
+
+  factory DhtRecord.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DhtRecord.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DhtRecord',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'keyId')
+    ..aOS(2, _omitFieldNames ? '' : 'keyName')
+    ..aE<DhtRecordKind>(3, _omitFieldNames ? '' : 'kind',
+        enumValues: DhtRecordKind.values)
+    ..aOB(4, _omitFieldNames ? '' : 'inCache')
+    ..aI(5, _omitFieldNames ? '' : 'subkeyCount',
+        fieldType: $pb.PbFieldType.OU3)
+    ..a<$fixnum.Int64>(
+        6, _omitFieldNames ? '' : 'valueBytes', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aD(7, _omitFieldNames ? '' : 'expiration')
+    ..aD(8, _omitFieldNames ? '' : 'expiresInSecs')
+    ..aD(9, _omitFieldNames ? '' : 'latestExpiration')
+    ..a<$fixnum.Int64>(
+        10, _omitFieldNames ? '' : 'dictMaxsize', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOM<DhtValueView>(11, _omitFieldNames ? '' : 'value',
+        subBuilder: DhtValueView.create)
+    ..pPM<DhtSubkey>(12, _omitFieldNames ? '' : 'subkeys',
+        subBuilder: DhtSubkey.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtRecord clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtRecord copyWith(void Function(DhtRecord) updates) =>
+      super.copyWith((message) => updates(message as DhtRecord)) as DhtRecord;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DhtRecord create() => DhtRecord._();
+  @$core.override
+  DhtRecord createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DhtRecord getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<DhtRecord>(create);
+  static DhtRecord? _defaultInstance;
+
+  /// The record's DHT id, hex. This is the key the store is indexed
+  /// by, and what `key_ids` filters on.
+  @$pb.TagNumber(1)
+  $core.String get keyId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set keyId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKeyId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKeyId() => $_clearField(1);
+
+  /// The plaintext name, when this id matches one this node knows how
+  /// to derive. Empty otherwise, which is the normal case for a record
+  /// replicated onto us for a model we do not serve — the id is a hash
+  /// and there is nothing to invert.
+  @$pb.TagNumber(2)
+  $core.String get keyName => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set keyName($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKeyName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKeyName() => $_clearField(2);
+
+  /// Regular value vs dictionary. The distinction is not cosmetic: a
+  /// dictionary is how N peers announce under one key without
+  /// overwriting each other, so a block key with one subkey per server
+  /// is the shape to expect, and a *regular* value under such a key is
+  /// a peer that clobbered the others.
+  @$pb.TagNumber(3)
+  DhtRecordKind get kind => $_getN(2);
+  @$pb.TagNumber(3)
+  set kind(DhtRecordKind value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasKind() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearKind() => $_clearField(3);
+
+  /// Cache tier rather than primary. A cached record is here because a
+  /// lookup passed through this node, not because anyone chose to
+  /// replicate onto it, and it is evictable.
+  @$pb.TagNumber(4)
+  $core.bool get inCache => $_getBF(3);
+  @$pb.TagNumber(4)
+  set inCache($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasInCache() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearInCache() => $_clearField(4);
+
+  /// Subkeys held for a dictionary, 0 for a regular value; `kind`
+  /// separates those. Counts expired subkeys too: nothing prunes a
+  /// stored subkey once it expires — sweeping drops whole records, and
+  /// the freshness check only rejects incoming stores — so compare
+  /// each subkey's own expiration to see what is still live.
+  @$pb.TagNumber(5)
+  $core.int get subkeyCount => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set subkeyCount($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSubkeyCount() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSubkeyCount() => $_clearField(5);
+
+  /// Value bytes only: the stored value for a regular record, the
+  /// summed subkey values (expired ones included) for a dictionary.
+  /// Not the serialized wire size, which adds msgpack framing.
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get valueBytes => $_getI64(5);
+  @$pb.TagNumber(6)
+  set valueBytes($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasValueBytes() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearValueBytes() => $_clearField(6);
+
+  /// The record's outer expiration, seconds since the UNIX epoch. The
+  /// one `rpc_find` reports, and for a dictionary it can differ from
+  /// `latest_expiration`.
+  @$pb.TagNumber(7)
+  $core.double get expiration => $_getN(6);
+  @$pb.TagNumber(7)
+  set expiration($core.double value) => $_setDouble(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasExpiration() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearExpiration() => $_clearField(7);
+
+  /// Seconds until `expiration`, as of `server_time`. Never negative:
+  /// the listing filters expired records. Sent alongside the absolute time because a client's clock
+  /// is not the daemon's.
+  @$pb.TagNumber(8)
+  $core.double get expiresInSecs => $_getN(7);
+  @$pb.TagNumber(8)
+  set expiresInSecs($core.double value) => $_setDouble(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasExpiresInSecs() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearExpiresInSecs() => $_clearField(8);
+
+  /// `DictionaryDHTValue.latest_expiration_time` — the running maximum
+  /// over every subkey ever stored, which Python never recomputes on
+  /// expiry. Set for dictionaries only, and a value well past
+  /// `expiration` is normal rather than a bug.
+  @$pb.TagNumber(9)
+  $core.double get latestExpiration => $_getN(8);
+  @$pb.TagNumber(9)
+  set latestExpiration($core.double value) => $_setDouble(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasLatestExpiration() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearLatestExpiration() => $_clearField(9);
+
+  /// The dictionary's own subkey cap. Absent when unbounded, and for
+  /// regular records.
+  @$pb.TagNumber(10)
+  $fixnum.Int64 get dictMaxsize => $_getI64(9);
+  @$pb.TagNumber(10)
+  set dictMaxsize($fixnum.Int64 value) => $_setInt64(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasDictMaxsize() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearDictMaxsize() => $_clearField(10);
+
+  /// The decoded value, when `include_values` was set. Absent for a
+  /// dictionary, whose values live per-subkey below.
+  @$pb.TagNumber(11)
+  DhtValueView get value => $_getN(10);
+  @$pb.TagNumber(11)
+  set value(DhtValueView value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasValue() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearValue() => $_clearField(11);
+  @$pb.TagNumber(11)
+  DhtValueView ensureValue() => $_ensure(10);
+
+  /// Per-subkey breakdown, when `include_values` was set and this is a
+  /// dictionary. Each subkey expires independently of the record.
+  @$pb.TagNumber(12)
+  $pb.PbList<DhtSubkey> get subkeys => $_getList(11);
+}
+
+class DhtSubkey extends $pb.GeneratedMessage {
+  factory DhtSubkey({
+    $core.String? subkey,
+    $core.double? expiration,
+    $core.double? expiresInSecs,
+    $fixnum.Int64? valueBytes,
+    DhtValueView? value,
+  }) {
+    final result = create();
+    if (subkey != null) result.subkey = subkey;
+    if (expiration != null) result.expiration = expiration;
+    if (expiresInSecs != null) result.expiresInSecs = expiresInSecs;
+    if (valueBytes != null) result.valueBytes = valueBytes;
+    if (value != null) result.value = value;
+    return result;
+  }
+
+  DhtSubkey._();
+
+  factory DhtSubkey.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DhtSubkey.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DhtSubkey',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'subkey')
+    ..aD(2, _omitFieldNames ? '' : 'expiration')
+    ..aD(3, _omitFieldNames ? '' : 'expiresInSecs')
+    ..a<$fixnum.Int64>(
+        4, _omitFieldNames ? '' : 'valueBytes', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOM<DhtValueView>(5, _omitFieldNames ? '' : 'value',
+        subBuilder: DhtValueView.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtSubkey clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtSubkey copyWith(void Function(DhtSubkey) updates) =>
+      super.copyWith((message) => updates(message as DhtSubkey)) as DhtSubkey;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DhtSubkey create() => DhtSubkey._();
+  @$core.override
+  DhtSubkey createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DhtSubkey getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<DhtSubkey>(create);
+  static DhtSubkey? _defaultInstance;
+
+  /// The subkey rendered from its msgpack form — a base58 peer id for
+  /// every record this network publishes, but nothing enforces that,
+  /// so it is rendered by the same rules as a value.
+  @$pb.TagNumber(1)
+  $core.String get subkey => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set subkey($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSubkey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSubkey() => $_clearField(1);
+
+  /// Absolute expiration, seconds since the UNIX epoch, and the
+  /// countdown to it. Independent of the record's own expiration:
+  /// that is the whole point of a dictionary.
+  @$pb.TagNumber(2)
+  $core.double get expiration => $_getN(1);
+  @$pb.TagNumber(2)
+  set expiration($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasExpiration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearExpiration() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get expiresInSecs => $_getN(2);
+  @$pb.TagNumber(3)
+  set expiresInSecs($core.double value) => $_setDouble(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasExpiresInSecs() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearExpiresInSecs() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get valueBytes => $_getI64(3);
+  @$pb.TagNumber(4)
+  set valueBytes($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasValueBytes() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearValueBytes() => $_clearField(4);
+
+  /// The decoded value.
+  @$pb.TagNumber(5)
+  DhtValueView get value => $_getN(4);
+  @$pb.TagNumber(5)
+  set value(DhtValueView value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasValue() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearValue() => $_clearField(5);
+  @$pb.TagNumber(5)
+  DhtValueView ensureValue() => $_ensure(4);
+}
+
+/// A msgpack value rendered for display.
+///
+/// Deliberately structural, not semantic: this decodes msgpack and shows
+/// what is there. It does not know that an Ext(64) under a block key is a
+/// petals ServerInfo, and does not invent field names for one — an Ext
+/// body that is itself msgpack (which is what Python's tuple encoding
+/// produces) is unwrapped and rendered as its contents, and one that is
+/// not is reported as opaque bytes under its type code.
+class DhtValueView extends $pb.GeneratedMessage {
+  factory DhtValueView({
+    $core.String? msgpackType,
+    $core.String? rendered,
+    $fixnum.Int64? rawBytes,
+    $core.int? extCode,
+    $core.bool? decoded,
+  }) {
+    final result = create();
+    if (msgpackType != null) result.msgpackType = msgpackType;
+    if (rendered != null) result.rendered = rendered;
+    if (rawBytes != null) result.rawBytes = rawBytes;
+    if (extCode != null) result.extCode = extCode;
+    if (decoded != null) result.decoded = decoded;
+    return result;
+  }
+
+  DhtValueView._();
+
+  factory DhtValueView.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DhtValueView.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DhtValueView',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'msgpackType')
+    ..aOS(2, _omitFieldNames ? '' : 'rendered')
+    ..a<$fixnum.Int64>(
+        3, _omitFieldNames ? '' : 'rawBytes', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aI(4, _omitFieldNames ? '' : 'extCode')
+    ..aOB(5, _omitFieldNames ? '' : 'decoded')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtValueView clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtValueView copyWith(void Function(DhtValueView) updates) =>
+      super.copyWith((message) => updates(message as DhtValueView))
+          as DhtValueView;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DhtValueView create() => DhtValueView._();
+  @$core.override
+  DhtValueView createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DhtValueView getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DhtValueView>(create);
+  static DhtValueView? _defaultInstance;
+
+  /// Top-level msgpack type: `map`, `array`, `str`, `bin`, `int`,
+  /// `float`, `bool`, `nil`, or `ext`. `undecodable` when the bytes
+  /// are not msgpack at all, in which case `rendered` is their hex.
+  @$pb.TagNumber(1)
+  $core.String get msgpackType => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set msgpackType($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMsgpackType() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMsgpackType() => $_clearField(1);
+
+  /// The value as compact JSON — valid for `jsonDecode` whenever
+  /// `decoded` is true; when false it is the raw hex and must not be
+  /// parsed. What JSON cannot say is a one-key tagged object:
+  ///   str/bin that is not UTF-8   {"$hex": "lowercase hex"}
+  ///   NaN / ±inf                  {"$float": "nan" | "inf" | "-inf"}
+  ///   ext with a msgpack body     {"$ext": code, "value": body}
+  ///   ext with any other body     {"$ext": code, "$hex": "…"}
+  /// Bin that is valid UTF-8 renders as a string. A non-string map key
+  /// becomes its compact JSON text as the object key; keys that collide
+  /// after that collapse, last one wins.
+  @$pb.TagNumber(2)
+  $core.String get rendered => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set rendered($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRendered() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRendered() => $_clearField(2);
+
+  /// Size of the value as stored, before any decoding.
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get rawBytes => $_getI64(2);
+  @$pb.TagNumber(3)
+  set rawBytes($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRawBytes() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRawBytes() => $_clearField(3);
+
+  /// The ext type code when the top level is an Ext, for out-of-band
+  /// display; `rendered` carries it too. 0x40 (64) is hivemind's
+  /// Python-tuple code and 0x50 (80) its dictionary code.
+  @$pb.TagNumber(4)
+  $core.int get extCode => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set extCode($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasExtCode() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearExtCode() => $_clearField(4);
+
+  /// True when `rendered` was produced by decoding, false when the
+  /// bytes defeated the decoder and it fell back to hex.
+  @$pb.TagNumber(5)
+  $core.bool get decoded => $_getBF(4);
+  @$pb.TagNumber(5)
+  set decoded($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasDecoded() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDecoded() => $_clearField(5);
 }
 
 class ChatMessage extends $pb.GeneratedMessage {

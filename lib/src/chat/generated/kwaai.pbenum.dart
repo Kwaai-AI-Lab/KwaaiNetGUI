@@ -178,6 +178,28 @@ class StorageReachability extends $pb.ProtobufEnum {
   const StorageReachability._(super.value, super.name);
 }
 
+class DhtRecordKind extends $pb.ProtobufEnum {
+  static const DhtRecordKind DHT_RECORD_KIND_UNSPECIFIED =
+      DhtRecordKind._(0, _omitEnumNames ? '' : 'DHT_RECORD_KIND_UNSPECIFIED');
+  static const DhtRecordKind DHT_RECORD_KIND_REGULAR =
+      DhtRecordKind._(1, _omitEnumNames ? '' : 'DHT_RECORD_KIND_REGULAR');
+  static const DhtRecordKind DHT_RECORD_KIND_DICTIONARY =
+      DhtRecordKind._(2, _omitEnumNames ? '' : 'DHT_RECORD_KIND_DICTIONARY');
+
+  static const $core.List<DhtRecordKind> values = <DhtRecordKind>[
+    DHT_RECORD_KIND_UNSPECIFIED,
+    DHT_RECORD_KIND_REGULAR,
+    DHT_RECORD_KIND_DICTIONARY,
+  ];
+
+  static final $core.List<DhtRecordKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static DhtRecordKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const DhtRecordKind._(super.value, super.name);
+}
+
 class Error_Code extends $pb.ProtobufEnum {
   static const Error_Code UNKNOWN =
       Error_Code._(0, _omitEnumNames ? '' : 'UNKNOWN');
