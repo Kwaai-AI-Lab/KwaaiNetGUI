@@ -408,11 +408,18 @@ class KwaaiRpcClient {
   /// listener unsubscribes. Errors on session/channel teardown — the
   /// storage provider resubscribes when connectivity returns, so like
   /// [blockCoverageStream] this doesn't reset the channel itself.
+  ///
+  /// [skipProbes] reports DHT records only: one update per round, every peer
+  /// left UNKNOWN, and no node dialled.
   Stream<pb.StorageUpdate> storageDiscoveryStream({
     int intervalSecs = 30,
+    bool skipProbes = false,
   }) async* {
     final session = await _sessionOrInit();
-    final op = session.storageDiscoverySubscribe(intervalSecs: intervalSecs);
+    final op = session.storageDiscoverySubscribe(
+      intervalSecs: intervalSecs,
+      skipProbes: skipProbes,
+    );
     try {
       yield* op.updates;
     } finally {

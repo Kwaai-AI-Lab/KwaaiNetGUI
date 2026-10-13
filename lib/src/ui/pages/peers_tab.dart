@@ -116,6 +116,7 @@ class _PeersTabState extends ConsumerState<PeersTab> {
   @override
   Widget build(BuildContext context) {
     final network = ref.watch(peersProvider);
+    final names = ref.watch(peerNamesProvider).valueOrNull ?? const {};
     final fresh = network.valueOrNull;
     // Identity, not equality: `valueOrNull` re-serves the last emitted value on
     // every rebuild, so stamping the arrival time whenever it is non-null would
@@ -187,6 +188,7 @@ class _PeersTabState extends ConsumerState<PeersTab> {
           child: _TableSection(
             connected: update.connected,
             routing: update.routing,
+            names: names,
             localProtocols: update.hasSelfStatus()
                 ? update.selfStatus.localProtocols
                 : const [],
@@ -738,6 +740,7 @@ class _TableSection extends StatefulWidget {
   const _TableSection({
     required this.connected,
     required this.routing,
+    required this.names,
     required this.localProtocols,
     required this.selectedPeerId,
     required this.onSelectPeer,
@@ -746,6 +749,9 @@ class _TableSection extends StatefulWidget {
 
   final List<pb.ConnectedPeer> connected;
   final List<pb.RoutingPeer> routing;
+
+  /// Announced names by peer id, from [peerNamesProvider].
+  final Map<String, String> names;
 
   /// What this node itself advertises. The protocol filter offers the union
   /// of this and everything the connected peers advertise — one discovered
@@ -856,6 +862,7 @@ class _TableSectionState extends State<_TableSection> {
                 )
               : _PeerTable(
                   rows: rows,
+                  names: widget.names,
                   selectedPeerId: widget.selectedPeerId,
                   onSelectPeer: widget.onSelectPeer,
                   onConnect: widget.onConnect,
@@ -1088,12 +1095,14 @@ List<PeerRow> mergePeerRows(
 class _PeerTable extends StatelessWidget {
   const _PeerTable({
     required this.rows,
+    required this.names,
     required this.selectedPeerId,
     required this.onSelectPeer,
     required this.onConnect,
   });
 
   final List<PeerRow> rows;
+  final Map<String, String> names;
   final String? selectedPeerId;
   final void Function(String peerId) onSelectPeer;
   final Future<bool> Function(String peerId) onConnect;
@@ -1137,6 +1146,7 @@ class _PeerTable extends StatelessWidget {
                 DataColumn(label: Text('RTT', style: headStyle), numeric: true),
                 DataColumn(label: Text('ROLE', style: headStyle)),
                 DataColumn(label: Text('VERSION', style: headStyle)),
+                DataColumn(label: Text('NAME', style: headStyle)),
                 DataColumn(label: Text('PEER ID', style: headStyle)),
                 DataColumn(label: Text('ADDRESS', style: headStyle)),
               ],
@@ -1200,6 +1210,7 @@ class _PeerTable extends StatelessWidget {
                           style: cellStyle,
                         ),
                       ),
+                      DataCell(Text(names[r.peerId] ?? '—', style: cellStyle)),
                       DataCell(
                         Row(
                           mainAxisSize: MainAxisSize.min,
