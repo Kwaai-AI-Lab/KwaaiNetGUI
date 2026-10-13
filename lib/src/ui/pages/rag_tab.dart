@@ -689,15 +689,25 @@ String ragPhaseLabel(
 }) {
   final counts = total > 0 ? ' $done/$total' : '';
   switch (phase) {
+    case pb.RagProgress_RagPhase.RAG_PHASE_RECEIVING:
+      // Counts are bytes the daemon has received of the upload.
+      return total > 0
+          ? 'Uploading ${formatByteCount(done)} / ${formatByteCount(total)}'
+          : 'Uploading';
     case pb.RagProgress_RagPhase.RAG_PHASE_EXTRACTING:
       return 'Extracting text';
     case pb.RagProgress_RagPhase.RAG_PHASE_EMBEDDING:
       return 'Embedding$counts';
-    case pb.RagProgress_RagPhase.RAG_PHASE_UPLOADING:
-      return 'Storing$counts';
     default:
       return 'Working';
   }
+}
+
+/// Compact byte count for progress text: B, KB or MB (binary units).
+String formatByteCount(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }
 
 /// The documents already in the selected KB, each removable.
