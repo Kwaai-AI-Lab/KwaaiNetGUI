@@ -335,6 +335,28 @@ class HopFailure extends $pb.ProtobufEnum {
   const HopFailure._(super.value, super.name);
 }
 
+class DhtRecordKind extends $pb.ProtobufEnum {
+  static const DhtRecordKind DHT_RECORD_KIND_UNSPECIFIED =
+      DhtRecordKind._(0, _omitEnumNames ? '' : 'DHT_RECORD_KIND_UNSPECIFIED');
+  static const DhtRecordKind DHT_RECORD_KIND_REGULAR =
+      DhtRecordKind._(1, _omitEnumNames ? '' : 'DHT_RECORD_KIND_REGULAR');
+  static const DhtRecordKind DHT_RECORD_KIND_DICTIONARY =
+      DhtRecordKind._(2, _omitEnumNames ? '' : 'DHT_RECORD_KIND_DICTIONARY');
+
+  static const $core.List<DhtRecordKind> values = <DhtRecordKind>[
+    DHT_RECORD_KIND_UNSPECIFIED,
+    DHT_RECORD_KIND_REGULAR,
+    DHT_RECORD_KIND_DICTIONARY,
+  ];
+
+  static final $core.List<DhtRecordKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static DhtRecordKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const DhtRecordKind._(super.value, super.name);
+}
+
 class Error_Code extends $pb.ProtobufEnum {
   static const Error_Code UNKNOWN =
       Error_Code._(0, _omitEnumNames ? '' : 'UNKNOWN');
@@ -395,6 +417,41 @@ class Error_Code extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const Error_Code._(super.value, super.name);
+}
+
+class RagProgress_RagPhase extends $pb.ProtobufEnum {
+  static const RagProgress_RagPhase RAG_PHASE_UNSPECIFIED =
+      RagProgress_RagPhase._(0, _omitEnumNames ? '' : 'RAG_PHASE_UNSPECIFIED');
+
+  /// Receiving the document. done/total count bytes. Sent once per
+  /// piece, after it is written: each acknowledges one piece of the
+  /// 8-piece window (see RagIngestData). A client that does not read
+  /// these for 60 s fails the ingest.
+  static const RagProgress_RagPhase RAG_PHASE_RECEIVING =
+      RagProgress_RagPhase._(1, _omitEnumNames ? '' : 'RAG_PHASE_RECEIVING');
+
+  /// Decoding the document into plain text. done/total are both 0:
+  /// this phase is a single indivisible step.
+  static const RagProgress_RagPhase RAG_PHASE_EXTRACTING =
+      RagProgress_RagPhase._(2, _omitEnumNames ? '' : 'RAG_PHASE_EXTRACTING');
+
+  /// Chunking, embedding and storing. done/total count chunks.
+  static const RagProgress_RagPhase RAG_PHASE_EMBEDDING =
+      RagProgress_RagPhase._(3, _omitEnumNames ? '' : 'RAG_PHASE_EMBEDDING');
+
+  static const $core.List<RagProgress_RagPhase> values = <RagProgress_RagPhase>[
+    RAG_PHASE_UNSPECIFIED,
+    RAG_PHASE_RECEIVING,
+    RAG_PHASE_EXTRACTING,
+    RAG_PHASE_EMBEDDING,
+  ];
+
+  static final $core.List<RagProgress_RagPhase?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static RagProgress_RagPhase? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const RagProgress_RagPhase._(super.value, super.name);
 }
 
 const $core.bool _omitEnumNames =

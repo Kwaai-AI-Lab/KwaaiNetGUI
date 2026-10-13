@@ -31,6 +31,13 @@ enum ClientFrame_Body {
   storageDiscovery,
   network,
   connect,
+  ragStatus,
+  ragInit,
+  ragIngest,
+  ragQuery,
+  ragIngestData,
+  ragDelete,
+  dhtRecords,
   notSet
 }
 
@@ -59,6 +66,13 @@ class ClientFrame extends $pb.GeneratedMessage {
     StorageDiscoveryRequest? storageDiscovery,
     NetworkRequest? network,
     ConnectRequest? connect,
+    RagStatusRequest? ragStatus,
+    RagInitRequest? ragInit,
+    RagIngestRequest? ragIngest,
+    RagQueryRequest? ragQuery,
+    RagIngestData? ragIngestData,
+    RagDeleteRequest? ragDelete,
+    DhtRecordsRequest? dhtRecords,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -71,6 +85,13 @@ class ClientFrame extends $pb.GeneratedMessage {
     if (storageDiscovery != null) result.storageDiscovery = storageDiscovery;
     if (network != null) result.network = network;
     if (connect != null) result.connect = connect;
+    if (ragStatus != null) result.ragStatus = ragStatus;
+    if (ragInit != null) result.ragInit = ragInit;
+    if (ragIngest != null) result.ragIngest = ragIngest;
+    if (ragQuery != null) result.ragQuery = ragQuery;
+    if (ragIngestData != null) result.ragIngestData = ragIngestData;
+    if (ragDelete != null) result.ragDelete = ragDelete;
+    if (dhtRecords != null) result.dhtRecords = dhtRecords;
     return result;
   }
 
@@ -93,13 +114,20 @@ class ClientFrame extends $pb.GeneratedMessage {
     16: ClientFrame_Body.storageDiscovery,
     17: ClientFrame_Body.network,
     18: ClientFrame_Body.connect,
+    20: ClientFrame_Body.ragStatus,
+    21: ClientFrame_Body.ragInit,
+    22: ClientFrame_Body.ragIngest,
+    23: ClientFrame_Body.ragQuery,
+    24: ClientFrame_Body.ragIngestData,
+    25: ClientFrame_Body.ragDelete,
+    26: ClientFrame_Body.dhtRecords,
     0: ClientFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ClientFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22, 23, 24, 25, 26])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingRequest>(10, _omitFieldNames ? '' : 'ping',
@@ -121,6 +149,20 @@ class ClientFrame extends $pb.GeneratedMessage {
         subBuilder: NetworkRequest.create)
     ..aOM<ConnectRequest>(18, _omitFieldNames ? '' : 'connect',
         subBuilder: ConnectRequest.create)
+    ..aOM<RagStatusRequest>(20, _omitFieldNames ? '' : 'ragStatus',
+        subBuilder: RagStatusRequest.create)
+    ..aOM<RagInitRequest>(21, _omitFieldNames ? '' : 'ragInit',
+        subBuilder: RagInitRequest.create)
+    ..aOM<RagIngestRequest>(22, _omitFieldNames ? '' : 'ragIngest',
+        subBuilder: RagIngestRequest.create)
+    ..aOM<RagQueryRequest>(23, _omitFieldNames ? '' : 'ragQuery',
+        subBuilder: RagQueryRequest.create)
+    ..aOM<RagIngestData>(24, _omitFieldNames ? '' : 'ragIngestData',
+        subBuilder: RagIngestData.create)
+    ..aOM<RagDeleteRequest>(25, _omitFieldNames ? '' : 'ragDelete',
+        subBuilder: RagDeleteRequest.create)
+    ..aOM<DhtRecordsRequest>(26, _omitFieldNames ? '' : 'dhtRecords',
+        subBuilder: DhtRecordsRequest.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -151,6 +193,13 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
+  @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
+  @$pb.TagNumber(22)
+  @$pb.TagNumber(23)
+  @$pb.TagNumber(24)
+  @$pb.TagNumber(25)
+  @$pb.TagNumber(26)
   ClientFrame_Body whichBody() => _ClientFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
@@ -161,6 +210,13 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
+  @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
+  @$pb.TagNumber(22)
+  @$pb.TagNumber(23)
+  @$pb.TagNumber(24)
+  @$pb.TagNumber(25)
+  @$pb.TagNumber(26)
   void clearBody() => $_clearField($_whichOneof(0));
 
   /// Operation correlation id. Pick any non-zero value unused by an
@@ -295,6 +351,110 @@ class ClientFrame extends $pb.GeneratedMessage {
   void clearConnect() => $_clearField(18);
   @$pb.TagNumber(18)
   ConnectRequest ensureConnect() => $_ensure(9);
+
+  /// Snapshot of every configured knowledge base. One
+  /// ServerFrame.rag_status reply, then Done. An empty kbs list
+  /// means "RAG is compiled in but nothing is initialised"; a
+  /// build without the `rag` feature answers UNIMPLEMENTED
+  /// instead, so the client can tell the two apart.
+  @$pb.TagNumber(20)
+  RagStatusRequest get ragStatus => $_getN(10);
+  @$pb.TagNumber(20)
+  set ragStatus(RagStatusRequest value) => $_setField(20, value);
+  @$pb.TagNumber(20)
+  $core.bool hasRagStatus() => $_has(10);
+  @$pb.TagNumber(20)
+  void clearRagStatus() => $_clearField(20);
+  @$pb.TagNumber(20)
+  RagStatusRequest ensureRagStatus() => $_ensure(10);
+
+  /// Create (or idempotently re-create) a knowledge base. Probes
+  /// the embedding model for its dimension, so it fails with
+  /// UNAVAILABLE when Ollama isn't reachable.
+  @$pb.TagNumber(21)
+  RagInitRequest get ragInit => $_getN(11);
+  @$pb.TagNumber(21)
+  set ragInit(RagInitRequest value) => $_setField(21, value);
+  @$pb.TagNumber(21)
+  $core.bool hasRagInit() => $_has(11);
+  @$pb.TagNumber(21)
+  void clearRagInit() => $_clearField(21);
+  @$pb.TagNumber(21)
+  RagInitRequest ensureRagInit() => $_ensure(11);
+
+  /// Ingest one document, whose bytes follow as rag_ingest_data
+  /// frames under this op's id. Emits ServerFrame.rag_progress
+  /// frames before the terminal rag_ingest reply. Reusing the id
+  /// of an op still in flight fails with INVALID_ARGUMENT.
+  /// Cancellable. A cancel, or the session closing, mid-upload ends
+  /// the ingest; one that fails or is cancelled after storing
+  /// vectors removes them again (best-effort).
+  @$pb.TagNumber(22)
+  RagIngestRequest get ragIngest => $_getN(12);
+  @$pb.TagNumber(22)
+  set ragIngest(RagIngestRequest value) => $_setField(22, value);
+  @$pb.TagNumber(22)
+  $core.bool hasRagIngest() => $_has(12);
+  @$pb.TagNumber(22)
+  void clearRagIngest() => $_clearField(22);
+  @$pb.TagNumber(22)
+  RagIngestRequest ensureRagIngest() => $_ensure(12);
+
+  /// Retrieve chunks for a query. One ServerFrame.rag_query reply,
+  /// then Done.
+  @$pb.TagNumber(23)
+  RagQueryRequest get ragQuery => $_getN(13);
+  @$pb.TagNumber(23)
+  set ragQuery(RagQueryRequest value) => $_setField(23, value);
+  @$pb.TagNumber(23)
+  $core.bool hasRagQuery() => $_has(13);
+  @$pb.TagNumber(23)
+  void clearRagQuery() => $_clearField(23);
+  @$pb.TagNumber(23)
+  RagQueryRequest ensureRagQuery() => $_ensure(13);
+
+  /// One piece of an ingest's document, sent in order with
+  /// ClientFrame.id set to that ingest's id. Acknowledged by a
+  /// RAG_PHASE_RECEIVING progress frame; see RagIngestData.
+  @$pb.TagNumber(24)
+  RagIngestData get ragIngestData => $_getN(14);
+  @$pb.TagNumber(24)
+  set ragIngestData(RagIngestData value) => $_setField(24, value);
+  @$pb.TagNumber(24)
+  $core.bool hasRagIngestData() => $_has(14);
+  @$pb.TagNumber(24)
+  void clearRagIngestData() => $_clearField(24);
+  @$pb.TagNumber(24)
+  RagIngestData ensureRagIngestData() => $_ensure(14);
+
+  /// Remove one document and every chunk it contributed. One
+  /// ServerFrame.rag_delete reply, then Done. Deleting a document
+  /// the KB doesn't hold is NOT_FOUND rather than a silent no-op,
+  /// so a stale UI row doesn't read as a successful delete.
+  @$pb.TagNumber(25)
+  RagDeleteRequest get ragDelete => $_getN(15);
+  @$pb.TagNumber(25)
+  set ragDelete(RagDeleteRequest value) => $_setField(25, value);
+  @$pb.TagNumber(25)
+  $core.bool hasRagDelete() => $_has(15);
+  @$pb.TagNumber(25)
+  void clearRagDelete() => $_clearField(25);
+  @$pb.TagNumber(25)
+  RagDeleteRequest ensureRagDelete() => $_ensure(15);
+
+  /// Hivemind DHT records this node holds locally. One
+  /// DhtRecordsReply, then Done. Reads the local store only — see
+  /// DhtRecordsRequest for why there is no network-wide listing.
+  @$pb.TagNumber(26)
+  DhtRecordsRequest get dhtRecords => $_getN(16);
+  @$pb.TagNumber(26)
+  set dhtRecords(DhtRecordsRequest value) => $_setField(26, value);
+  @$pb.TagNumber(26)
+  $core.bool hasDhtRecords() => $_has(16);
+  @$pb.TagNumber(26)
+  void clearDhtRecords() => $_clearField(26);
+  @$pb.TagNumber(26)
+  DhtRecordsRequest ensureDhtRecords() => $_ensure(16);
 }
 
 enum ServerFrame_Body {
@@ -308,6 +468,13 @@ enum ServerFrame_Body {
   network,
   connect,
   inferenceEvent,
+  ragStatus,
+  ragInit,
+  ragProgress,
+  ragQuery,
+  ragIngest,
+  ragDelete,
+  dhtRecords,
   notSet
 }
 
@@ -327,6 +494,13 @@ class ServerFrame extends $pb.GeneratedMessage {
     NetworkUpdate? network,
     ConnectReply? connect,
     InferenceEvent? inferenceEvent,
+    RagStatusUpdate? ragStatus,
+    RagInitReply? ragInit,
+    RagProgress? ragProgress,
+    RagQueryReply? ragQuery,
+    RagIngestReply? ragIngest,
+    RagDeleteReply? ragDelete,
+    DhtRecordsReply? dhtRecords,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -340,6 +514,13 @@ class ServerFrame extends $pb.GeneratedMessage {
     if (network != null) result.network = network;
     if (connect != null) result.connect = connect;
     if (inferenceEvent != null) result.inferenceEvent = inferenceEvent;
+    if (ragStatus != null) result.ragStatus = ragStatus;
+    if (ragInit != null) result.ragInit = ragInit;
+    if (ragProgress != null) result.ragProgress = ragProgress;
+    if (ragQuery != null) result.ragQuery = ragQuery;
+    if (ragIngest != null) result.ragIngest = ragIngest;
+    if (ragDelete != null) result.ragDelete = ragDelete;
+    if (dhtRecords != null) result.dhtRecords = dhtRecords;
     return result;
   }
 
@@ -363,13 +544,21 @@ class ServerFrame extends $pb.GeneratedMessage {
     17: ServerFrame_Body.network,
     18: ServerFrame_Body.connect,
     19: ServerFrame_Body.inferenceEvent,
+    20: ServerFrame_Body.ragStatus,
+    21: ServerFrame_Body.ragInit,
+    22: ServerFrame_Body.ragProgress,
+    23: ServerFrame_Body.ragQuery,
+    24: ServerFrame_Body.ragIngest,
+    25: ServerFrame_Body.ragDelete,
+    26: ServerFrame_Body.dhtRecords,
     0: ServerFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ServerFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+    ..oo(
+        0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingReply>(10, _omitFieldNames ? '' : 'pong',
@@ -390,6 +579,20 @@ class ServerFrame extends $pb.GeneratedMessage {
         subBuilder: ConnectReply.create)
     ..aOM<InferenceEvent>(19, _omitFieldNames ? '' : 'inferenceEvent',
         subBuilder: InferenceEvent.create)
+    ..aOM<RagStatusUpdate>(20, _omitFieldNames ? '' : 'ragStatus',
+        subBuilder: RagStatusUpdate.create)
+    ..aOM<RagInitReply>(21, _omitFieldNames ? '' : 'ragInit',
+        subBuilder: RagInitReply.create)
+    ..aOM<RagProgress>(22, _omitFieldNames ? '' : 'ragProgress',
+        subBuilder: RagProgress.create)
+    ..aOM<RagQueryReply>(23, _omitFieldNames ? '' : 'ragQuery',
+        subBuilder: RagQueryReply.create)
+    ..aOM<RagIngestReply>(24, _omitFieldNames ? '' : 'ragIngest',
+        subBuilder: RagIngestReply.create)
+    ..aOM<RagDeleteReply>(25, _omitFieldNames ? '' : 'ragDelete',
+        subBuilder: RagDeleteReply.create)
+    ..aOM<DhtRecordsReply>(26, _omitFieldNames ? '' : 'dhtRecords',
+        subBuilder: DhtRecordsReply.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -421,6 +624,13 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
   @$pb.TagNumber(19)
+  @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
+  @$pb.TagNumber(22)
+  @$pb.TagNumber(23)
+  @$pb.TagNumber(24)
+  @$pb.TagNumber(25)
+  @$pb.TagNumber(26)
   ServerFrame_Body whichBody() => _ServerFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
@@ -432,6 +642,13 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
   @$pb.TagNumber(19)
+  @$pb.TagNumber(20)
+  @$pb.TagNumber(21)
+  @$pb.TagNumber(22)
+  @$pb.TagNumber(23)
+  @$pb.TagNumber(24)
+  @$pb.TagNumber(25)
+  @$pb.TagNumber(26)
   void clearBody() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -573,6 +790,92 @@ class ServerFrame extends $pb.GeneratedMessage {
   void clearInferenceEvent() => $_clearField(19);
   @$pb.TagNumber(19)
   InferenceEvent ensureInferenceEvent() => $_ensure(10);
+
+  /// Reply to RagStatusRequest.
+  @$pb.TagNumber(20)
+  RagStatusUpdate get ragStatus => $_getN(11);
+  @$pb.TagNumber(20)
+  set ragStatus(RagStatusUpdate value) => $_setField(20, value);
+  @$pb.TagNumber(20)
+  $core.bool hasRagStatus() => $_has(11);
+  @$pb.TagNumber(20)
+  void clearRagStatus() => $_clearField(20);
+  @$pb.TagNumber(20)
+  RagStatusUpdate ensureRagStatus() => $_ensure(11);
+
+  /// Reply to RagInitRequest.
+  @$pb.TagNumber(21)
+  RagInitReply get ragInit => $_getN(12);
+  @$pb.TagNumber(21)
+  set ragInit(RagInitReply value) => $_setField(21, value);
+  @$pb.TagNumber(21)
+  $core.bool hasRagInit() => $_has(12);
+  @$pb.TagNumber(21)
+  void clearRagInit() => $_clearField(21);
+  @$pb.TagNumber(21)
+  RagInitReply ensureRagInit() => $_ensure(12);
+
+  /// Mid-operation progress for rag_ingest. Zero or more of these
+  /// precede the terminal rag_ingest reply; a client that ignores
+  /// them still gets a correct result.
+  @$pb.TagNumber(22)
+  RagProgress get ragProgress => $_getN(13);
+  @$pb.TagNumber(22)
+  set ragProgress(RagProgress value) => $_setField(22, value);
+  @$pb.TagNumber(22)
+  $core.bool hasRagProgress() => $_has(13);
+  @$pb.TagNumber(22)
+  void clearRagProgress() => $_clearField(22);
+  @$pb.TagNumber(22)
+  RagProgress ensureRagProgress() => $_ensure(13);
+
+  /// Reply to RagQueryRequest.
+  @$pb.TagNumber(23)
+  RagQueryReply get ragQuery => $_getN(14);
+  @$pb.TagNumber(23)
+  set ragQuery(RagQueryReply value) => $_setField(23, value);
+  @$pb.TagNumber(23)
+  $core.bool hasRagQuery() => $_has(14);
+  @$pb.TagNumber(23)
+  void clearRagQuery() => $_clearField(23);
+  @$pb.TagNumber(23)
+  RagQueryReply ensureRagQuery() => $_ensure(14);
+
+  /// Terminal reply to RagIngestRequest.
+  @$pb.TagNumber(24)
+  RagIngestReply get ragIngest => $_getN(15);
+  @$pb.TagNumber(24)
+  set ragIngest(RagIngestReply value) => $_setField(24, value);
+  @$pb.TagNumber(24)
+  $core.bool hasRagIngest() => $_has(15);
+  @$pb.TagNumber(24)
+  void clearRagIngest() => $_clearField(24);
+  @$pb.TagNumber(24)
+  RagIngestReply ensureRagIngest() => $_ensure(15);
+
+  /// Reply to RagDeleteRequest.
+  @$pb.TagNumber(25)
+  RagDeleteReply get ragDelete => $_getN(16);
+  @$pb.TagNumber(25)
+  set ragDelete(RagDeleteReply value) => $_setField(25, value);
+  @$pb.TagNumber(25)
+  $core.bool hasRagDelete() => $_has(16);
+  @$pb.TagNumber(25)
+  void clearRagDelete() => $_clearField(25);
+  @$pb.TagNumber(25)
+  RagDeleteReply ensureRagDelete() => $_ensure(16);
+
+  /// Reply to a DhtRecordsRequest.
+  @$pb.TagNumber(26)
+  DhtRecordsReply get dhtRecords => $_getN(17);
+  @$pb.TagNumber(26)
+  set dhtRecords(DhtRecordsReply value) => $_setField(26, value);
+  @$pb.TagNumber(26)
+  $core.bool hasDhtRecords() => $_has(17);
+  @$pb.TagNumber(26)
+  void clearDhtRecords() => $_clearField(26);
+  @$pb.TagNumber(26)
+  DhtRecordsReply ensureDhtRecords() => $_ensure(17);
 }
 
 /// Sent from client → server to abort an in-flight operation by id.
@@ -2122,9 +2425,9 @@ class RoutingPeer extends $pb.GeneratedMessage {
   /// XOR distance from our own key to this peer's, big-endian hex, 64
   /// digits, no leading `0x`.
   ///
-  /// The DHT's own metric, and the only way to check that a lookup
-  /// actually walked closer. Fixed for the life of the entry, so it costs
-  /// nothing in subscription churn.
+  /// The DHT's own metric: it decides which bucket the entry sits in and
+  /// which peers a walk asks first. Fixed for the life of the entry, so it
+  /// costs nothing in subscription churn.
   @$pb.TagNumber(10)
   $core.String get distance => $_getSZ(9);
   @$pb.TagNumber(10)
@@ -2135,8 +2438,9 @@ class RoutingPeer extends $pb.GeneratedMessage {
   void clearDistance() => $_clearField(10);
 
   /// Seconds since we last *established* a connection to this peer, in
-  /// either direction. Absent means never — which is a real and common
-  /// state for a routing entry: kad holds a peer the moment a configured
+  /// either direction. Absent means never connected, or not within the
+  /// node's bounded recency cache (1024 peers, oldest dropped first). Never
+  /// is a real and common state: kad holds a peer the moment a configured
   /// address is seeded into it, before any dial has succeeded.
   ///
   /// Deliberately not part of the subscription's change identity, for the
@@ -3503,6 +3807,1844 @@ class InferenceEvent extends $pb.GeneratedMessage {
   $core.bool hasDroppedEvents() => $_has(24);
   @$pb.TagNumber(80)
   void clearDroppedEvents() => $_clearField(80);
+}
+
+/// One knowledge base as reported by rag_status / rag_init.
+class RagKb extends $pb.GeneratedMessage {
+  factory RagKb({
+    $core.String? name,
+    $core.String? embedModel,
+    $core.bool? remote,
+    $core.Iterable<RagDoc>? documents,
+  }) {
+    final result = create();
+    if (name != null) result.name = name;
+    if (embedModel != null) result.embedModel = embedModel;
+    if (remote != null) result.remote = remote;
+    if (documents != null) result.documents.addAll(documents);
+    return result;
+  }
+
+  RagKb._();
+
+  factory RagKb.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagKb.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagKb',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..aOS(2, _omitFieldNames ? '' : 'embedModel')
+    ..aOB(3, _omitFieldNames ? '' : 'remote')
+    ..pPM<RagDoc>(4, _omitFieldNames ? '' : 'documents',
+        subBuilder: RagDoc.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagKb clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagKb copyWith(void Function(RagKb) updates) =>
+      super.copyWith((message) => updates(message as RagKb)) as RagKb;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagKb create() => RagKb._();
+  @$core.override
+  RagKb createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagKb getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RagKb>(create);
+  static RagKb? _defaultInstance;
+
+  /// KB name, e.g. "default". Unique per daemon.
+  @$pb.TagNumber(1)
+  $core.String get name => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set name($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearName() => $_clearField(1);
+
+  /// Ollama embedding model this KB was initialised with. Chunks
+  /// embedded with a different model are not comparable, so this is
+  /// effectively part of the KB's identity.
+  @$pb.TagNumber(2)
+  $core.String get embedModel => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set embedModel($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEmbedModel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEmbedModel() => $_clearField(2);
+
+  /// True when the KB's vectors live somewhere other than the local
+  /// embedded store (a remote Eve node or an HTTP storage service).
+  /// Phase 1 can report these but not query or ingest into them.
+  @$pb.TagNumber(3)
+  $core.bool get remote => $_getBF(2);
+  @$pb.TagNumber(3)
+  set remote($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRemote() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRemote() => $_clearField(3);
+
+  /// Documents ingested so far, each with its chunk count. Best-effort:
+  /// a KB whose metadata store can't be opened is still reported, with
+  /// an empty list, rather than failing the whole status op.
+  @$pb.TagNumber(4)
+  $pb.PbList<RagDoc> get documents => $_getList(3);
+}
+
+/// One ingested document, as reported by rag_status.
+class RagDoc extends $pb.GeneratedMessage {
+  factory RagDoc({
+    $core.String? name,
+    $core.int? chunks,
+  }) {
+    final result = create();
+    if (name != null) result.name = name;
+    if (chunks != null) result.chunks = chunks;
+    return result;
+  }
+
+  RagDoc._();
+
+  factory RagDoc.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagDoc.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagDoc',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..aI(2, _omitFieldNames ? '' : 'chunks', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagDoc clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagDoc copyWith(void Function(RagDoc) updates) =>
+      super.copyWith((message) => updates(message as RagDoc)) as RagDoc;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagDoc create() => RagDoc._();
+  @$core.override
+  RagDoc createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagDoc getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RagDoc>(create);
+  static RagDoc? _defaultInstance;
+
+  /// Display name recorded at ingest — what rag_delete expects back.
+  @$pb.TagNumber(1)
+  $core.String get name => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set name($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearName() => $_clearField(1);
+
+  /// Chunks this document contributed, which is also its vector count.
+  /// 0 when the metadata row exists but couldn't be read, rather than
+  /// omitting the document entirely.
+  @$pb.TagNumber(2)
+  $core.int get chunks => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set chunks($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasChunks() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearChunks() => $_clearField(2);
+}
+
+class RagStatusRequest extends $pb.GeneratedMessage {
+  factory RagStatusRequest() => create();
+
+  RagStatusRequest._();
+
+  factory RagStatusRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagStatusRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagStatusRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagStatusRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagStatusRequest copyWith(void Function(RagStatusRequest) updates) =>
+      super.copyWith((message) => updates(message as RagStatusRequest))
+          as RagStatusRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagStatusRequest create() => RagStatusRequest._();
+  @$core.override
+  RagStatusRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagStatusRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RagStatusRequest>(create);
+  static RagStatusRequest? _defaultInstance;
+}
+
+class RagStatusUpdate extends $pb.GeneratedMessage {
+  factory RagStatusUpdate({
+    $core.Iterable<RagKb>? kbs,
+  }) {
+    final result = create();
+    if (kbs != null) result.kbs.addAll(kbs);
+    return result;
+  }
+
+  RagStatusUpdate._();
+
+  factory RagStatusUpdate.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagStatusUpdate.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagStatusUpdate',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..pPM<RagKb>(1, _omitFieldNames ? '' : 'kbs', subBuilder: RagKb.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagStatusUpdate clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagStatusUpdate copyWith(void Function(RagStatusUpdate) updates) =>
+      super.copyWith((message) => updates(message as RagStatusUpdate))
+          as RagStatusUpdate;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagStatusUpdate create() => RagStatusUpdate._();
+  @$core.override
+  RagStatusUpdate createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagStatusUpdate getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RagStatusUpdate>(create);
+  static RagStatusUpdate? _defaultInstance;
+
+  /// Empty when RAG is compiled in but no KB has been initialised.
+  @$pb.TagNumber(1)
+  $pb.PbList<RagKb> get kbs => $_getList(0);
+}
+
+class RagInitRequest extends $pb.GeneratedMessage {
+  factory RagInitRequest({
+    $core.String? kb,
+    $core.String? embedModel,
+  }) {
+    final result = create();
+    if (kb != null) result.kb = kb;
+    if (embedModel != null) result.embedModel = embedModel;
+    return result;
+  }
+
+  RagInitRequest._();
+
+  factory RagInitRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagInitRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagInitRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'kb')
+    ..aOS(2, _omitFieldNames ? '' : 'embedModel')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagInitRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagInitRequest copyWith(void Function(RagInitRequest) updates) =>
+      super.copyWith((message) => updates(message as RagInitRequest))
+          as RagInitRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagInitRequest create() => RagInitRequest._();
+  @$core.override
+  RagInitRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagInitRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RagInitRequest>(create);
+  static RagInitRequest? _defaultInstance;
+
+  /// KB to create. Empty means "default". Re-initialising an existing
+  /// KB keeps its data directory and documents; a remote KB answers
+  /// UNIMPLEMENTED.
+  @$pb.TagNumber(1)
+  $core.String get kb => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set kb($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKb() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKb() => $_clearField(1);
+
+  /// Ollama embedding model. Empty means the daemon's default for a new
+  /// KB and the current model for an existing one. Changing the model of
+  /// a KB that holds documents fails with INVALID_ARGUMENT.
+  @$pb.TagNumber(2)
+  $core.String get embedModel => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set embedModel($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEmbedModel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEmbedModel() => $_clearField(2);
+}
+
+class RagInitReply extends $pb.GeneratedMessage {
+  factory RagInitReply({
+    RagKb? kb,
+  }) {
+    final result = create();
+    if (kb != null) result.kb = kb;
+    return result;
+  }
+
+  RagInitReply._();
+
+  factory RagInitReply.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagInitReply.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagInitReply',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOM<RagKb>(1, _omitFieldNames ? '' : 'kb', subBuilder: RagKb.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagInitReply clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagInitReply copyWith(void Function(RagInitReply) updates) =>
+      super.copyWith((message) => updates(message as RagInitReply))
+          as RagInitReply;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagInitReply create() => RagInitReply._();
+  @$core.override
+  RagInitReply createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagInitReply getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RagInitReply>(create);
+  static RagInitReply? _defaultInstance;
+
+  /// The KB as it exists after init. `documents` is empty for a fresh
+  /// KB and populated when init refreshed an existing one.
+  @$pb.TagNumber(1)
+  RagKb get kb => $_getN(0);
+  @$pb.TagNumber(1)
+  set kb(RagKb value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKb() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKb() => $_clearField(1);
+  @$pb.TagNumber(1)
+  RagKb ensureKb() => $_ensure(0);
+}
+
+class RagIngestRequest extends $pb.GeneratedMessage {
+  factory RagIngestRequest({
+    $core.String? kb,
+    $core.String? docName,
+    $fixnum.Int64? size,
+  }) {
+    final result = create();
+    if (kb != null) result.kb = kb;
+    if (docName != null) result.docName = docName;
+    if (size != null) result.size = size;
+    return result;
+  }
+
+  RagIngestRequest._();
+
+  factory RagIngestRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagIngestRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagIngestRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'kb')
+    ..aOS(2, _omitFieldNames ? '' : 'docName')
+    ..a<$fixnum.Int64>(3, _omitFieldNames ? '' : 'size', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagIngestRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagIngestRequest copyWith(void Function(RagIngestRequest) updates) =>
+      super.copyWith((message) => updates(message as RagIngestRequest))
+          as RagIngestRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagIngestRequest create() => RagIngestRequest._();
+  @$core.override
+  RagIngestRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagIngestRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RagIngestRequest>(create);
+  static RagIngestRequest? _defaultInstance;
+
+  /// KB to ingest into. Empty means "default".
+  @$pb.TagNumber(1)
+  $core.String get kb => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set kb($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKb() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKb() => $_clearField(1);
+
+  /// Display name for the document, required. Its extension picks the
+  /// parser (`.pdf`, `.docx`, …), so send the original file name.
+  @$pb.TagNumber(2)
+  $core.String get docName => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set docName($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDocName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDocName() => $_clearField(2);
+
+  /// Total bytes the rag_ingest_data frames will carry, above 0 and at
+  /// most 256 MiB. The ingest starts once exactly this many have
+  /// arrived. A piece carrying bytes past it fails the ingest; pieces
+  /// sent after exactly `size` bytes are discarded.
+  ///
+  /// A daemon receives at most 4 uploads at once; beyond that the
+  /// ingest fails with UNAVAILABLE before any piece is read.
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get size => $_getI64(2);
+  @$pb.TagNumber(3)
+  set size($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSize() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSize() => $_clearField(3);
+}
+
+/// A piece of the document an ingest is uploading. Keep each well under
+/// the 4 MiB gRPC frame limit; 256 KiB is a good size.
+///
+/// Flow control is a window of 8 pieces: at most 8 may be unacknowledged
+/// (sent, with no RAG_PHASE_RECEIVING frame for them yet). The server
+/// buffers no more, so a ninth can fail the ingest with INVALID_ARGUMENT.
+/// An upload that sends nothing for 60 s fails the same way.
+class RagIngestData extends $pb.GeneratedMessage {
+  factory RagIngestData({
+    $core.List<$core.int>? data,
+  }) {
+    final result = create();
+    if (data != null) result.data = data;
+    return result;
+  }
+
+  RagIngestData._();
+
+  factory RagIngestData.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagIngestData.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagIngestData',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..a<$core.List<$core.int>>(
+        1, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagIngestData clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagIngestData copyWith(void Function(RagIngestData) updates) =>
+      super.copyWith((message) => updates(message as RagIngestData))
+          as RagIngestData;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagIngestData create() => RagIngestData._();
+  @$core.override
+  RagIngestData createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagIngestData getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RagIngestData>(create);
+  static RagIngestData? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<$core.int> get data => $_getN(0);
+  @$pb.TagNumber(1)
+  set data($core.List<$core.int> value) => $_setBytes(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasData() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearData() => $_clearField(1);
+}
+
+/// Progress for an in-flight ingest. Deliberately ONE flat message with
+/// a phase enum rather than a oneof-per-phase: phases are a fixed,
+/// ordered pipeline sharing the same done/total shape, and a flat
+/// message lets a client render a progress bar without a match on
+/// every variant. Adding a phase later is then an enum value, not a
+/// new oneof arm every client must handle.
+class RagProgress extends $pb.GeneratedMessage {
+  factory RagProgress({
+    RagProgress_RagPhase? phase,
+    $core.int? done,
+    $core.int? total,
+    $core.String? detail,
+  }) {
+    final result = create();
+    if (phase != null) result.phase = phase;
+    if (done != null) result.done = done;
+    if (total != null) result.total = total;
+    if (detail != null) result.detail = detail;
+    return result;
+  }
+
+  RagProgress._();
+
+  factory RagProgress.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagProgress.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagProgress',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aE<RagProgress_RagPhase>(1, _omitFieldNames ? '' : 'phase',
+        enumValues: RagProgress_RagPhase.values)
+    ..aI(2, _omitFieldNames ? '' : 'done', fieldType: $pb.PbFieldType.OU3)
+    ..aI(3, _omitFieldNames ? '' : 'total', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(4, _omitFieldNames ? '' : 'detail')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagProgress clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagProgress copyWith(void Function(RagProgress) updates) =>
+      super.copyWith((message) => updates(message as RagProgress))
+          as RagProgress;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagProgress create() => RagProgress._();
+  @$core.override
+  RagProgress createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagProgress getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RagProgress>(create);
+  static RagProgress? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  RagProgress_RagPhase get phase => $_getN(0);
+  @$pb.TagNumber(1)
+  set phase(RagProgress_RagPhase value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPhase() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPhase() => $_clearField(1);
+
+  /// Units completed / expected for this phase. Both 0 when the
+  /// phase has no meaningful subdivision.
+  @$pb.TagNumber(2)
+  $core.int get done => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set done($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDone() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDone() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get total => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set total($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTotal() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTotal() => $_clearField(3);
+
+  /// Optional human-readable detail (e.g. the document name).
+  @$pb.TagNumber(4)
+  $core.String get detail => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set detail($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDetail() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDetail() => $_clearField(4);
+}
+
+class RagIngestReply extends $pb.GeneratedMessage {
+  factory RagIngestReply({
+    $core.int? chunksIngested,
+    $core.int? vectorsUploaded,
+  }) {
+    final result = create();
+    if (chunksIngested != null) result.chunksIngested = chunksIngested;
+    if (vectorsUploaded != null) result.vectorsUploaded = vectorsUploaded;
+    return result;
+  }
+
+  RagIngestReply._();
+
+  factory RagIngestReply.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagIngestReply.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagIngestReply',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'chunksIngested',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'vectorsUploaded',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagIngestReply clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagIngestReply copyWith(void Function(RagIngestReply) updates) =>
+      super.copyWith((message) => updates(message as RagIngestReply))
+          as RagIngestReply;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagIngestReply create() => RagIngestReply._();
+  @$core.override
+  RagIngestReply createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagIngestReply getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RagIngestReply>(create);
+  static RagIngestReply? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get chunksIngested => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set chunksIngested($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChunksIngested() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChunksIngested() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get vectorsUploaded => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set vectorsUploaded($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasVectorsUploaded() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearVectorsUploaded() => $_clearField(2);
+}
+
+class RagQueryRequest extends $pb.GeneratedMessage {
+  factory RagQueryRequest({
+    $core.String? kb,
+    $core.String? text,
+    $core.int? topK,
+    $core.double? minScore,
+  }) {
+    final result = create();
+    if (kb != null) result.kb = kb;
+    if (text != null) result.text = text;
+    if (topK != null) result.topK = topK;
+    if (minScore != null) result.minScore = minScore;
+    return result;
+  }
+
+  RagQueryRequest._();
+
+  factory RagQueryRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagQueryRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagQueryRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'kb')
+    ..aOS(2, _omitFieldNames ? '' : 'text')
+    ..aI(3, _omitFieldNames ? '' : 'topK', fieldType: $pb.PbFieldType.OU3)
+    ..aD(4, _omitFieldNames ? '' : 'minScore')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagQueryRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagQueryRequest copyWith(void Function(RagQueryRequest) updates) =>
+      super.copyWith((message) => updates(message as RagQueryRequest))
+          as RagQueryRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagQueryRequest create() => RagQueryRequest._();
+  @$core.override
+  RagQueryRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagQueryRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RagQueryRequest>(create);
+  static RagQueryRequest? _defaultInstance;
+
+  /// KB to query. Empty means "default".
+  @$pb.TagNumber(1)
+  $core.String get kb => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set kb($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKb() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKb() => $_clearField(1);
+
+  /// The query text.
+  @$pb.TagNumber(2)
+  $core.String get text => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set text($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasText() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearText() => $_clearField(2);
+
+  /// Max chunks to return. 0 means the server default (20).
+  @$pb.TagNumber(3)
+  $core.int get topK => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set topK($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTopK() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTopK() => $_clearField(3);
+
+  /// Drop chunks scoring below this. 0 keeps everything.
+  @$pb.TagNumber(4)
+  $core.double get minScore => $_getN(3);
+  @$pb.TagNumber(4)
+  set minScore($core.double value) => $_setDouble(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasMinScore() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMinScore() => $_clearField(4);
+}
+
+/// One retrieved chunk. Mirrors the JSON the HTTP RAG API returns.
+class RagChunk extends $pb.GeneratedMessage {
+  factory RagChunk({
+    $core.int? rank,
+    $core.double? score,
+    $core.String? doc,
+    $core.int? chunkIndex,
+    $core.String? text,
+  }) {
+    final result = create();
+    if (rank != null) result.rank = rank;
+    if (score != null) result.score = score;
+    if (doc != null) result.doc = doc;
+    if (chunkIndex != null) result.chunkIndex = chunkIndex;
+    if (text != null) result.text = text;
+    return result;
+  }
+
+  RagChunk._();
+
+  factory RagChunk.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagChunk.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagChunk',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'rank', fieldType: $pb.PbFieldType.OU3)
+    ..aD(2, _omitFieldNames ? '' : 'score')
+    ..aOS(3, _omitFieldNames ? '' : 'doc')
+    ..aI(4, _omitFieldNames ? '' : 'chunkIndex', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(5, _omitFieldNames ? '' : 'text')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagChunk clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagChunk copyWith(void Function(RagChunk) updates) =>
+      super.copyWith((message) => updates(message as RagChunk)) as RagChunk;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagChunk create() => RagChunk._();
+  @$core.override
+  RagChunk createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagChunk getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RagChunk>(create);
+  static RagChunk? _defaultInstance;
+
+  /// 1-based position in the result list.
+  @$pb.TagNumber(1)
+  $core.int get rank => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set rank($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRank() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRank() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get score => $_getN(1);
+  @$pb.TagNumber(2)
+  set score($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasScore() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearScore() => $_clearField(2);
+
+  /// Document this chunk came from.
+  @$pb.TagNumber(3)
+  $core.String get doc => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set doc($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDoc() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDoc() => $_clearField(3);
+
+  /// 0-based index of the chunk within its document.
+  @$pb.TagNumber(4)
+  $core.int get chunkIndex => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set chunkIndex($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasChunkIndex() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearChunkIndex() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get text => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set text($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasText() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearText() => $_clearField(5);
+}
+
+class RagQueryReply extends $pb.GeneratedMessage {
+  factory RagQueryReply({
+    $core.Iterable<RagChunk>? chunks,
+  }) {
+    final result = create();
+    if (chunks != null) result.chunks.addAll(chunks);
+    return result;
+  }
+
+  RagQueryReply._();
+
+  factory RagQueryReply.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagQueryReply.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagQueryReply',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..pPM<RagChunk>(1, _omitFieldNames ? '' : 'chunks',
+        subBuilder: RagChunk.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagQueryReply clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagQueryReply copyWith(void Function(RagQueryReply) updates) =>
+      super.copyWith((message) => updates(message as RagQueryReply))
+          as RagQueryReply;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagQueryReply create() => RagQueryReply._();
+  @$core.override
+  RagQueryReply createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagQueryReply getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RagQueryReply>(create);
+  static RagQueryReply? _defaultInstance;
+
+  /// Ordered best-first. Empty when nothing cleared min_score.
+  @$pb.TagNumber(1)
+  $pb.PbList<RagChunk> get chunks => $_getList(0);
+}
+
+class RagDeleteRequest extends $pb.GeneratedMessage {
+  factory RagDeleteRequest({
+    $core.String? kb,
+    $core.String? docName,
+  }) {
+    final result = create();
+    if (kb != null) result.kb = kb;
+    if (docName != null) result.docName = docName;
+    return result;
+  }
+
+  RagDeleteRequest._();
+
+  factory RagDeleteRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagDeleteRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagDeleteRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'kb')
+    ..aOS(2, _omitFieldNames ? '' : 'docName')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagDeleteRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagDeleteRequest copyWith(void Function(RagDeleteRequest) updates) =>
+      super.copyWith((message) => updates(message as RagDeleteRequest))
+          as RagDeleteRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagDeleteRequest create() => RagDeleteRequest._();
+  @$core.override
+  RagDeleteRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagDeleteRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RagDeleteRequest>(create);
+  static RagDeleteRequest? _defaultInstance;
+
+  /// KB to delete from. Empty means "default".
+  @$pb.TagNumber(1)
+  $core.String get kb => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set kb($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKb() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKb() => $_clearField(1);
+
+  /// Document name as reported in RagDoc.name — the display name the
+  /// ingest recorded, not a filesystem path. Deleting by name rather
+  /// than by chunk id keeps the client from having to know how a
+  /// document was split.
+  @$pb.TagNumber(2)
+  $core.String get docName => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set docName($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDocName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDocName() => $_clearField(2);
+}
+
+class RagDeleteReply extends $pb.GeneratedMessage {
+  factory RagDeleteReply({
+    $core.int? chunksDeleted,
+  }) {
+    final result = create();
+    if (chunksDeleted != null) result.chunksDeleted = chunksDeleted;
+    return result;
+  }
+
+  RagDeleteReply._();
+
+  factory RagDeleteReply.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagDeleteReply.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagDeleteReply',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'chunksDeleted',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagDeleteReply clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagDeleteReply copyWith(void Function(RagDeleteReply) updates) =>
+      super.copyWith((message) => updates(message as RagDeleteReply))
+          as RagDeleteReply;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagDeleteReply create() => RagDeleteReply._();
+  @$core.override
+  RagDeleteReply createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagDeleteReply getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RagDeleteReply>(create);
+  static RagDeleteReply? _defaultInstance;
+
+  /// Chunks removed from the metadata store, which is also the number
+  /// of vectors dropped. Never 0 on success: a document with no chunks
+  /// answers NOT_FOUND instead.
+  @$pb.TagNumber(1)
+  $core.int get chunksDeleted => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set chunksDeleted($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasChunksDeleted() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearChunksDeleted() => $_clearField(1);
+}
+
+/// List the DHT records this node holds locally — the only listing that
+/// exists. Kademlia has no key-enumeration operation, so what a node
+/// holds is answerable in full while "what is in the DHT" is not.
+class DhtRecordsRequest extends $pb.GeneratedMessage {
+  factory DhtRecordsRequest({
+    $core.bool? includeValues,
+    $core.Iterable<$core.String>? keyIds,
+    $core.int? limit,
+  }) {
+    final result = create();
+    if (includeValues != null) result.includeValues = includeValues;
+    if (keyIds != null) result.keyIds.addAll(keyIds);
+    if (limit != null) result.limit = limit;
+    return result;
+  }
+
+  DhtRecordsRequest._();
+
+  factory DhtRecordsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DhtRecordsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DhtRecordsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'includeValues')
+    ..pPS(2, _omitFieldNames ? '' : 'keyIds')
+    ..aI(3, _omitFieldNames ? '' : 'limit', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtRecordsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtRecordsRequest copyWith(void Function(DhtRecordsRequest) updates) =>
+      super.copyWith((message) => updates(message as DhtRecordsRequest))
+          as DhtRecordsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DhtRecordsRequest create() => DhtRecordsRequest._();
+  @$core.override
+  DhtRecordsRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DhtRecordsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DhtRecordsRequest>(create);
+  static DhtRecordsRequest? _defaultInstance;
+
+  /// Fill in `value` and `subkeys`. Requires a non-empty `key_ids`:
+  /// values run to a megabyte each, so a whole-store listing carrying
+  /// them could not fit one frame. INVALID_ARGUMENT otherwise.
+  ///
+  /// Values are attached in reply order until about 3 MiB of value data
+  /// has been included, each value or subkey charged its encoded size in
+  /// the reply (never less than its raw size); once one does not fit, no
+  /// further value is attached. A dictionary returns at most 256
+  /// subkeys, in subkey byte order. Anything withheld sets
+  /// `values_truncated` on its record and on the reply.
+  @$pb.TagNumber(1)
+  $core.bool get includeValues => $_getBF(0);
+  @$pb.TagNumber(1)
+  set includeValues($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasIncludeValues() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearIncludeValues() => $_clearField(1);
+
+  /// Restrict the listing to these DHT ids (hex, as reported in
+  /// DhtRecord.key_id; either case, optional `0x`). Empty lists
+  /// everything. An id that is not hex is INVALID_ARGUMENT.
+  @$pb.TagNumber(2)
+  $pb.PbList<$core.String> get keyIds => $_getList(1);
+
+  /// Maximum records to return. 0 uses the daemon's default (500);
+  /// above its ceiling (5000) it is clamped, not rejected.
+  @$pb.TagNumber(3)
+  $core.int get limit => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set limit($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasLimit() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearLimit() => $_clearField(3);
+}
+
+class DhtRecordsReply extends $pb.GeneratedMessage {
+  factory DhtRecordsReply({
+    $core.String? serverTime,
+    $core.Iterable<DhtRecord>? records,
+    $core.Iterable<DhtKnownKey>? knownKeys,
+    $core.int? totalRecords,
+    $core.bool? valuesTruncated,
+  }) {
+    final result = create();
+    if (serverTime != null) result.serverTime = serverTime;
+    if (records != null) result.records.addAll(records);
+    if (knownKeys != null) result.knownKeys.addAll(knownKeys);
+    if (totalRecords != null) result.totalRecords = totalRecords;
+    if (valuesTruncated != null) result.valuesTruncated = valuesTruncated;
+    return result;
+  }
+
+  DhtRecordsReply._();
+
+  factory DhtRecordsReply.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DhtRecordsReply.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DhtRecordsReply',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'serverTime')
+    ..pPM<DhtRecord>(2, _omitFieldNames ? '' : 'records',
+        subBuilder: DhtRecord.create)
+    ..pPM<DhtKnownKey>(3, _omitFieldNames ? '' : 'knownKeys',
+        subBuilder: DhtKnownKey.create)
+    ..aI(4, _omitFieldNames ? '' : 'totalRecords',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOB(5, _omitFieldNames ? '' : 'valuesTruncated')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtRecordsReply clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtRecordsReply copyWith(void Function(DhtRecordsReply) updates) =>
+      super.copyWith((message) => updates(message as DhtRecordsReply))
+          as DhtRecordsReply;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DhtRecordsReply create() => DhtRecordsReply._();
+  @$core.override
+  DhtRecordsReply createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DhtRecordsReply getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DhtRecordsReply>(create);
+  static DhtRecordsReply? _defaultInstance;
+
+  /// Daemon wall-clock time of this snapshot, RFC 3339.
+  @$pb.TagNumber(1)
+  $core.String get serverTime => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set serverTime($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasServerTime() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearServerTime() => $_clearField(1);
+
+  /// Live records, primary tier first, then cache, each tier in key
+  /// order. A key held in both appears twice: the copies carry their
+  /// own expirations and values, and a find serves whichever expires
+  /// later, so they are genuinely two records.
+  @$pb.TagNumber(2)
+  $pb.PbList<DhtRecord> get records => $_getList(1);
+
+  /// The keys this node can name: the registries plus one per block of
+  /// its configured prefix. The reverse table for DhtRecord.key_name:
+  /// a DHT id is SHA1(msgpack(name)) and cannot be inverted.
+  @$pb.TagNumber(3)
+  $pb.PbList<DhtKnownKey> get knownKeys => $_getList(2);
+
+  /// Records matching the filter before `limit` was applied. Greater
+  /// than `records.len()` means the listing was cut short.
+  @$pb.TagNumber(4)
+  $core.int get totalRecords => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set totalRecords($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTotalRecords() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTotalRecords() => $_clearField(4);
+
+  /// Some record's `values_truncated` is set: `include_values` was asked
+  /// and the reply's value budget or subkey cap withheld something.
+  @$pb.TagNumber(5)
+  $core.bool get valuesTruncated => $_getBF(4);
+  @$pb.TagNumber(5)
+  set valuesTruncated($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasValuesTruncated() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearValuesTruncated() => $_clearField(5);
+}
+
+/// A plaintext key name and the DHT id it hashes to.
+class DhtKnownKey extends $pb.GeneratedMessage {
+  factory DhtKnownKey({
+    $core.String? name,
+    $core.String? keyId,
+  }) {
+    final result = create();
+    if (name != null) result.name = name;
+    if (keyId != null) result.keyId = keyId;
+    return result;
+  }
+
+  DhtKnownKey._();
+
+  factory DhtKnownKey.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DhtKnownKey.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DhtKnownKey',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'name')
+    ..aOS(2, _omitFieldNames ? '' : 'keyId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtKnownKey clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtKnownKey copyWith(void Function(DhtKnownKey) updates) =>
+      super.copyWith((message) => updates(message as DhtKnownKey))
+          as DhtKnownKey;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DhtKnownKey create() => DhtKnownKey._();
+  @$core.override
+  DhtKnownKey createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DhtKnownKey getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DhtKnownKey>(create);
+  static DhtKnownKey? _defaultInstance;
+
+  /// e.g. `_petals.models`, `_kwaai.vpk.nodes`, `Qwen3-8B.0`.
+  @$pb.TagNumber(1)
+  $core.String get name => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set name($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasName() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearName() => $_clearField(1);
+
+  /// SHA1(msgpack(name)), hex.
+  @$pb.TagNumber(2)
+  $core.String get keyId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set keyId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKeyId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKeyId() => $_clearField(2);
+}
+
+/// One DHT record: a stored value plus everything known about it that is
+/// not the value itself.
+class DhtRecord extends $pb.GeneratedMessage {
+  factory DhtRecord({
+    $core.String? keyId,
+    $core.String? keyName,
+    DhtRecordKind? kind,
+    $core.bool? inCache,
+    $core.int? subkeyCount,
+    $fixnum.Int64? valueBytes,
+    $core.double? expiration,
+    $core.double? expiresInSecs,
+    $core.double? latestExpiration,
+    $fixnum.Int64? dictMaxsize,
+    DhtValueView? value,
+    $core.Iterable<DhtSubkey>? subkeys,
+    $core.bool? valuesTruncated,
+  }) {
+    final result = create();
+    if (keyId != null) result.keyId = keyId;
+    if (keyName != null) result.keyName = keyName;
+    if (kind != null) result.kind = kind;
+    if (inCache != null) result.inCache = inCache;
+    if (subkeyCount != null) result.subkeyCount = subkeyCount;
+    if (valueBytes != null) result.valueBytes = valueBytes;
+    if (expiration != null) result.expiration = expiration;
+    if (expiresInSecs != null) result.expiresInSecs = expiresInSecs;
+    if (latestExpiration != null) result.latestExpiration = latestExpiration;
+    if (dictMaxsize != null) result.dictMaxsize = dictMaxsize;
+    if (value != null) result.value = value;
+    if (subkeys != null) result.subkeys.addAll(subkeys);
+    if (valuesTruncated != null) result.valuesTruncated = valuesTruncated;
+    return result;
+  }
+
+  DhtRecord._();
+
+  factory DhtRecord.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DhtRecord.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DhtRecord',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'keyId')
+    ..aOS(2, _omitFieldNames ? '' : 'keyName')
+    ..aE<DhtRecordKind>(3, _omitFieldNames ? '' : 'kind',
+        enumValues: DhtRecordKind.values)
+    ..aOB(4, _omitFieldNames ? '' : 'inCache')
+    ..aI(5, _omitFieldNames ? '' : 'subkeyCount',
+        fieldType: $pb.PbFieldType.OU3)
+    ..a<$fixnum.Int64>(
+        6, _omitFieldNames ? '' : 'valueBytes', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aD(7, _omitFieldNames ? '' : 'expiration')
+    ..aD(8, _omitFieldNames ? '' : 'expiresInSecs')
+    ..aD(9, _omitFieldNames ? '' : 'latestExpiration')
+    ..a<$fixnum.Int64>(
+        10, _omitFieldNames ? '' : 'dictMaxsize', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOM<DhtValueView>(11, _omitFieldNames ? '' : 'value',
+        subBuilder: DhtValueView.create)
+    ..pPM<DhtSubkey>(12, _omitFieldNames ? '' : 'subkeys',
+        subBuilder: DhtSubkey.create)
+    ..aOB(13, _omitFieldNames ? '' : 'valuesTruncated')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtRecord clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtRecord copyWith(void Function(DhtRecord) updates) =>
+      super.copyWith((message) => updates(message as DhtRecord)) as DhtRecord;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DhtRecord create() => DhtRecord._();
+  @$core.override
+  DhtRecord createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DhtRecord getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<DhtRecord>(create);
+  static DhtRecord? _defaultInstance;
+
+  /// The record's DHT id, hex. This is the key the store is indexed
+  /// by, and what `key_ids` filters on.
+  @$pb.TagNumber(1)
+  $core.String get keyId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set keyId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKeyId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKeyId() => $_clearField(1);
+
+  /// The plaintext name, when this id matches one this node knows how
+  /// to derive. Empty otherwise, which is the normal case for a record
+  /// replicated onto us for a model we do not serve — the id is a hash
+  /// and there is nothing to invert.
+  @$pb.TagNumber(2)
+  $core.String get keyName => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set keyName($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKeyName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKeyName() => $_clearField(2);
+
+  /// Regular value vs dictionary. The distinction is not cosmetic: a
+  /// dictionary is how N peers announce under one key without
+  /// overwriting each other, so a block key with one subkey per server
+  /// is the shape to expect, and a *regular* value under such a key is
+  /// a peer that clobbered the others.
+  @$pb.TagNumber(3)
+  DhtRecordKind get kind => $_getN(2);
+  @$pb.TagNumber(3)
+  set kind(DhtRecordKind value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasKind() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearKind() => $_clearField(3);
+
+  /// Cache tier rather than primary. A cached record is here because a
+  /// lookup passed through this node, not because anyone chose to
+  /// replicate onto it, and it is evictable.
+  @$pb.TagNumber(4)
+  $core.bool get inCache => $_getBF(3);
+  @$pb.TagNumber(4)
+  set inCache($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasInCache() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearInCache() => $_clearField(4);
+
+  /// Subkeys held for a dictionary, 0 for a regular value; `kind`
+  /// separates those. Counts expired subkeys too: nothing prunes a
+  /// stored subkey once it expires — sweeping drops whole records, and
+  /// the freshness check only rejects incoming stores — so compare
+  /// each subkey's own expiration to see what is still live.
+  @$pb.TagNumber(5)
+  $core.int get subkeyCount => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set subkeyCount($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSubkeyCount() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSubkeyCount() => $_clearField(5);
+
+  /// Value bytes only: the stored value for a regular record, the
+  /// summed subkey values (expired ones included) for a dictionary.
+  /// Not the serialized wire size, which adds msgpack framing.
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get valueBytes => $_getI64(5);
+  @$pb.TagNumber(6)
+  set valueBytes($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasValueBytes() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearValueBytes() => $_clearField(6);
+
+  /// The record's outer expiration, seconds since the UNIX epoch. The
+  /// one `rpc_find` reports, and for a dictionary it can differ from
+  /// `latest_expiration`.
+  @$pb.TagNumber(7)
+  $core.double get expiration => $_getN(6);
+  @$pb.TagNumber(7)
+  set expiration($core.double value) => $_setDouble(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasExpiration() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearExpiration() => $_clearField(7);
+
+  /// Seconds until `expiration`, as of `server_time`. Never negative:
+  /// the listing filters expired records. Sent alongside the absolute
+  /// time because a client's clock is not the daemon's.
+  @$pb.TagNumber(8)
+  $core.double get expiresInSecs => $_getN(7);
+  @$pb.TagNumber(8)
+  set expiresInSecs($core.double value) => $_setDouble(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasExpiresInSecs() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearExpiresInSecs() => $_clearField(8);
+
+  /// `DictionaryDHTValue.latest_expiration_time` — the running maximum
+  /// over every subkey ever stored, which Python never recomputes on
+  /// expiry. Set for dictionaries only, and a value well past
+  /// `expiration` is normal rather than a bug.
+  @$pb.TagNumber(9)
+  $core.double get latestExpiration => $_getN(8);
+  @$pb.TagNumber(9)
+  set latestExpiration($core.double value) => $_setDouble(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasLatestExpiration() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearLatestExpiration() => $_clearField(9);
+
+  /// The dictionary's own subkey cap. Absent when unbounded, and for
+  /// regular records.
+  @$pb.TagNumber(10)
+  $fixnum.Int64 get dictMaxsize => $_getI64(9);
+  @$pb.TagNumber(10)
+  set dictMaxsize($fixnum.Int64 value) => $_setInt64(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasDictMaxsize() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearDictMaxsize() => $_clearField(10);
+
+  /// The decoded value, when `include_values` was set. Absent for a
+  /// dictionary, whose values live per-subkey below.
+  @$pb.TagNumber(11)
+  DhtValueView get value => $_getN(10);
+  @$pb.TagNumber(11)
+  set value(DhtValueView value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasValue() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearValue() => $_clearField(11);
+  @$pb.TagNumber(11)
+  DhtValueView ensureValue() => $_ensure(10);
+
+  /// Per-subkey breakdown, when `include_values` was set and this is a
+  /// dictionary. Each subkey expires independently of the record, and
+  /// expired ones are included (see `subkey_count`). A prefix in subkey
+  /// byte order: fewer than `subkey_count` entries means the rest were
+  /// withheld, and `values_truncated` is set.
+  @$pb.TagNumber(12)
+  $pb.PbList<DhtSubkey> get subkeys => $_getList(11);
+
+  /// `include_values` was asked but part of this record's value was
+  /// withheld: a regular record's `value`, or the subkeys past
+  /// `subkeys.len()`. See DhtRecordsRequest.include_values. Also set,
+  /// with nothing attached, when the record expired or was evicted
+  /// between being listed and its value being read.
+  @$pb.TagNumber(13)
+  $core.bool get valuesTruncated => $_getBF(12);
+  @$pb.TagNumber(13)
+  set valuesTruncated($core.bool value) => $_setBool(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasValuesTruncated() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearValuesTruncated() => $_clearField(13);
+}
+
+class DhtSubkey extends $pb.GeneratedMessage {
+  factory DhtSubkey({
+    $core.String? subkey,
+    $core.double? expiration,
+    $core.double? expiresInSecs,
+    $fixnum.Int64? valueBytes,
+    DhtValueView? value,
+  }) {
+    final result = create();
+    if (subkey != null) result.subkey = subkey;
+    if (expiration != null) result.expiration = expiration;
+    if (expiresInSecs != null) result.expiresInSecs = expiresInSecs;
+    if (valueBytes != null) result.valueBytes = valueBytes;
+    if (value != null) result.value = value;
+    return result;
+  }
+
+  DhtSubkey._();
+
+  factory DhtSubkey.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DhtSubkey.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DhtSubkey',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'subkey')
+    ..aD(2, _omitFieldNames ? '' : 'expiration')
+    ..aD(3, _omitFieldNames ? '' : 'expiresInSecs')
+    ..a<$fixnum.Int64>(
+        4, _omitFieldNames ? '' : 'valueBytes', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOM<DhtValueView>(5, _omitFieldNames ? '' : 'value',
+        subBuilder: DhtValueView.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtSubkey clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtSubkey copyWith(void Function(DhtSubkey) updates) =>
+      super.copyWith((message) => updates(message as DhtSubkey)) as DhtSubkey;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DhtSubkey create() => DhtSubkey._();
+  @$core.override
+  DhtSubkey createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DhtSubkey getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<DhtSubkey>(create);
+  static DhtSubkey? _defaultInstance;
+
+  /// The subkey rendered from its msgpack form — a base58 peer id for
+  /// every record this network publishes, but nothing enforces that,
+  /// so it is rendered by the same rules as a value.
+  @$pb.TagNumber(1)
+  $core.String get subkey => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set subkey($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSubkey() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSubkey() => $_clearField(1);
+
+  /// Absolute expiration, seconds since the UNIX epoch, and the
+  /// countdown to it. Independent of the record's own expiration:
+  /// that is the whole point of a dictionary. Unlike the record's,
+  /// `expires_in_secs` can be negative: an expired subkey stays until
+  /// its record goes, and is not live.
+  @$pb.TagNumber(2)
+  $core.double get expiration => $_getN(1);
+  @$pb.TagNumber(2)
+  set expiration($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasExpiration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearExpiration() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get expiresInSecs => $_getN(2);
+  @$pb.TagNumber(3)
+  set expiresInSecs($core.double value) => $_setDouble(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasExpiresInSecs() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearExpiresInSecs() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get valueBytes => $_getI64(3);
+  @$pb.TagNumber(4)
+  set valueBytes($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasValueBytes() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearValueBytes() => $_clearField(4);
+
+  /// The decoded value.
+  @$pb.TagNumber(5)
+  DhtValueView get value => $_getN(4);
+  @$pb.TagNumber(5)
+  set value(DhtValueView value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasValue() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearValue() => $_clearField(5);
+  @$pb.TagNumber(5)
+  DhtValueView ensureValue() => $_ensure(4);
+}
+
+/// A msgpack value rendered for display.
+///
+/// Deliberately structural, not semantic: this decodes msgpack and shows
+/// what is there. It does not know that an Ext(64) under a block key is a
+/// petals ServerInfo, and does not invent field names for one — an Ext
+/// body that is itself msgpack (which is what Python's tuple encoding
+/// produces) is unwrapped and rendered as its contents, and one that is
+/// not is reported as opaque bytes under its type code.
+class DhtValueView extends $pb.GeneratedMessage {
+  factory DhtValueView({
+    $core.String? msgpackType,
+    $core.String? rendered,
+    $fixnum.Int64? rawBytes,
+    $core.int? extCode,
+    $core.bool? decoded,
+  }) {
+    final result = create();
+    if (msgpackType != null) result.msgpackType = msgpackType;
+    if (rendered != null) result.rendered = rendered;
+    if (rawBytes != null) result.rawBytes = rawBytes;
+    if (extCode != null) result.extCode = extCode;
+    if (decoded != null) result.decoded = decoded;
+    return result;
+  }
+
+  DhtValueView._();
+
+  factory DhtValueView.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DhtValueView.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DhtValueView',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'msgpackType')
+    ..aOS(2, _omitFieldNames ? '' : 'rendered')
+    ..a<$fixnum.Int64>(
+        3, _omitFieldNames ? '' : 'rawBytes', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aI(4, _omitFieldNames ? '' : 'extCode')
+    ..aOB(5, _omitFieldNames ? '' : 'decoded')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtValueView clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DhtValueView copyWith(void Function(DhtValueView) updates) =>
+      super.copyWith((message) => updates(message as DhtValueView))
+          as DhtValueView;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DhtValueView create() => DhtValueView._();
+  @$core.override
+  DhtValueView createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DhtValueView getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DhtValueView>(create);
+  static DhtValueView? _defaultInstance;
+
+  /// Top-level msgpack type: `map`, `array`, `str`, `bin`, `int`,
+  /// `float`, `bool`, `nil`, or `ext`. `undecodable` when the bytes
+  /// are not msgpack at all, in which case `rendered` is their hex.
+  @$pb.TagNumber(1)
+  $core.String get msgpackType => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set msgpackType($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMsgpackType() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMsgpackType() => $_clearField(1);
+
+  /// The value as compact JSON — valid for `jsonDecode` whenever
+  /// `decoded` is true; when false it is the raw hex and must not be
+  /// parsed. What JSON cannot say is a one-key tagged object:
+  ///   str/bin that is not UTF-8   {"$hex": "lowercase hex"}
+  ///   NaN / ±inf                  {"$float": "nan" | "inf" | "-inf"}
+  ///   ext with a msgpack body     {"$ext": code, "value": body}
+  ///   ext with any other body     {"$ext": code, "$hex": "…"}
+  /// Bin that is valid UTF-8 renders as a string. A non-string map key
+  /// becomes its compact JSON text as the object key; keys that collide
+  /// after that collapse, last one wins.
+  @$pb.TagNumber(2)
+  $core.String get rendered => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set rendered($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRendered() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRendered() => $_clearField(2);
+
+  /// Size of the value as stored, before any decoding.
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get rawBytes => $_getI64(2);
+  @$pb.TagNumber(3)
+  set rawBytes($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRawBytes() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRawBytes() => $_clearField(3);
+
+  /// The ext type code when the top level is an Ext, for out-of-band
+  /// display; `rendered` carries it too. 0x40 (64) is hivemind's
+  /// Python-tuple code and 0x50 (80) its dictionary code.
+  @$pb.TagNumber(4)
+  $core.int get extCode => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set extCode($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasExtCode() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearExtCode() => $_clearField(4);
+
+  /// True when `rendered` was produced by decoding, false when the
+  /// bytes defeated the decoder and it fell back to hex.
+  @$pb.TagNumber(5)
+  $core.bool get decoded => $_getBF(4);
+  @$pb.TagNumber(5)
+  set decoded($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasDecoded() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDecoded() => $_clearField(5);
 }
 
 class ChatMessage extends $pb.GeneratedMessage {
