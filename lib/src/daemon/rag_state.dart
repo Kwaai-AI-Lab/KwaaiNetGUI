@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../chat/generated/kwaai.pb.dart' as pb;
@@ -90,7 +92,7 @@ class RagIngestJob {
     this.error,
   });
 
-  /// Absolute path handed to the daemon.
+  /// Local file the GUI uploads; also the job's identity in the queue.
   final String path;
 
   /// Basename, for display.
@@ -227,7 +229,7 @@ class RagIngestQueue extends StateNotifier<List<RagIngestJob>> {
     _update(job.path, (j) => j.copyWith(status: RagJobStatus.running));
     final client = _ref.read(kwaaiRpcClientProvider);
     try {
-      final op = await client.ragIngest(path: job.path, kb: job.kb);
+      final op = await client.ragIngest(file: File(job.path), kb: job.kb);
       final sub = op.progress.listen((p) {
         _update(
           job.path,

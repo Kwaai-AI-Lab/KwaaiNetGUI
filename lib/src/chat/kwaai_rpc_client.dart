@@ -551,18 +551,18 @@ class KwaaiRpcClient {
         .timeout(const Duration(seconds: 60));
   }
 
-  /// Ingest the file at [path] (absolute, on the daemon's filesystem).
+  /// Upload [file] to the daemon and ingest it; see [SessionClient.ragIngest].
   ///
   /// Returns the operation so the caller can render progress; no timeout,
   /// since embedding a large document legitimately takes minutes and the
   /// progress feed already shows whether it is moving.
   Future<RagIngestOperation> ragIngest({
-    required String path,
+    required File file,
     String kb = '',
-    String docName = '',
+    String? docName,
   }) async {
     final session = await _sessionOrInit();
-    return session.ragIngest(path: path, kb: kb, docName: docName);
+    return session.ragIngest(file: file, kb: kb, docName: docName);
   }
 
   Future<void> _resetChannel({bool silent = false}) async {

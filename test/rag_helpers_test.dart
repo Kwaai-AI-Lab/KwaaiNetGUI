@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -22,10 +25,27 @@ pb.RagKb _kb(String name) => pb.RagKb()..name = name;
 class _NoDaemonRpcClient implements KwaaiRpcClient {
   @override
   Future<RagIngestOperation> ragIngest({
-    required String path,
+    required File file,
     String kb = '',
-    String docName = '',
+    String? docName,
   }) async => throw UnimplementedError('no daemon in unit tests');
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Hands every ingest the one scripted [op]; anything else is a hard error.
+class _ScriptedRpcClient implements KwaaiRpcClient {
+  _ScriptedRpcClient(this.op);
+
+  final RagIngestOperation op;
+
+  @override
+  Future<RagIngestOperation> ragIngest({
+    required File file,
+    String kb = '',
+    String? docName,
+  }) async => op;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -192,14 +212,30 @@ void main() {
         ),
         contains('3/10'),
       );
+    });
+
+    test('shows RECEIVING as bytes uploaded', () {
       expect(
         ragPhaseLabel(
-          pb.RagProgress_RagPhase.RAG_PHASE_UPLOADING,
-          done: 9,
-          total: 9,
+          pb.RagProgress_RagPhase.RAG_PHASE_RECEIVING,
+          done: 512 * 1024,
+          total: 2 * 1024 * 1024,
         ),
-        contains('9/9'),
+        'Uploading 512 KB / 2.0 MB',
       );
+      expect(
+        ragPhaseLabel(pb.RagProgress_RagPhase.RAG_PHASE_RECEIVING),
+        'Uploading',
+      );
+    });
+  });
+
+  group('formatByteCount', () {
+    test('picks B, KB or MB', () {
+      expect(formatByteCount(0), '0 B');
+      expect(formatByteCount(1023), '1023 B');
+      expect(formatByteCount(256 * 1024), '256 KB');
+      expect(formatByteCount(3 * 1024 * 1024 + 512 * 1024), '3.5 MB');
     });
   });
 
@@ -254,6 +290,52 @@ void main() {
       final jobs = container.read(ragIngestQueueProvider);
       expect(jobs.map((j) => j.name), ['a.md', 'b.md']);
       expect(jobs.map((j) => j.kb), ['alpha', 'beta']);
+    });
+
+    test('a running job tracks RECEIVING byte progress', () async {
+      final progress = StreamController<pb.RagProgress>();
+      final done = Completer<pb.RagIngestReply>();
+      final container = ProviderContainer(
+        overrides: [
+          kwaaiRpcClientProvider.overrideWithValue(
+            _ScriptedRpcClient(
+              RagIngestOperation(
+                id: 1,
+                progress: progress.stream,
+                done: done.future,
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final sub = container.listen(ragIngestQueueProvider, (_, _) {});
+      addTearDown(sub.close);
+
+      container.read(ragIngestQueueProvider.notifier).enqueue(const [
+        '/docs/a.pdf',
+      ], kb: 'default');
+      progress.add(
+        pb.RagProgress(
+          phase: pb.RagProgress_RagPhase.RAG_PHASE_RECEIVING,
+          done: 1024,
+          total: 4096,
+        ),
+      );
+      await pumpEventQueue();
+
+      final job = container.read(ragIngestQueueProvider).single;
+      expect(job.status, RagJobStatus.running);
+      expect(job.phase, pb.RagProgress_RagPhase.RAG_PHASE_RECEIVING);
+      expect(job.fraction, 0.25);
+
+      done.complete(pb.RagIngestReply(chunksIngested: 2));
+      await progress.close();
+      await pumpEventQueue();
+      expect(
+        container.read(ragIngestQueueProvider).single.status,
+        RagJobStatus.done,
+      );
     });
 
     test('ignores an empty enqueue', () {

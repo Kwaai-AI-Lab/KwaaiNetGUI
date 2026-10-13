@@ -35,6 +35,7 @@ enum ClientFrame_Body {
   ragInit,
   ragIngest,
   ragQuery,
+  ragIngestData,
   ragDelete,
   notSet
 }
@@ -68,6 +69,7 @@ class ClientFrame extends $pb.GeneratedMessage {
     RagInitRequest? ragInit,
     RagIngestRequest? ragIngest,
     RagQueryRequest? ragQuery,
+    RagIngestData? ragIngestData,
     RagDeleteRequest? ragDelete,
   }) {
     final result = create();
@@ -85,6 +87,7 @@ class ClientFrame extends $pb.GeneratedMessage {
     if (ragInit != null) result.ragInit = ragInit;
     if (ragIngest != null) result.ragIngest = ragIngest;
     if (ragQuery != null) result.ragQuery = ragQuery;
+    if (ragIngestData != null) result.ragIngestData = ragIngestData;
     if (ragDelete != null) result.ragDelete = ragDelete;
     return result;
   }
@@ -112,6 +115,7 @@ class ClientFrame extends $pb.GeneratedMessage {
     21: ClientFrame_Body.ragInit,
     22: ClientFrame_Body.ragIngest,
     23: ClientFrame_Body.ragQuery,
+    24: ClientFrame_Body.ragIngestData,
     25: ClientFrame_Body.ragDelete,
     0: ClientFrame_Body.notSet
   };
@@ -119,7 +123,7 @@ class ClientFrame extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'ClientFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22, 23, 25])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22, 23, 24, 25])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingRequest>(10, _omitFieldNames ? '' : 'ping',
@@ -149,6 +153,8 @@ class ClientFrame extends $pb.GeneratedMessage {
         subBuilder: RagIngestRequest.create)
     ..aOM<RagQueryRequest>(23, _omitFieldNames ? '' : 'ragQuery',
         subBuilder: RagQueryRequest.create)
+    ..aOM<RagIngestData>(24, _omitFieldNames ? '' : 'ragIngestData',
+        subBuilder: RagIngestData.create)
     ..aOM<RagDeleteRequest>(25, _omitFieldNames ? '' : 'ragDelete',
         subBuilder: RagDeleteRequest.create)
     ..hasRequiredFields = false;
@@ -185,6 +191,7 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(21)
   @$pb.TagNumber(22)
   @$pb.TagNumber(23)
+  @$pb.TagNumber(24)
   @$pb.TagNumber(25)
   ClientFrame_Body whichBody() => _ClientFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
@@ -200,6 +207,7 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(21)
   @$pb.TagNumber(22)
   @$pb.TagNumber(23)
+  @$pb.TagNumber(24)
   @$pb.TagNumber(25)
   void clearBody() => $_clearField($_whichOneof(0));
 
@@ -366,9 +374,9 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(21)
   RagInitRequest ensureRagInit() => $_ensure(11);
 
-  /// Ingest one document from a path on the *daemon's* filesystem.
-  /// Emits zero or more ServerFrame.rag_progress frames before the
-  /// terminal rag_ingest reply. Cancellable.
+  /// Ingest one document, whose bytes follow as rag_ingest_data
+  /// frames under this op's id. Emits ServerFrame.rag_progress
+  /// frames before the terminal rag_ingest reply. Cancellable.
   @$pb.TagNumber(22)
   RagIngestRequest get ragIngest => $_getN(12);
   @$pb.TagNumber(22)
@@ -393,20 +401,33 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(23)
   RagQueryRequest ensureRagQuery() => $_ensure(13);
 
+  /// One piece of an ingest's document, sent in order with
+  /// ClientFrame.id set to that ingest's id. Has no reply of its own.
+  @$pb.TagNumber(24)
+  RagIngestData get ragIngestData => $_getN(14);
+  @$pb.TagNumber(24)
+  set ragIngestData(RagIngestData value) => $_setField(24, value);
+  @$pb.TagNumber(24)
+  $core.bool hasRagIngestData() => $_has(14);
+  @$pb.TagNumber(24)
+  void clearRagIngestData() => $_clearField(24);
+  @$pb.TagNumber(24)
+  RagIngestData ensureRagIngestData() => $_ensure(14);
+
   /// Remove one document and every chunk it contributed. One
   /// ServerFrame.rag_delete reply, then Done. Deleting a document
   /// the KB doesn't hold is NOT_FOUND rather than a silent no-op,
   /// so a stale UI row doesn't read as a successful delete.
   @$pb.TagNumber(25)
-  RagDeleteRequest get ragDelete => $_getN(14);
+  RagDeleteRequest get ragDelete => $_getN(15);
   @$pb.TagNumber(25)
   set ragDelete(RagDeleteRequest value) => $_setField(25, value);
   @$pb.TagNumber(25)
-  $core.bool hasRagDelete() => $_has(14);
+  $core.bool hasRagDelete() => $_has(15);
   @$pb.TagNumber(25)
   void clearRagDelete() => $_clearField(25);
   @$pb.TagNumber(25)
-  RagDeleteRequest ensureRagDelete() => $_ensure(14);
+  RagDeleteRequest ensureRagDelete() => $_ensure(15);
 }
 
 enum ServerFrame_Body {
@@ -3429,13 +3450,13 @@ class RagInitReply extends $pb.GeneratedMessage {
 class RagIngestRequest extends $pb.GeneratedMessage {
   factory RagIngestRequest({
     $core.String? kb,
-    $core.String? path,
     $core.String? docName,
+    $fixnum.Int64? size,
   }) {
     final result = create();
     if (kb != null) result.kb = kb;
-    if (path != null) result.path = path;
     if (docName != null) result.docName = docName;
+    if (size != null) result.size = size;
     return result;
   }
 
@@ -3453,8 +3474,9 @@ class RagIngestRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'kb')
-    ..aOS(2, _omitFieldNames ? '' : 'path')
-    ..aOS(3, _omitFieldNames ? '' : 'docName')
+    ..aOS(2, _omitFieldNames ? '' : 'docName')
+    ..a<$fixnum.Int64>(3, _omitFieldNames ? '' : 'size', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3486,26 +3508,85 @@ class RagIngestRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearKb() => $_clearField(1);
 
-  /// Absolute path on the *daemon's* filesystem. The daemon reads
-  /// this directly; nothing is streamed over the wire.
+  /// Display name for the document, required. Its extension picks the
+  /// parser (`.pdf`, `.docx`, …), so send the original file name.
   @$pb.TagNumber(2)
-  $core.String get path => $_getSZ(1);
+  $core.String get docName => $_getSZ(1);
   @$pb.TagNumber(2)
-  set path($core.String value) => $_setString(1, value);
+  set docName($core.String value) => $_setString(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasPath() => $_has(1);
+  $core.bool hasDocName() => $_has(1);
   @$pb.TagNumber(2)
-  void clearPath() => $_clearField(2);
+  void clearDocName() => $_clearField(2);
 
-  /// Display name for the document. Empty means the file's basename.
+  /// Total bytes the rag_ingest_data frames will carry. The ingest
+  /// starts once exactly this many have arrived; a piece that runs past
+  /// it fails the ingest, as does a size above the limit (256 MiB).
   @$pb.TagNumber(3)
-  $core.String get docName => $_getSZ(2);
+  $fixnum.Int64 get size => $_getI64(2);
   @$pb.TagNumber(3)
-  set docName($core.String value) => $_setString(2, value);
+  set size($fixnum.Int64 value) => $_setInt64(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasDocName() => $_has(2);
+  $core.bool hasSize() => $_has(2);
   @$pb.TagNumber(3)
-  void clearDocName() => $_clearField(3);
+  void clearSize() => $_clearField(3);
+}
+
+/// A piece of the document an ingest is uploading. Keep each well under
+/// the 4 MiB gRPC frame limit; 256 KiB is a good size.
+class RagIngestData extends $pb.GeneratedMessage {
+  factory RagIngestData({
+    $core.List<$core.int>? data,
+  }) {
+    final result = create();
+    if (data != null) result.data = data;
+    return result;
+  }
+
+  RagIngestData._();
+
+  factory RagIngestData.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RagIngestData.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RagIngestData',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..a<$core.List<$core.int>>(
+        1, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagIngestData clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RagIngestData copyWith(void Function(RagIngestData) updates) =>
+      super.copyWith((message) => updates(message as RagIngestData))
+          as RagIngestData;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RagIngestData create() => RagIngestData._();
+  @$core.override
+  RagIngestData createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RagIngestData getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RagIngestData>(create);
+  static RagIngestData? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<$core.int> get data => $_getN(0);
+  @$pb.TagNumber(1)
+  set data($core.List<$core.int> value) => $_setBytes(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasData() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearData() => $_clearField(1);
 }
 
 /// Progress for an in-flight ingest. Deliberately ONE flat message with

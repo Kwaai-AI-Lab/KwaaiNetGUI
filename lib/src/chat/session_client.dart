@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
 
@@ -47,10 +48,16 @@ class SessionClient {
 
   bool _closed = false;
 
+  // Writers waiting for the paused outbound stream to resume.
+  Completer<void>? _writable;
+
   /// Opens the bidi stream if not already open. Idempotent.
   void ensureOpen() {
     if (_outbound != null || _closed) return;
-    final out = StreamController<pb.ClientFrame>();
+    final out = StreamController<pb.ClientFrame>(
+      onListen: _wakeWriters,
+      onResume: _wakeWriters,
+    );
     _outbound = out;
     final inbound = _stub.session(out.stream);
     _log('opened Session stream');
@@ -107,6 +114,7 @@ class SessionClient {
     }
     _outbound?.close();
     _outbound = null;
+    _wakeWriters();
     _inboundSub?.cancel();
     _inboundSub = null;
   }
@@ -475,21 +483,27 @@ class SessionClient {
     return reply;
   }
 
-  /// `kwaainet rag ingest` — read [path] into the KB, embedding as it goes.
+  /// `kwaainet rag ingest` — upload [file] into the KB, embedding as it goes.
   ///
-  /// [path] is read by the *daemon*, not streamed, so it must be absolute
-  /// and on the daemon's filesystem. The GUI runs on the same machine, so a
-  /// path from the file picker or a drop is already valid.
+  /// The bytes travel over the session: a RagIngest frame announcing
+  /// [docName] (default: the file's basename, whose extension picks the
+  /// daemon's parser) and the size, then the file as rag_ingest_data pieces
+  /// of at most [pieceBytes] under the same id. The file is streamed, never
+  /// held whole in memory: at most [windowBytes] go unacknowledged by the
+  /// daemon's per-piece RECEIVING progress before the read pauses.
   ///
   /// Unlike the other three ops this is long-running and reports as it
   /// works, so it returns an operation rather than a bare Future: progress
   /// frames arrive on [RagIngestOperation.progress] and the terminal reply
   /// completes [RagIngestOperation.done]. Both come off the same router, so
-  /// a caller may ignore progress entirely and still get the reply.
+  /// a caller may ignore progress entirely and still get the reply. A read
+  /// failure mid-upload cancels the op and completes [done] with that error.
   RagIngestOperation ragIngest({
-    required String path,
+    required File file,
     String kb = '',
-    String docName = '',
+    String? docName,
+    int pieceBytes = kRagIngestPieceBytes,
+    int windowBytes = kRagIngestWindowBytes,
   }) {
     ensureOpen();
     if (_closed || _outbound == null) {
@@ -497,22 +511,27 @@ class SessionClient {
         kind: SessionEndKind.localClose,
         reason: 'session not open',
       );
-      return RagIngestOperation(
-        id: null,
-        progress: const Stream<pb.RagProgress>.empty(),
-        done: Future<pb.RagIngestReply>.error(ended),
-      );
+      return _failedIngest(ended);
+    }
+    final int size;
+    try {
+      size = file.lengthSync();
+    } on FileSystemException catch (e) {
+      return _failedIngest(e);
     }
     final id = _nextId++;
     final controller = StreamController<pb.ServerFrame>();
     _routers[id] = controller;
-    _outbound!.add(
+    final out = _outbound!;
+    out.add(
       pb.ClientFrame()
         ..id = Int64(id)
         ..ragIngest = (pb.RagIngestRequest()
           ..kb = kb
-          ..path = path
-          ..docName = docName),
+          ..docName = (docName == null || docName.isEmpty)
+              ? _basename(file.path)
+              : docName
+          ..size = Int64(size)),
     );
 
     // One router feeding two consumers, as in [_openOp]: the router is
@@ -522,11 +541,27 @@ class SessionClient {
     // between this returning and the UI listening.
     final progress = StreamController<pb.RagProgress>();
     final done = Completer<pb.RagIngestReply>();
+
+    // Bytes the daemon has acknowledged; the uploader waits on [ackWaiter].
+    var acked = 0;
+    Completer<void>? ackWaiter;
+    void wakeUploader() {
+      final w = ackWaiter;
+      ackWaiter = null;
+      w?.complete();
+    }
+
     controller.stream.listen(
       (f) {
         switch (f.whichBody()) {
           case pb.ServerFrame_Body.ragProgress:
-            if (!progress.isClosed) progress.add(f.ragProgress);
+            final p = f.ragProgress;
+            if (p.phase == pb.RagProgress_RagPhase.RAG_PHASE_RECEIVING &&
+                p.done > acked) {
+              acked = p.done;
+              wakeUploader();
+            }
+            if (!progress.isClosed) progress.add(p);
           case pb.ServerFrame_Body.ragIngest:
             if (!done.isCompleted) done.complete(f.ragIngest);
           default:
@@ -555,11 +590,99 @@ class SessionClient {
       },
     );
 
+    // Stops on any end of the op: daemon reply/error, a cancel, or teardown.
+    bool stopped() => done.isCompleted || !identical(_outbound, out);
+    // Wake a window wait on any end too, so it can see stopped() and return.
+    done.future.then(
+      (_) => wakeUploader(),
+      onError: (Object _) => wakeUploader(),
+    );
+    // A window smaller than one piece could never admit it.
+    final window = windowBytes < pieceBytes ? pieceBytes : windowBytes;
+    Future<void> room(int sent, int len) async {
+      while (!stopped() && sent - acked + len > window) {
+        await (ackWaiter ??= Completer<void>()).future;
+      }
+    }
+
+    unawaited(
+      _uploadIngestData(
+        id,
+        out,
+        file,
+        size,
+        pieceBytes,
+        stopped,
+        room,
+      ).catchError((Object e, StackTrace st) {
+        if (stopped()) return;
+        done.completeError(e, st);
+        if (!progress.isClosed) progress.close();
+        // Tell the daemon to stop waiting for bytes that will never come.
+        unawaited(cancel(id).catchError((Object _) {}));
+      }),
+    );
+
     return RagIngestOperation(
       id: id,
       progress: progress.stream,
       done: done.future,
     );
+  }
+
+  RagIngestOperation _failedIngest(Object error) => RagIngestOperation(
+    id: null,
+    progress: const Stream<pb.RagProgress>.empty(),
+    done: Future<pb.RagIngestReply>.error(error),
+  );
+
+  /// Send [file] as rag_ingest_data frames under [id], pausing the read until
+  /// [room] admits each piece. Throws if the read fails or the file's length
+  /// no longer matches the announced [size].
+  Future<void> _uploadIngestData(
+    int id,
+    StreamController<pb.ClientFrame> out,
+    File file,
+    int size,
+    int pieceBytes,
+    bool Function() stopped,
+    Future<void> Function(int sent, int len) room,
+  ) async {
+    var sent = 0;
+    // Leaving the loop early cancels openRead's subscription: the read stops.
+    await for (final piece in ragPieces(file.openRead(), pieceBytes)) {
+      await room(sent, piece.length);
+      if (stopped()) return;
+      sent += piece.length;
+      if (sent > size) {
+        throw FileSystemException('file grew during upload', file.path);
+      }
+      out.add(
+        pb.ClientFrame()
+          ..id = Int64(id)
+          ..ragIngestData = (pb.RagIngestData()..data = piece),
+      );
+      await _outboundWritable();
+    }
+    if (!stopped() && sent != size) {
+      throw FileSystemException('file shrank during upload', file.path);
+    }
+  }
+
+  /// Completes once the outbound stream can take more: on resume while it is
+  /// paused (e.g. the rpc not yet listening), else after one event-loop turn.
+  Future<void> _outboundWritable() {
+    final out = _outbound;
+    if (out == null || !out.isPaused) {
+      return Future<void>.delayed(Duration.zero);
+    }
+    return (_writable ??= Completer<void>()).future;
+  }
+
+  void _wakeWriters() {
+    final w = _writable;
+    _writable = null;
+    w?.complete();
   }
 
   /// Cancel an in-flight operation. The target operation's stream will
@@ -635,6 +758,32 @@ class SessionClient {
     return controller.stream;
   }
 }
+
+/// Size of each rag_ingest_data piece; well under the daemon's 4 MiB frame cap.
+const kRagIngestPieceBytes = 256 * 1024;
+
+/// Most upload bytes allowed in flight unacknowledged (8 pieces). grpc-dart
+/// does not surface HTTP/2 flow control, so this is what bounds memory.
+const kRagIngestWindowBytes = 8 * kRagIngestPieceBytes;
+
+/// Regroup [source]'s chunks into pieces of exactly [size] bytes (the last
+/// may be shorter). Pull-driven: the source pauses while a piece is pending.
+Stream<Uint8List> ragPieces(Stream<List<int>> source, int size) async* {
+  final buf = BytesBuilder(copy: false);
+  await for (final chunk in source) {
+    buf.add(chunk);
+    if (buf.length < size) continue;
+    final bytes = buf.takeBytes();
+    var off = 0;
+    for (; off + size <= bytes.length; off += size) {
+      yield Uint8List.sublistView(bytes, off, off + size);
+    }
+    if (off < bytes.length) buf.add(Uint8List.sublistView(bytes, off));
+  }
+  if (buf.isNotEmpty) yield buf.takeBytes();
+}
+
+String _basename(String path) => path.split(RegExp(r'[/\\]')).last;
 
 /// How long to wait for the daemon's *first* frame before declaring the
 /// request dead. Generous: the daemon may still be loading a model, resolving

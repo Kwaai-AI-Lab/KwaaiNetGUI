@@ -217,25 +217,25 @@ class RagProgress_RagPhase extends $pb.ProtobufEnum {
   static const RagProgress_RagPhase RAG_PHASE_UNSPECIFIED =
       RagProgress_RagPhase._(0, _omitEnumNames ? '' : 'RAG_PHASE_UNSPECIFIED');
 
-  /// Reading and decoding the source file into plain text.
-  /// done/total are not meaningful here (both 0) — this phase is
-  /// a single indivisible step.
+  /// Receiving the document. done/total count bytes. Sent once per
+  /// piece written, so a client can bound the bytes it has in flight.
+  static const RagProgress_RagPhase RAG_PHASE_RECEIVING =
+      RagProgress_RagPhase._(1, _omitEnumNames ? '' : 'RAG_PHASE_RECEIVING');
+
+  /// Decoding the document into plain text. done/total are both 0:
+  /// this phase is a single indivisible step.
   static const RagProgress_RagPhase RAG_PHASE_EXTRACTING =
-      RagProgress_RagPhase._(1, _omitEnumNames ? '' : 'RAG_PHASE_EXTRACTING');
+      RagProgress_RagPhase._(2, _omitEnumNames ? '' : 'RAG_PHASE_EXTRACTING');
 
-  /// Chunking + embedding. done/total count chunks.
+  /// Chunking, embedding and storing. done/total count chunks.
   static const RagProgress_RagPhase RAG_PHASE_EMBEDDING =
-      RagProgress_RagPhase._(2, _omitEnumNames ? '' : 'RAG_PHASE_EMBEDDING');
-
-  /// Writing vectors to the store. done/total count chunks.
-  static const RagProgress_RagPhase RAG_PHASE_UPLOADING =
-      RagProgress_RagPhase._(3, _omitEnumNames ? '' : 'RAG_PHASE_UPLOADING');
+      RagProgress_RagPhase._(3, _omitEnumNames ? '' : 'RAG_PHASE_EMBEDDING');
 
   static const $core.List<RagProgress_RagPhase> values = <RagProgress_RagPhase>[
     RAG_PHASE_UNSPECIFIED,
+    RAG_PHASE_RECEIVING,
     RAG_PHASE_EXTRACTING,
     RAG_PHASE_EMBEDDING,
-    RAG_PHASE_UPLOADING,
   ];
 
   static final $core.List<RagProgress_RagPhase?> _byValue =

@@ -155,6 +155,15 @@ const ClientFrame$json = {
       '10': 'ragIngest'
     },
     {
+      '1': 'rag_ingest_data',
+      '3': 24,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.RagIngestData',
+      '9': 0,
+      '10': 'ragIngestData'
+    },
+    {
       '1': 'rag_query',
       '3': 23,
       '4': 1,
@@ -224,14 +233,15 @@ final $typed_data.Uint8List clientFrameDescriptor = $convert.base64Decode(
     'ZjYW5jZWwSOwoKcmFnX3N0YXR1cxgUIAEoCzIaLmt3YWFpLnYxLlJhZ1N0YXR1c1JlcXVlc3RI'
     'AFIJcmFnU3RhdHVzEjUKCHJhZ19pbml0GBUgASgLMhgua3dhYWkudjEuUmFnSW5pdFJlcXVlc3'
     'RIAFIHcmFnSW5pdBI7CgpyYWdfaW5nZXN0GBYgASgLMhoua3dhYWkudjEuUmFnSW5nZXN0UmVx'
-    'dWVzdEgAUglyYWdJbmdlc3QSOAoJcmFnX3F1ZXJ5GBcgASgLMhkua3dhYWkudjEuUmFnUXVlcn'
-    'lSZXF1ZXN0SABSCHJhZ1F1ZXJ5EkcKDmJsb2NrX2NvdmVyYWdlGA8gASgLMh4ua3dhYWkudjEu'
-    'QmxvY2tDb3ZlcmFnZVJlcXVlc3RIAFINYmxvY2tDb3ZlcmFnZRI0CgduZXR3b3JrGBEgASgLMh'
-    'gua3dhYWkudjEuTmV0d29ya1JlcXVlc3RIAFIHbmV0d29yaxI0Cgdjb25uZWN0GBIgASgLMhgu'
-    'a3dhYWkudjEuQ29ubmVjdFJlcXVlc3RIAFIHY29ubmVjdBJQChFzdG9yYWdlX2Rpc2NvdmVyeR'
-    'gQIAEoCzIhLmt3YWFpLnYxLlN0b3JhZ2VEaXNjb3ZlcnlSZXF1ZXN0SABSEHN0b3JhZ2VEaXNj'
-    'b3ZlcnkSOwoKcmFnX2RlbGV0ZRgZIAEoCzIaLmt3YWFpLnYxLlJhZ0RlbGV0ZVJlcXVlc3RIAF'
-    'IJcmFnRGVsZXRlQgYKBGJvZHk=');
+    'dWVzdEgAUglyYWdJbmdlc3QSQQoPcmFnX2luZ2VzdF9kYXRhGBggASgLMhcua3dhYWkudjEuUm'
+    'FnSW5nZXN0RGF0YUgAUg1yYWdJbmdlc3REYXRhEjgKCXJhZ19xdWVyeRgXIAEoCzIZLmt3YWFp'
+    'LnYxLlJhZ1F1ZXJ5UmVxdWVzdEgAUghyYWdRdWVyeRJHCg5ibG9ja19jb3ZlcmFnZRgPIAEoCz'
+    'IeLmt3YWFpLnYxLkJsb2NrQ292ZXJhZ2VSZXF1ZXN0SABSDWJsb2NrQ292ZXJhZ2USNAoHbmV0'
+    'd29yaxgRIAEoCzIYLmt3YWFpLnYxLk5ldHdvcmtSZXF1ZXN0SABSB25ldHdvcmsSNAoHY29ubm'
+    'VjdBgSIAEoCzIYLmt3YWFpLnYxLkNvbm5lY3RSZXF1ZXN0SABSB2Nvbm5lY3QSUAoRc3RvcmFn'
+    'ZV9kaXNjb3ZlcnkYECABKAsyIS5rd2FhaS52MS5TdG9yYWdlRGlzY292ZXJ5UmVxdWVzdEgAUh'
+    'BzdG9yYWdlRGlzY292ZXJ5EjsKCnJhZ19kZWxldGUYGSABKAsyGi5rd2FhaS52MS5SYWdEZWxl'
+    'dGVSZXF1ZXN0SABSCXJhZ0RlbGV0ZUIGCgRib2R5');
 
 @$core.Deprecated('Use serverFrameDescriptor instead')
 const ServerFrame$json = {
@@ -1021,15 +1031,27 @@ const RagIngestRequest$json = {
   '1': 'RagIngestRequest',
   '2': [
     {'1': 'kb', '3': 1, '4': 1, '5': 9, '10': 'kb'},
-    {'1': 'path', '3': 2, '4': 1, '5': 9, '10': 'path'},
-    {'1': 'doc_name', '3': 3, '4': 1, '5': 9, '10': 'docName'},
+    {'1': 'doc_name', '3': 2, '4': 1, '5': 9, '10': 'docName'},
+    {'1': 'size', '3': 3, '4': 1, '5': 4, '10': 'size'},
   ],
 };
 
 /// Descriptor for `RagIngestRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List ragIngestRequestDescriptor = $convert.base64Decode(
-    'ChBSYWdJbmdlc3RSZXF1ZXN0Eg4KAmtiGAEgASgJUgJrYhISCgRwYXRoGAIgASgJUgRwYXRoEh'
-    'kKCGRvY19uYW1lGAMgASgJUgdkb2NOYW1l');
+    'ChBSYWdJbmdlc3RSZXF1ZXN0Eg4KAmtiGAEgASgJUgJrYhIZCghkb2NfbmFtZRgCIAEoCVIHZG'
+    '9jTmFtZRISCgRzaXplGAMgASgEUgRzaXpl');
+
+@$core.Deprecated('Use ragIngestDataDescriptor instead')
+const RagIngestData$json = {
+  '1': 'RagIngestData',
+  '2': [
+    {'1': 'data', '3': 1, '4': 1, '5': 12, '10': 'data'},
+  ],
+};
+
+/// Descriptor for `RagIngestData`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List ragIngestDataDescriptor =
+    $convert.base64Decode('Cg1SYWdJbmdlc3REYXRhEhIKBGRhdGEYASABKAxSBGRhdGE=');
 
 @$core.Deprecated('Use ragProgressDescriptor instead')
 const RagProgress$json = {
@@ -1055,9 +1077,9 @@ const RagProgress_RagPhase$json = {
   '1': 'RagPhase',
   '2': [
     {'1': 'RAG_PHASE_UNSPECIFIED', '2': 0},
-    {'1': 'RAG_PHASE_EXTRACTING', '2': 1},
-    {'1': 'RAG_PHASE_EMBEDDING', '2': 2},
-    {'1': 'RAG_PHASE_UPLOADING', '2': 3},
+    {'1': 'RAG_PHASE_RECEIVING', '2': 1},
+    {'1': 'RAG_PHASE_EXTRACTING', '2': 2},
+    {'1': 'RAG_PHASE_EMBEDDING', '2': 3},
   ],
 };
 
@@ -1066,8 +1088,8 @@ final $typed_data.Uint8List ragProgressDescriptor = $convert.base64Decode(
     'CgtSYWdQcm9ncmVzcxI0CgVwaGFzZRgBIAEoDjIeLmt3YWFpLnYxLlJhZ1Byb2dyZXNzLlJhZ1'
     'BoYXNlUgVwaGFzZRISCgRkb25lGAIgASgNUgRkb25lEhQKBXRvdGFsGAMgASgNUgV0b3RhbBIW'
     'CgZkZXRhaWwYBCABKAlSBmRldGFpbCJxCghSYWdQaGFzZRIZChVSQUdfUEhBU0VfVU5TUEVDSU'
-    'ZJRUQQABIYChRSQUdfUEhBU0VfRVhUUkFDVElORxABEhcKE1JBR19QSEFTRV9FTUJFRERJTkcQ'
-    'AhIXChNSQUdfUEhBU0VfVVBMT0FESU5HEAM=');
+    'ZJRUQQABIXChNSQUdfUEhBU0VfUkVDRUlWSU5HEAESGAoUUkFHX1BIQVNFX0VYVFJBQ1RJTkcQ'
+    'AhIXChNSQUdfUEhBU0VfRU1CRURESU5HEAM=');
 
 @$core.Deprecated('Use ragIngestReplyDescriptor instead')
 const RagIngestReply$json = {
