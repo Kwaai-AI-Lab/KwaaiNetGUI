@@ -3382,8 +3382,8 @@ class DhtRecord extends $pb.GeneratedMessage {
   void clearExpiration() => $_clearField(7);
 
   /// Seconds until `expiration`, as of `server_time`. Never negative:
-  /// the listing filters expired records. Sent alongside the absolute time because a client's clock
-  /// is not the daemon's.
+  /// the listing filters expired records. Sent alongside the absolute
+  /// time because a client's clock is not the daemon's.
   @$pb.TagNumber(8)
   $core.double get expiresInSecs => $_getN(7);
   @$pb.TagNumber(8)
