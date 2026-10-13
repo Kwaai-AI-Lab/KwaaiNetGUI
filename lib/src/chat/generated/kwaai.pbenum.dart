@@ -366,38 +366,5 @@ class Error_Code extends $pb.ProtobufEnum {
   const Error_Code._(super.value, super.name);
 }
 
-class RagProgress_RagPhase extends $pb.ProtobufEnum {
-  static const RagProgress_RagPhase RAG_PHASE_UNSPECIFIED =
-      RagProgress_RagPhase._(0, _omitEnumNames ? '' : 'RAG_PHASE_UNSPECIFIED');
-
-  /// Reading and decoding the source file into plain text.
-  /// done/total are not meaningful here (both 0) — this phase is
-  /// a single indivisible step.
-  static const RagProgress_RagPhase RAG_PHASE_EXTRACTING =
-      RagProgress_RagPhase._(1, _omitEnumNames ? '' : 'RAG_PHASE_EXTRACTING');
-
-  /// Chunking + embedding. done/total count chunks.
-  static const RagProgress_RagPhase RAG_PHASE_EMBEDDING =
-      RagProgress_RagPhase._(2, _omitEnumNames ? '' : 'RAG_PHASE_EMBEDDING');
-
-  /// Writing vectors to the store. done/total count chunks.
-  static const RagProgress_RagPhase RAG_PHASE_UPLOADING =
-      RagProgress_RagPhase._(3, _omitEnumNames ? '' : 'RAG_PHASE_UPLOADING');
-
-  static const $core.List<RagProgress_RagPhase> values = <RagProgress_RagPhase>[
-    RAG_PHASE_UNSPECIFIED,
-    RAG_PHASE_EXTRACTING,
-    RAG_PHASE_EMBEDDING,
-    RAG_PHASE_UPLOADING,
-  ];
-
-  static final $core.List<RagProgress_RagPhase?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
-  static RagProgress_RagPhase? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const RagProgress_RagPhase._(super.value, super.name);
-}
-
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');
