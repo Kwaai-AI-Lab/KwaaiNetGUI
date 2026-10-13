@@ -455,19 +455,6 @@ class KwaaiRpcClient {
     return session.dhtRecords(includeValues: includeValues, keyIds: keyIds);
   }
 
-  /// Resolve one DHT key across the network. [onOperationId] fires once the
-  /// session is open, as in [chatStreamCancellable].
-  Future<pb.DhtLookupReply> dhtLookup(
-    String key, {
-    int timeoutSecs = 0,
-    required void Function(int? operationId) onOperationId,
-  }) async {
-    final session = await _sessionOrInit();
-    final op = session.dhtLookupOp(key, timeoutSecs: timeoutSecs);
-    onOperationId(op.id);
-    return op.reply;
-  }
-
   /// Version of the *running* daemon, read from `StatusReply.version`.
   ///
   /// Returns null when the daemon isn't reachable, or when it predates the

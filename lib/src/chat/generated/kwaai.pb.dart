@@ -32,7 +32,6 @@ enum ClientFrame_Body {
   network,
   connect,
   dhtRecords,
-  dhtLookup,
   notSet
 }
 
@@ -62,7 +61,6 @@ class ClientFrame extends $pb.GeneratedMessage {
     NetworkRequest? network,
     ConnectRequest? connect,
     DhtRecordsRequest? dhtRecords,
-    DhtLookupRequest? dhtLookup,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -76,7 +74,6 @@ class ClientFrame extends $pb.GeneratedMessage {
     if (network != null) result.network = network;
     if (connect != null) result.connect = connect;
     if (dhtRecords != null) result.dhtRecords = dhtRecords;
-    if (dhtLookup != null) result.dhtLookup = dhtLookup;
     return result;
   }
 
@@ -100,14 +97,13 @@ class ClientFrame extends $pb.GeneratedMessage {
     17: ClientFrame_Body.network,
     18: ClientFrame_Body.connect,
     26: ClientFrame_Body.dhtRecords,
-    27: ClientFrame_Body.dhtLookup,
     0: ClientFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ClientFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 26, 27])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 26])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingRequest>(10, _omitFieldNames ? '' : 'ping',
@@ -131,8 +127,6 @@ class ClientFrame extends $pb.GeneratedMessage {
         subBuilder: ConnectRequest.create)
     ..aOM<DhtRecordsRequest>(26, _omitFieldNames ? '' : 'dhtRecords',
         subBuilder: DhtRecordsRequest.create)
-    ..aOM<DhtLookupRequest>(27, _omitFieldNames ? '' : 'dhtLookup',
-        subBuilder: DhtLookupRequest.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -164,7 +158,6 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
   @$pb.TagNumber(26)
-  @$pb.TagNumber(27)
   ClientFrame_Body whichBody() => _ClientFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
@@ -176,7 +169,6 @@ class ClientFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
   @$pb.TagNumber(26)
-  @$pb.TagNumber(27)
   void clearBody() => $_clearField($_whichOneof(0));
 
   /// Operation correlation id. Pick any non-zero value unused by an
@@ -325,19 +317,6 @@ class ClientFrame extends $pb.GeneratedMessage {
   void clearDhtRecords() => $_clearField(26);
   @$pb.TagNumber(26)
   DhtRecordsRequest ensureDhtRecords() => $_ensure(10);
-
-  /// Resolve one known key across the network. One DhtLookupReply,
-  /// then Done.
-  @$pb.TagNumber(27)
-  DhtLookupRequest get dhtLookup => $_getN(11);
-  @$pb.TagNumber(27)
-  set dhtLookup(DhtLookupRequest value) => $_setField(27, value);
-  @$pb.TagNumber(27)
-  $core.bool hasDhtLookup() => $_has(11);
-  @$pb.TagNumber(27)
-  void clearDhtLookup() => $_clearField(27);
-  @$pb.TagNumber(27)
-  DhtLookupRequest ensureDhtLookup() => $_ensure(11);
 }
 
 enum ServerFrame_Body {
@@ -351,7 +330,6 @@ enum ServerFrame_Body {
   network,
   connect,
   dhtRecords,
-  dhtLookup,
   notSet
 }
 
@@ -371,7 +349,6 @@ class ServerFrame extends $pb.GeneratedMessage {
     NetworkUpdate? network,
     ConnectReply? connect,
     DhtRecordsReply? dhtRecords,
-    DhtLookupReply? dhtLookup,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -385,7 +362,6 @@ class ServerFrame extends $pb.GeneratedMessage {
     if (network != null) result.network = network;
     if (connect != null) result.connect = connect;
     if (dhtRecords != null) result.dhtRecords = dhtRecords;
-    if (dhtLookup != null) result.dhtLookup = dhtLookup;
     return result;
   }
 
@@ -409,14 +385,13 @@ class ServerFrame extends $pb.GeneratedMessage {
     17: ServerFrame_Body.network,
     18: ServerFrame_Body.connect,
     26: ServerFrame_Body.dhtRecords,
-    27: ServerFrame_Body.dhtLookup,
     0: ServerFrame_Body.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ServerFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
       createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 26, 27])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 26])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'id', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOM<PingReply>(10, _omitFieldNames ? '' : 'pong',
@@ -437,8 +412,6 @@ class ServerFrame extends $pb.GeneratedMessage {
         subBuilder: ConnectReply.create)
     ..aOM<DhtRecordsReply>(26, _omitFieldNames ? '' : 'dhtRecords',
         subBuilder: DhtRecordsReply.create)
-    ..aOM<DhtLookupReply>(27, _omitFieldNames ? '' : 'dhtLookup',
-        subBuilder: DhtLookupReply.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -470,7 +443,6 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
   @$pb.TagNumber(26)
-  @$pb.TagNumber(27)
   ServerFrame_Body whichBody() => _ServerFrame_BodyByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(10)
   @$pb.TagNumber(11)
@@ -482,7 +454,6 @@ class ServerFrame extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   @$pb.TagNumber(18)
   @$pb.TagNumber(26)
-  @$pb.TagNumber(27)
   void clearBody() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -621,18 +592,6 @@ class ServerFrame extends $pb.GeneratedMessage {
   void clearDhtRecords() => $_clearField(26);
   @$pb.TagNumber(26)
   DhtRecordsReply ensureDhtRecords() => $_ensure(10);
-
-  /// Reply to a DhtLookupRequest.
-  @$pb.TagNumber(27)
-  DhtLookupReply get dhtLookup => $_getN(11);
-  @$pb.TagNumber(27)
-  set dhtLookup(DhtLookupReply value) => $_setField(27, value);
-  @$pb.TagNumber(27)
-  $core.bool hasDhtLookup() => $_has(11);
-  @$pb.TagNumber(27)
-  void clearDhtLookup() => $_clearField(27);
-  @$pb.TagNumber(27)
-  DhtLookupReply ensureDhtLookup() => $_ensure(11);
 }
 
 /// Sent from client → server to abort an in-flight operation by id.
@@ -1975,12 +1934,26 @@ class RoutingPeer extends $pb.GeneratedMessage {
     $core.bool? connected,
     $core.bool? isBootstrap,
     $core.Iterable<$core.String>? addrs,
+    KadStatus? kadStatus,
+    $core.int? bucket,
+    $core.int? bucketEntries,
+    $core.int? bucketCapacity,
+    $core.bool? bucketPending,
+    $core.String? distance,
+    $core.int? lastContactSecs,
   }) {
     final result = create();
     if (peerId != null) result.peerId = peerId;
     if (connected != null) result.connected = connected;
     if (isBootstrap != null) result.isBootstrap = isBootstrap;
     if (addrs != null) result.addrs.addAll(addrs);
+    if (kadStatus != null) result.kadStatus = kadStatus;
+    if (bucket != null) result.bucket = bucket;
+    if (bucketEntries != null) result.bucketEntries = bucketEntries;
+    if (bucketCapacity != null) result.bucketCapacity = bucketCapacity;
+    if (bucketPending != null) result.bucketPending = bucketPending;
+    if (distance != null) result.distance = distance;
+    if (lastContactSecs != null) result.lastContactSecs = lastContactSecs;
     return result;
   }
 
@@ -2001,6 +1974,17 @@ class RoutingPeer extends $pb.GeneratedMessage {
     ..aOB(2, _omitFieldNames ? '' : 'connected')
     ..aOB(3, _omitFieldNames ? '' : 'isBootstrap')
     ..pPS(4, _omitFieldNames ? '' : 'addrs')
+    ..aE<KadStatus>(5, _omitFieldNames ? '' : 'kadStatus',
+        enumValues: KadStatus.values)
+    ..aI(6, _omitFieldNames ? '' : 'bucket', fieldType: $pb.PbFieldType.OU3)
+    ..aI(7, _omitFieldNames ? '' : 'bucketEntries',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(8, _omitFieldNames ? '' : 'bucketCapacity',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOB(9, _omitFieldNames ? '' : 'bucketPending')
+    ..aOS(10, _omitFieldNames ? '' : 'distance')
+    ..aI(11, _omitFieldNames ? '' : 'lastContactSecs',
+        fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2066,6 +2050,102 @@ class RoutingPeer extends $pb.GeneratedMessage {
   /// is its own loopback reads as healthy until the address is visible.
   @$pb.TagNumber(4)
   $pb.PbList<$core.String> get addrs => $_getList(3);
+
+  /// Kad's own liveness verdict for this entry.
+  ///
+  /// Not the same claim as `connected`, which is the swarm's live
+  /// connection set: kad marks an entry Disconnected on connection close
+  /// but keeps it in the bucket, and it lags the swarm by an event loop
+  /// turn either way. A row where the two disagree is the normal
+  /// steady state for a peer we have dropped and still know how to reach.
+  @$pb.TagNumber(5)
+  KadStatus get kadStatus => $_getN(4);
+  @$pb.TagNumber(5)
+  set kadStatus(KadStatus value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasKadStatus() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearKadStatus() => $_clearField(5);
+
+  /// Which k-bucket holds this entry: floor(log2(XOR distance)), 0-255.
+  ///
+  /// Derived from the distance rather than the iteration order, so it is
+  /// the bucket's real index and not a position in a filtered walk.
+  @$pb.TagNumber(6)
+  $core.int get bucket => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set bucket($core.int value) => $_setUnsignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasBucket() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearBucket() => $_clearField(6);
+
+  /// How many entries that bucket currently holds, and the k it is capped
+  /// at. Together they say whether the bucket is full — which is what
+  /// decides if a newly-discovered peer can be inserted at all, or has to
+  /// wait as a pending replacement for a disconnected occupant.
+  @$pb.TagNumber(7)
+  $core.int get bucketEntries => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set bucketEntries($core.int value) => $_setUnsignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasBucketEntries() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearBucketEntries() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get bucketCapacity => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set bucketCapacity($core.int value) => $_setUnsignedInt32(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasBucketCapacity() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearBucketCapacity() => $_clearField(8);
+
+  /// Whether that bucket holds a pending node: a peer waiting to take the
+  /// place of a disconnected entry. Per bucket, not per entry — every
+  /// entry in a full bucket reports the same flag.
+  @$pb.TagNumber(9)
+  $core.bool get bucketPending => $_getBF(8);
+  @$pb.TagNumber(9)
+  set bucketPending($core.bool value) => $_setBool(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasBucketPending() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearBucketPending() => $_clearField(9);
+
+  /// XOR distance from our own key to this peer's, big-endian hex, 64
+  /// digits, no leading `0x`.
+  ///
+  /// The DHT's own metric, and the only way to check that a lookup
+  /// actually walked closer. Fixed for the life of the entry, so it costs
+  /// nothing in subscription churn.
+  @$pb.TagNumber(10)
+  $core.String get distance => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set distance($core.String value) => $_setString(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasDistance() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearDistance() => $_clearField(10);
+
+  /// Seconds since we last *established* a connection to this peer, in
+  /// either direction. Absent means never — which is a real and common
+  /// state for a routing entry: kad holds a peer the moment a configured
+  /// address is seeded into it, before any dial has succeeded.
+  ///
+  /// Deliberately not part of the subscription's change identity, for the
+  /// same reason as `rtt_ms`: it moves every tick and would turn a quiet
+  /// node into a 5-second frame generator. The value a client holds is
+  /// therefore as of the last snapshot it was actually sent.
+  @$pb.TagNumber(11)
+  $core.int get lastContactSecs => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set lastContactSecs($core.int value) => $_setUnsignedInt32(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasLastContactSecs() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearLastContactSecs() => $_clearField(11);
 }
 
 /// This node's own position in the network.
@@ -2887,8 +2967,7 @@ class ConnectReply extends $pb.GeneratedMessage {
 
 /// List the DHT records this node holds locally — the only listing that
 /// exists. Kademlia has no key-enumeration operation, so what a node
-/// holds is answerable in full while "what is in the DHT" is not; use
-/// DhtLookupRequest for a key you already know the name of.
+/// holds is answerable in full while "what is in the DHT" is not.
 class DhtRecordsRequest extends $pb.GeneratedMessage {
   factory DhtRecordsRequest({
     $core.bool? includeValues,
@@ -3042,9 +3121,8 @@ class DhtRecordsReply extends $pb.GeneratedMessage {
   $pb.PbList<DhtRecord> get records => $_getList(1);
 
   /// The keys this node can name: the registries plus one per block of
-  /// its configured prefix. Both the reverse table for
-  /// DhtRecord.key_name — a DHT id is SHA1(msgpack(name)) and cannot be
-  /// inverted — and the candidate list for DhtLookupRequest.
+  /// its configured prefix. The reverse table for DhtRecord.key_name:
+  /// a DHT id is SHA1(msgpack(name)) and cannot be inverted.
   @$pb.TagNumber(3)
   $pb.PbList<DhtKnownKey> get knownKeys => $_getList(2);
 
@@ -3303,10 +3381,8 @@ class DhtRecord extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearExpiration() => $_clearField(7);
 
-  /// Seconds until `expiration`, as of `server_time`. Never negative
-  /// in a local listing, which filters expired records; a lookup
-  /// result can be, since it is stamped with the answering peer's
-  /// clock. Sent alongside the absolute time because a client's clock
+  /// Seconds until `expiration`, as of `server_time`. Never negative:
+  /// the listing filters expired records. Sent alongside the absolute time because a client's clock
   /// is not the daemon's.
   @$pb.TagNumber(8)
   $core.double get expiresInSecs => $_getN(7);
@@ -3551,9 +3627,16 @@ class DhtValueView extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearMsgpackType() => $_clearField(1);
 
-  /// JSON-like rendering, one line. Binary that is valid UTF-8 renders
-  /// as a quoted string; binary that is not renders as `hex:…`, so the
-  /// two are never confused. Ext renders as `ext(<code>)<contents>`.
+  /// The value as compact JSON — valid for `jsonDecode` whenever
+  /// `decoded` is true; when false it is the raw hex and must not be
+  /// parsed. What JSON cannot say is a one-key tagged object:
+  ///   str/bin that is not UTF-8   {"$hex": "lowercase hex"}
+  ///   NaN / ±inf                  {"$float": "nan" | "inf" | "-inf"}
+  ///   ext with a msgpack body     {"$ext": code, "value": body}
+  ///   ext with any other body     {"$ext": code, "$hex": "…"}
+  /// Bin that is valid UTF-8 renders as a string. A non-string map key
+  /// becomes its compact JSON text as the object key; keys that collide
+  /// after that collapse, last one wins.
   @$pb.TagNumber(2)
   $core.String get rendered => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -3573,9 +3656,9 @@ class DhtValueView extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearRawBytes() => $_clearField(3);
 
-  /// The ext type code, when the top level is an Ext. 0x40 (64) is
-  /// hivemind's Python-tuple code and 0x50 (80) its dictionary code;
-  /// anything else came from a peer we do not have a decoder for.
+  /// The ext type code when the top level is an Ext, for out-of-band
+  /// display; `rendered` carries it too. 0x40 (64) is hivemind's
+  /// Python-tuple code and 0x50 (80) its dictionary code.
   @$pb.TagNumber(4)
   $core.int get extCode => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -3595,314 +3678,6 @@ class DhtValueView extends $pb.GeneratedMessage {
   $core.bool hasDecoded() => $_has(4);
   @$pb.TagNumber(5)
   void clearDecoded() => $_clearField(5);
-}
-
-/// Resolve one key across the network — the counterpart to
-/// DhtRecordsRequest, and only ever possible for a key whose *name* is
-/// known, since the id is SHA1(msgpack(name)).
-class DhtLookupRequest extends $pb.GeneratedMessage {
-  factory DhtLookupRequest({
-    $core.String? key,
-    $core.Iterable<$core.String>? peers,
-    $core.int? timeoutSecs,
-  }) {
-    final result = create();
-    if (key != null) result.key = key;
-    if (peers != null) result.peers.addAll(peers);
-    if (timeoutSecs != null) result.timeoutSecs = timeoutSecs;
-    return result;
-  }
-
-  DhtLookupRequest._();
-
-  factory DhtLookupRequest.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory DhtLookupRequest.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'DhtLookupRequest',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'key')
-    ..pPS(2, _omitFieldNames ? '' : 'peers')
-    ..aI(3, _omitFieldNames ? '' : 'timeoutSecs',
-        fieldType: $pb.PbFieldType.OU3)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DhtLookupRequest clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DhtLookupRequest copyWith(void Function(DhtLookupRequest) updates) =>
-      super.copyWith((message) => updates(message as DhtLookupRequest))
-          as DhtLookupRequest;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static DhtLookupRequest create() => DhtLookupRequest._();
-  @$core.override
-  DhtLookupRequest createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static DhtLookupRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<DhtLookupRequest>(create);
-  static DhtLookupRequest? _defaultInstance;
-
-  /// The plaintext key name — `_petals.models`, `_kwaai.vpk.nodes`,
-  /// `_kwaai.inference.nodes`, `<prefix>.<block>`, or anything else.
-  /// Hashed to its DHT id here.
-  @$pb.TagNumber(1)
-  $core.String get key => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set key($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasKey() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearKey() => $_clearField(1);
-
-  /// Peers to ask, base58 peer ids. Empty means the node's configured
-  /// peers plus its routing table — whoever it was already going to
-  /// talk to. A node configured with an explicitly empty peer list
-  /// gets UNAVAILABLE, never a fallback to a compiled-in bootstrap.
-  /// Both lists are capped at 16 peers.
-  @$pb.TagNumber(2)
-  $pb.PbList<$core.String> get peers => $_getList(1);
-
-  /// Per-peer budget. 0 uses the daemon's default.
-  @$pb.TagNumber(3)
-  $core.int get timeoutSecs => $_getIZ(2);
-  @$pb.TagNumber(3)
-  set timeoutSecs($core.int value) => $_setUnsignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasTimeoutSecs() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearTimeoutSecs() => $_clearField(3);
-}
-
-class DhtLookupReply extends $pb.GeneratedMessage {
-  factory DhtLookupReply({
-    $core.String? serverTime,
-    $core.String? key,
-    $core.String? keyId,
-    $core.Iterable<DhtLookupPeer>? peers,
-    DhtRecord? record,
-  }) {
-    final result = create();
-    if (serverTime != null) result.serverTime = serverTime;
-    if (key != null) result.key = key;
-    if (keyId != null) result.keyId = keyId;
-    if (peers != null) result.peers.addAll(peers);
-    if (record != null) result.record = record;
-    return result;
-  }
-
-  DhtLookupReply._();
-
-  factory DhtLookupReply.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory DhtLookupReply.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'DhtLookupReply',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'serverTime')
-    ..aOS(2, _omitFieldNames ? '' : 'key')
-    ..aOS(3, _omitFieldNames ? '' : 'keyId')
-    ..pPM<DhtLookupPeer>(4, _omitFieldNames ? '' : 'peers',
-        subBuilder: DhtLookupPeer.create)
-    ..aOM<DhtRecord>(5, _omitFieldNames ? '' : 'record',
-        subBuilder: DhtRecord.create)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DhtLookupReply clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DhtLookupReply copyWith(void Function(DhtLookupReply) updates) =>
-      super.copyWith((message) => updates(message as DhtLookupReply))
-          as DhtLookupReply;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static DhtLookupReply create() => DhtLookupReply._();
-  @$core.override
-  DhtLookupReply createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static DhtLookupReply getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<DhtLookupReply>(create);
-  static DhtLookupReply? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get serverTime => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set serverTime($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasServerTime() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearServerTime() => $_clearField(1);
-
-  /// Echoed back with the id it hashed to, so a client can show what
-  /// was actually asked for.
-  @$pb.TagNumber(2)
-  $core.String get key => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set key($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasKey() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearKey() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.String get keyId => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set keyId($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasKeyId() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearKeyId() => $_clearField(3);
-
-  /// One entry per peer asked, in the order asked. A peer that
-  /// answered NOT_FOUND is a real result — it is how you tell "nobody
-  /// has this" from "nobody was reachable".
-  @$pb.TagNumber(4)
-  $pb.PbList<DhtLookupPeer> get peers => $_getList(3);
-
-  /// The freshest answer across every peer that returned one, by outer
-  /// expiration. Absent when no peer had the key.
-  ///
-  /// Its `in_cache` is meaningless here (nothing was stored locally)
-  /// and is always false; `key_name` is the requested key.
-  @$pb.TagNumber(5)
-  DhtRecord get record => $_getN(4);
-  @$pb.TagNumber(5)
-  set record(DhtRecord value) => $_setField(5, value);
-  @$pb.TagNumber(5)
-  $core.bool hasRecord() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearRecord() => $_clearField(5);
-  @$pb.TagNumber(5)
-  DhtRecord ensureRecord() => $_ensure(4);
-}
-
-class DhtLookupPeer extends $pb.GeneratedMessage {
-  factory DhtLookupPeer({
-    $core.String? peerId,
-    DhtLookupOutcome? outcome,
-    $core.String? error,
-    $core.int? elapsedMs,
-    DhtRecord? record,
-  }) {
-    final result = create();
-    if (peerId != null) result.peerId = peerId;
-    if (outcome != null) result.outcome = outcome;
-    if (error != null) result.error = error;
-    if (elapsedMs != null) result.elapsedMs = elapsedMs;
-    if (record != null) result.record = record;
-    return result;
-  }
-
-  DhtLookupPeer._();
-
-  factory DhtLookupPeer.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory DhtLookupPeer.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'DhtLookupPeer',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'peerId')
-    ..aE<DhtLookupOutcome>(2, _omitFieldNames ? '' : 'outcome',
-        enumValues: DhtLookupOutcome.values)
-    ..aOS(3, _omitFieldNames ? '' : 'error')
-    ..aI(4, _omitFieldNames ? '' : 'elapsedMs', fieldType: $pb.PbFieldType.OU3)
-    ..aOM<DhtRecord>(5, _omitFieldNames ? '' : 'record',
-        subBuilder: DhtRecord.create)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DhtLookupPeer clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DhtLookupPeer copyWith(void Function(DhtLookupPeer) updates) =>
-      super.copyWith((message) => updates(message as DhtLookupPeer))
-          as DhtLookupPeer;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static DhtLookupPeer create() => DhtLookupPeer._();
-  @$core.override
-  DhtLookupPeer createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static DhtLookupPeer getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<DhtLookupPeer>(create);
-  static DhtLookupPeer? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get peerId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set peerId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasPeerId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearPeerId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  DhtLookupOutcome get outcome => $_getN(1);
-  @$pb.TagNumber(2)
-  set outcome(DhtLookupOutcome value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasOutcome() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearOutcome() => $_clearField(2);
-
-  /// Failure detail when `outcome` is ERROR, empty otherwise. A dial
-  /// failure and a protocol refusal both land here — the text
-  /// distinguishes them.
-  @$pb.TagNumber(3)
-  $core.String get error => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set error($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasError() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearError() => $_clearField(3);
-
-  /// Round trip for this peer, including any dial it had to make.
-  @$pb.TagNumber(4)
-  $core.int get elapsedMs => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set elapsedMs($core.int value) => $_setUnsignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasElapsedMs() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearElapsedMs() => $_clearField(4);
-
-  /// What this peer returned, when `outcome` is FOUND. Kept per peer
-  /// rather than only merged, because peers disagreeing about a record
-  /// is exactly what a reader is looking for.
-  @$pb.TagNumber(5)
-  DhtRecord get record => $_getN(4);
-  @$pb.TagNumber(5)
-  set record(DhtRecord value) => $_setField(5, value);
-  @$pb.TagNumber(5)
-  $core.bool hasRecord() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearRecord() => $_clearField(5);
-  @$pb.TagNumber(5)
-  DhtRecord ensureRecord() => $_ensure(4);
 }
 
 class ChatMessage extends $pb.GeneratedMessage {

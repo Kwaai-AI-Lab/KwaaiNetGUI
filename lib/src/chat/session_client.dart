@@ -376,52 +376,6 @@ class SessionClient {
     return reply;
   }
 
-  /// `dht_lookup` — resolve one key across the network, by name. Returns the
-  /// id alongside the reply: the daemon honours [cancel] mid-lookup.
-  DhtLookupOperation dhtLookupOp(String key, {int timeoutSecs = 0}) {
-    ensureOpen();
-    if (_closed || _outbound == null) {
-      return DhtLookupOperation(
-        id: null,
-        reply: Future.error(
-          SessionEndedError(
-            kind: SessionEndKind.localClose,
-            reason: 'session not open',
-          ),
-        ),
-      );
-    }
-    final id = _nextId++;
-    final controller = StreamController<pb.ServerFrame>();
-    _routers[id] = controller;
-    _outbound!.add(
-      pb.ClientFrame()
-        ..id = Int64(id)
-        ..dhtLookup = (pb.DhtLookupRequest()
-          ..key = key
-          ..timeoutSecs = timeoutSecs),
-    );
-    return DhtLookupOperation(
-      id: id,
-      reply: _dhtLookupReply(controller.stream),
-    );
-  }
-
-  Future<pb.DhtLookupReply> _dhtLookupReply(
-    Stream<pb.ServerFrame> frames,
-  ) async {
-    pb.DhtLookupReply? reply;
-    await for (final f in frames) {
-      if (f.whichBody() == pb.ServerFrame_Body.dhtLookup) {
-        reply = f.dhtLookup;
-      }
-    }
-    if (reply == null) {
-      throw SessionOpError(code: 0, message: 'dhtLookup returned no reply');
-    }
-    return reply;
-  }
-
   /// Cancel an in-flight operation. The target operation's stream will
   /// error with SessionOpError(code=CANCELLED).
   Future<void> cancel(int operationId) async {
@@ -629,16 +583,6 @@ class NetworkOperation {
 
   final int? id;
   final Stream<pb.NetworkUpdate> updates;
-}
-
-/// An in-flight DHT lookup: its single reply plus the server operation id
-/// needed to [SessionClient.cancel] it. Same id semantics as
-/// [SessionOperation] — null means no frame was ever sent.
-class DhtLookupOperation {
-  DhtLookupOperation({required this.id, required this.reply});
-
-  final int? id;
-  final Future<pb.DhtLookupReply> reply;
 }
 
 /// Thrown into a per-op stream when the server emits Error for that id.

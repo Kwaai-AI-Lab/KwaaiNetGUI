@@ -86,8 +86,6 @@ class KwaaiDropdown<T> extends StatefulWidget {
     required this.onChanged,
     this.hintText,
     this.enabled = true,
-    this.itemBuilder,
-    this.width,
   });
 
   final List<KwaaiDropdownItem<T>> items;
@@ -95,19 +93,6 @@ class KwaaiDropdown<T> extends StatefulWidget {
   final ValueChanged<T?>? onChanged;
   final String? hintText;
   final bool enabled;
-
-  /// Renders an item as a row instead of its label, in both the popup and
-  /// the collapsed field. [foreground] is the row's text colour (it flips on
-  /// hover). Pair with [width]: labels are not measured for custom rows.
-  final Widget Function(
-    BuildContext context,
-    KwaaiDropdownItem<T> item,
-    Color foreground,
-  )?
-  itemBuilder;
-
-  /// Fixed trigger width, in place of the widest-label measurement.
-  final double? width;
 
   @override
   State<KwaaiDropdown<T>> createState() => _KwaaiDropdownState<T>();
@@ -137,14 +122,12 @@ class _KwaaiDropdownState<T> extends State<KwaaiDropdown<T>> {
     super.dispose();
   }
 
-  KwaaiDropdownItem<T>? get _selectedItem {
+  String? get _selectedLabel {
     for (final item in widget.items) {
-      if (item.value == widget.value) return item;
+      if (item.value == widget.value) return item.label;
     }
     return null;
   }
-
-  String? get _selectedLabel => _selectedItem?.label;
 
   int get _selectedIndex {
     for (var i = 0; i < widget.items.length; i++) {
@@ -196,10 +179,7 @@ class _KwaaiDropdownState<T> extends State<KwaaiDropdown<T>> {
 
     // Trigger width = widest label + content padding (10 each side) +
     // chevron column (24) + a small fudge for ellipsis safety.
-    final triggerWidth =
-        widget.width ?? _widestLabelWidth(context) + 10 + 10 + 24 + 4;
-    final itemBuilder = widget.itemBuilder;
-    final selected = _selectedItem;
+    final triggerWidth = _widestLabelWidth(context) + 10 + 10 + 24 + 4;
 
     final restingBorder = OutlineInputBorder(
       borderRadius: radius,
@@ -238,9 +218,6 @@ class _KwaaiDropdownState<T> extends State<KwaaiDropdown<T>> {
                 label: item.label,
                 selected: item.value == widget.value,
                 onTap: () => _select(item.value),
-                builder: itemBuilder == null
-                    ? null
-                    : (fg) => itemBuilder(context, item, fg),
               ),
           ],
         ),
@@ -316,14 +293,13 @@ class _KwaaiDropdownState<T> extends State<KwaaiDropdown<T>> {
                         maxHeight: 24,
                       ),
                     ),
-                    child: itemBuilder != null && selected != null
-                        ? itemBuilder(context, selected, scheme.onSurface)
-                        : Text(
-                            _selectedLabel ?? '',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(height: 1.0),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                    child: Text(
+                      _selectedLabel ?? '',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(height: 1.0),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
               ),
@@ -342,15 +318,11 @@ class _MenuRow<T> extends StatefulWidget {
     required this.label,
     required this.selected,
     required this.onTap,
-    this.builder,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
-
-  /// Custom row content, given the current foreground colour.
-  final Widget Function(Color foreground)? builder;
 
   @override
   State<_MenuRow<T>> createState() => _MenuRowState<T>();
@@ -393,12 +365,12 @@ class _MenuRowState<T> extends State<_MenuRow<T>> {
                       : null,
                 ),
                 const SizedBox(width: 4),
-                widget.builder?.call(hoverFg) ??
-                    Text(
-                      widget.label,
-                      style: Theme.of(context).textTheme.bodyMedium
-                          ?.copyWith(height: 1.0, color: hoverFg),
-                    ),
+                Text(
+                  widget.label,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(height: 1.0, color: hoverFg),
+                ),
               ],
             ),
           ),
