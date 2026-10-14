@@ -299,7 +299,10 @@ String ragErrorText(Object error) {
       case 4: // CANCELLED
         return 'Cancelled.';
       case kRagUnimplemented:
-        return 'This daemon was built without RAG support.';
+        // Also a remote KB's answer to init/ingest, which the message names.
+        return error.message.isEmpty
+            ? 'This daemon was built without RAG support.'
+            : error.message;
       default:
         return error.message.isEmpty ? 'Something went wrong.' : error.message;
     }
@@ -307,6 +310,7 @@ String ragErrorText(Object error) {
   if (error is SessionEndedError) {
     return 'Lost the connection to the daemon.';
   }
+  if (error is RagFileRejected) return error.message;
   return error.toString();
 }
 

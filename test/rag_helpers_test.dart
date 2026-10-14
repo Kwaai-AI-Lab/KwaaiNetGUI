@@ -134,6 +134,28 @@ void main() {
       );
     });
 
+    test('shows init\'s INVALID_ARGUMENT and UNIMPLEMENTED messages', () {
+      // A model change on a KB with documents, and init on a remote KB.
+      const model = 'rag_init cannot switch KB \'a\' from x to y';
+      expect(ragErrorText(SessionOpError(code: 1, message: model)), model);
+      const remote = 'KB \'shared\' is remote';
+      expect(
+        ragErrorText(SessionOpError(code: kRagUnimplemented, message: remote)),
+        remote,
+      );
+      expect(
+        ragErrorText(SessionOpError(code: kRagUnimplemented, message: '')),
+        contains('without RAG support'),
+      );
+    });
+
+    test('shows a pre-send file rejection as written', () {
+      expect(
+        ragErrorText(RagFileRejected('The file is empty.')),
+        'The file is empty.',
+      );
+    });
+
     test('reports a lost session without leaking the exception type', () {
       final text = ragErrorText(
         SessionEndedError(kind: SessionEndKind.remoteClose, reason: 'bye'),
