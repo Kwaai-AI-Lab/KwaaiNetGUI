@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,9 +28,24 @@ String localStoreNote({required bool truncated}) =>
     '${truncated ? '' : ' and complete'} answer about this node and says '
     'nothing about the network’s key space.';
 
-/// `Error.Code.UNIMPLEMENTED` from kwaai.proto — the Go p2p path, which has no
-/// hivemind store to enumerate.
-const _unimplemented = 6;
+/// The daemon's p2p node has not started yet: UNAVAILABLE now, UNIMPLEMENTED
+/// from earlier builds of `dht_records`. Transient, so the tab retries.
+bool isNodeStarting(Object? error) =>
+    error is SessionOpError &&
+    (error.code == pb.Error_Code.UNAVAILABLE.value ||
+        error.code == pb.Error_Code.UNIMPLEMENTED.value);
+
+/// A daemon predating `dht_records` decodes the frame with no body. Matched on
+/// the exact message: the code alone is also its reply to any malformed frame.
+bool isDaemonTooOld(Object? error) =>
+    error is SessionOpError &&
+    error.code == pb.Error_Code.INVALID_ARGUMENT.value &&
+    error.message == 'ClientFrame missing body';
+
+/// Backoff between automatic retries while the node starts: 2s, 4s, 8s, then
+/// every 15s.
+Duration startingRetryDelay(int attempt) =>
+    Duration(seconds: math.min(2 << math.min(attempt, 3), 15));
 
 /// Settings tab for `dht_records`: a header, one table, and a detail panel.
 /// The listing is one-shot; values are fetched per row.
@@ -56,8 +73,27 @@ class _DhtTabState extends ConsumerState<DhtTab> {
   /// When [_last] arrived, for the stale banner.
   DateTime? _lastArrived;
 
+  /// Pending automatic retry while the p2p node starts, and how many have run.
+  Timer? _retryTimer;
+  int _retryAttempt = 0;
+
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen(dhtRecordsProvider, (_, next) {
+      if (next.isLoading) return;
+      if (next.hasError && isNodeStarting(next.error)) {
+        _retryTimer?.cancel();
+        _retryTimer = Timer(startingRetryDelay(_retryAttempt++), _retry);
+      } else if (!next.hasError) {
+        _retryAttempt = 0;
+      }
+    });
     final listing = ref.watch(dhtRecordsProvider);
     final fresh = listing.valueOrNull;
     if (fresh != null && !identical(fresh, _last)) {
@@ -69,10 +105,16 @@ class _DhtTabState extends ConsumerState<DhtTab> {
     if (reply == null) {
       final err = listing.error;
       if (err != null) {
+        final starting = isNodeStarting(err);
         return ServiceStatusView(
-          headline: 'DHT records are not available',
-          spinner: false,
-          subtitle: _UnavailableDetail(error: err),
+          headline: starting
+              ? 'The p2p node is still starting'
+              : 'DHT records are not available',
+          spinner: starting,
+          subtitle: _UnavailableDetail(
+            error: err,
+            onRetry: listing.isLoading ? null : _retry,
+          ),
         );
       }
 
@@ -112,8 +154,12 @@ class _DhtTabState extends ConsumerState<DhtTab> {
                 ),
               ),
               const SizedBox(width: 12),
+              // Gated on the connection too: while the daemon is away the
+              // provider sits loading, and "unreachable" is the real reason.
               _RefreshButton(
-                onPressed: listing.isLoading ? null : _refreshLocal,
+                onPressed: connected && !listing.isLoading
+                    ? _refreshLocal
+                    : null,
               ),
             ],
           ),
@@ -155,7 +201,7 @@ class _DhtTabState extends ConsumerState<DhtTab> {
     );
   }
 
-  /// Band 3: the selected record.
+  /// The detail panel for the selected record.
   List<Widget> _detailBand(pb.DhtRecordsReply reply, Widget divider) {
     final selected = _selected;
     if (selected == null) return const [];
@@ -201,7 +247,12 @@ class _DhtTabState extends ConsumerState<DhtTab> {
 
   void _refreshLocal() {
     setState(_clearSelection);
-    ref.invalidate(dhtRecordsProvider);
+    _retry();
+  }
+
+  void _retry() {
+    _retryTimer?.cancel();
+    if (mounted) ref.invalidate(dhtRecordsProvider);
   }
 
   /// Expand a row, fetching its values — scoped to this key *and* tier, since
@@ -264,8 +315,8 @@ String subkeyLabel(String rendered) {
   return rendered;
 }
 
-/// A countdown from `expires_in_secs`. Negative is real: dictionaries keep
-/// expired subkeys.
+/// A countdown from `expires_in_secs`. Negative only for a subkey: the listing
+/// filters expired records, but dictionaries keep expired subkeys.
 String formatExpiry(double secs) {
   final rounded = secs.round();
   final magnitude = _magnitude(rounded.abs());
@@ -310,7 +361,8 @@ String formatEpoch(double epochSecs) {
       '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
 }
 
-/// Re-requests the listing. Disabled while one is in flight.
+/// Re-requests the listing. Disabled while one is in flight or the daemon is
+/// unreachable.
 class _RefreshButton extends StatelessWidget {
   const _RefreshButton({required this.onPressed});
 
@@ -328,9 +380,9 @@ class _RefreshButton extends StatelessWidget {
   }
 }
 
-/// Band 1: what the listing is, how much of it is shown, and
-/// the summary. The note is not collapsible — it is the one thing about this
-/// view a reader can most easily get wrong.
+/// The header: what the listing is, how much of it is shown, and the summary.
+/// The note is not collapsible — it is the one thing about this view a reader
+/// can most easily get wrong.
 class _LocalHeader extends StatelessWidget {
   const _LocalHeader({
     required this.shown,
@@ -493,14 +545,8 @@ class _RecordTable extends StatelessWidget {
                         ),
                       ),
                       DataCell(
-                        Text(
-                          formatExpiry(r.expiresInSecs),
-                          style: cellStyle?.copyWith(
-                            color: r.expiresInSecs < 0
-                                ? kwaai.semanticWarning
-                                : null,
-                          ),
-                        ),
+                        // Never negative: the listing filters expired records.
+                        Text(formatExpiry(r.expiresInSecs), style: cellStyle),
                       ),
                     ],
                   ),
@@ -1002,12 +1048,15 @@ class _StaleBanner extends StatelessWidget {
   }
 }
 
-/// Secondary detail under the unavailable headline: the daemon's own words,
-/// plus the one fix we can name without guessing.
+/// Secondary detail under the unavailable headline: what went wrong in words
+/// the user can act on, and a way to try again.
 class _UnavailableDetail extends StatelessWidget {
-  const _UnavailableDetail({required this.error});
+  const _UnavailableDetail({required this.error, required this.onRetry});
 
   final Object error;
+
+  /// Null while a retry is in flight.
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -1015,9 +1064,10 @@ class _UnavailableDetail extends StatelessWidget {
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7),
     );
-    final needsNative =
-        error is SessionOpError &&
-        (error as SessionOpError).code == _unimplemented;
+    final starting = isNodeStarting(error);
+    final text = starting
+        ? 'Its DHT store is not up yet. Retrying automatically.'
+        : _errorText(error);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -1025,27 +1075,25 @@ class _UnavailableDetail extends StatelessWidget {
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Text(
-            needsNative
-                ? 'This daemon runs the Go p2p stack, which has no hivemind '
-                      'store to enumerate.'
-                : _errorText(error),
+            '${text[0].toUpperCase()}${text.substring(1)}',
             style: muted,
             textAlign: TextAlign.center,
           ),
         ),
-        if (needsNative) ...[
-          const SizedBox(height: 10),
-          SelectableText(
-            'kwaainet config set native_p2p true',
-            style: _mono(context, theme.textTheme.bodySmall),
-          ),
-        ],
+        const SizedBox(height: 10),
+        TextButton(
+          onPressed: onRetry,
+          child: Text(starting ? 'Retry now' : 'Retry'),
+        ),
       ],
     );
   }
 }
 
 String _errorText(Object? error) => switch (error) {
+  _ when isNodeStarting(error) => 'the p2p node is still starting',
+  _ when isDaemonTooOld(error) =>
+    'this daemon is too old to list DHT records — update kwaainet',
   SessionOpError e => e.message,
   null => 'unknown error',
   _ => error.toString(),
