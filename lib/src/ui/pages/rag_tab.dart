@@ -449,7 +449,7 @@ String? validateKbName(String name) {
 /// The model is omitted when the daemon didn't report one rather than
 /// rendering a dangling separator.
 String _kbSubtitle(pb.RagKb kb) {
-  final docs = kb.docs.length;
+  final docs = kb.documents.length;
   return [
     '$docs ${docs == 1 ? 'document' : 'documents'}',
     if (kb.embedModel.isNotEmpty) kb.embedModel,
@@ -723,7 +723,7 @@ class _DocumentList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    if (kb.docs.isEmpty) {
+    if (kb.documents.isEmpty) {
       return Text(
         'No documents yet. Add one above to make it searchable.',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -736,21 +736,13 @@ class _DocumentList extends StatelessWidget {
       children: [
         Text('In this KB', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        // Prefer `documents`, which carries chunk counts. A daemon that
-        // predates that field sends only `docs`, so fall back to the bare
-        // names and render them without a size line rather than showing
-        // every document as "0 chunks".
-        if (kb.documents.isNotEmpty)
-          for (final d in kb.documents)
-            _DocumentRow(
-              kb: kb.name,
-              doc: d.name,
-              chunks: d.chunks,
-              enabled: enabled,
-            )
-        else
-          for (final d in kb.docs)
-            _DocumentRow(kb: kb.name, doc: d, enabled: enabled),
+        for (final d in kb.documents)
+          _DocumentRow(
+            kb: kb.name,
+            doc: d.name,
+            chunks: d.chunks,
+            enabled: enabled,
+          ),
       ],
     );
   }
@@ -764,17 +756,16 @@ class _DocumentRow extends ConsumerStatefulWidget {
     required this.kb,
     required this.doc,
     required this.enabled,
-    this.chunks,
+    required this.chunks,
   });
 
   final String kb;
   final String doc;
   final bool enabled;
 
-  /// Chunks this document contributed, or null when the daemon is too old
-  /// to report it — in which case no size line is shown at all, rather
-  /// than claiming zero.
-  final int? chunks;
+  /// Chunks this document contributed; 0 means the daemon couldn't read
+  /// the count, so no size line is shown rather than claiming zero.
+  final int chunks;
 
   @override
   ConsumerState<_DocumentRow> createState() => _DocumentRowState();
@@ -869,7 +860,7 @@ class _DocumentRowState extends ConsumerState<_DocumentRow> {
                   // vectors are 1:1 by construction — one vector is stored
                   // per chunk — so one number is stated two ways rather
                   // than two numbers that could disagree.
-                  if (widget.chunks case final n?)
+                  if (widget.chunks case final n when n > 0)
                     Text(
                       '$n ${n == 1 ? 'chunk' : 'chunks'} · $n '
                       '${n == 1 ? 'vector' : 'vectors'}',

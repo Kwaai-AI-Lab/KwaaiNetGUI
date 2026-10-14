@@ -23,10 +23,8 @@ import 'package:kwaainet_gui/src/ui/widgets/kwaai_text_field.dart';
 pb.RagStatusUpdate _status(List<pb.RagKb> kbs) =>
     pb.RagStatusUpdate()..kbs.addAll(kbs);
 
-/// [chunks] gives each doc a chunk count, keyed by name. A doc absent
-/// from it still appears, with no `documents` entry — which is how a
-/// daemon predating RagKb.documents reports, and what the fallback path
-/// renders.
+/// [chunks] gives each doc a chunk count, keyed by name; a doc absent from
+/// it reports 0, which is the daemon's "couldn't read the count".
 pb.RagKb _kb({
   String name = 'default',
   String embedModel = 'nomic-embed-text',
@@ -36,12 +34,11 @@ pb.RagKb _kb({
 }) => pb.RagKb()
   ..name = name
   ..embedModel = embedModel
-  ..docs.addAll(docs)
   ..documents.addAll([
     for (final d in docs)
-      if (chunks[d] case final n?) pb.RagDoc()
+      pb.RagDoc()
         ..name = d
-        ..chunks = n,
+        ..chunks = chunks[d] ?? 0,
   ])
   ..remote = remote;
 
@@ -364,7 +361,7 @@ void main() {
     expect(find.text('1 chunk · 1 vector'), findsOneWidget);
   });
 
-  testWidgets('a daemon that reports no counts shows none', (tester) async {
+  testWidgets('a count the daemon couldn\'t read shows none', (tester) async {
     await tester.pumpWidget(
       _host(
         status: AsyncValue.data(

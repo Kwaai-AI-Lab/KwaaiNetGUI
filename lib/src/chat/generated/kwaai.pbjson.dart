@@ -947,11 +947,10 @@ const RagKb$json = {
   '2': [
     {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
     {'1': 'embed_model', '3': 2, '4': 1, '5': 9, '10': 'embedModel'},
-    {'1': 'docs', '3': 3, '4': 3, '5': 9, '10': 'docs'},
-    {'1': 'remote', '3': 4, '4': 1, '5': 8, '10': 'remote'},
+    {'1': 'remote', '3': 3, '4': 1, '5': 8, '10': 'remote'},
     {
       '1': 'documents',
-      '3': 5,
+      '3': 4,
       '4': 3,
       '5': 11,
       '6': '.kwaai.v1.RagDoc',
@@ -963,8 +962,8 @@ const RagKb$json = {
 /// Descriptor for `RagKb`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List ragKbDescriptor = $convert.base64Decode(
     'CgVSYWdLYhISCgRuYW1lGAEgASgJUgRuYW1lEh8KC2VtYmVkX21vZGVsGAIgASgJUgplbWJlZE'
-    '1vZGVsEhIKBGRvY3MYAyADKAlSBGRvY3MSFgoGcmVtb3RlGAQgASgIUgZyZW1vdGUSLgoJZG9j'
-    'dW1lbnRzGAUgAygLMhAua3dhYWkudjEuUmFnRG9jUglkb2N1bWVudHM=');
+    '1vZGVsEhYKBnJlbW90ZRgDIAEoCFIGcmVtb3RlEi4KCWRvY3VtZW50cxgEIAMoCzIQLmt3YWFp'
+    'LnYxLlJhZ0RvY1IJZG9jdW1lbnRz');
 
 @$core.Deprecated('Use ragDocDescriptor instead')
 const RagDoc$json = {

@@ -218,7 +218,9 @@ class RagProgress_RagPhase extends $pb.ProtobufEnum {
       RagProgress_RagPhase._(0, _omitEnumNames ? '' : 'RAG_PHASE_UNSPECIFIED');
 
   /// Receiving the document. done/total count bytes. Sent once per
-  /// piece written, so a client can bound the bytes it has in flight.
+  /// piece, after it is written: each acknowledges one piece of the
+  /// 8-piece window (see RagIngestData). A client that does not read
+  /// these for 60 s fails the ingest.
   static const RagProgress_RagPhase RAG_PHASE_RECEIVING =
       RagProgress_RagPhase._(1, _omitEnumNames ? '' : 'RAG_PHASE_RECEIVING');
 

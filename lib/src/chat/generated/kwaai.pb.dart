@@ -376,7 +376,11 @@ class ClientFrame extends $pb.GeneratedMessage {
 
   /// Ingest one document, whose bytes follow as rag_ingest_data
   /// frames under this op's id. Emits ServerFrame.rag_progress
-  /// frames before the terminal rag_ingest reply. Cancellable.
+  /// frames before the terminal rag_ingest reply. Reusing the id
+  /// of an op still in flight fails with INVALID_ARGUMENT.
+  /// Cancellable. A cancel, or the session closing, mid-upload ends
+  /// the ingest; one that fails or is cancelled after storing
+  /// vectors removes them again (best-effort).
   @$pb.TagNumber(22)
   RagIngestRequest get ragIngest => $_getN(12);
   @$pb.TagNumber(22)
@@ -402,7 +406,8 @@ class ClientFrame extends $pb.GeneratedMessage {
   RagQueryRequest ensureRagQuery() => $_ensure(13);
 
   /// One piece of an ingest's document, sent in order with
-  /// ClientFrame.id set to that ingest's id. Has no reply of its own.
+  /// ClientFrame.id set to that ingest's id. Acknowledged by a
+  /// RAG_PHASE_RECEIVING progress frame; see RagIngestData.
   @$pb.TagNumber(24)
   RagIngestData get ragIngestData => $_getN(14);
   @$pb.TagNumber(24)
@@ -3062,14 +3067,12 @@ class RagKb extends $pb.GeneratedMessage {
   factory RagKb({
     $core.String? name,
     $core.String? embedModel,
-    $core.Iterable<$core.String>? docs,
     $core.bool? remote,
     $core.Iterable<RagDoc>? documents,
   }) {
     final result = create();
     if (name != null) result.name = name;
     if (embedModel != null) result.embedModel = embedModel;
-    if (docs != null) result.docs.addAll(docs);
     if (remote != null) result.remote = remote;
     if (documents != null) result.documents.addAll(documents);
     return result;
@@ -3090,9 +3093,8 @@ class RagKb extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'name')
     ..aOS(2, _omitFieldNames ? '' : 'embedModel')
-    ..pPS(3, _omitFieldNames ? '' : 'docs')
-    ..aOB(4, _omitFieldNames ? '' : 'remote')
-    ..pPM<RagDoc>(5, _omitFieldNames ? '' : 'documents',
+    ..aOB(3, _omitFieldNames ? '' : 'remote')
+    ..pPM<RagDoc>(4, _omitFieldNames ? '' : 'documents',
         subBuilder: RagDoc.create)
     ..hasRequiredFields = false;
 
@@ -3136,32 +3138,23 @@ class RagKb extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearEmbedModel() => $_clearField(2);
 
-  /// Documents ingested so far, by name. Best-effort: a KB whose
-  /// metadata store can't be opened is still reported, with an empty
-  /// list, rather than failing the whole status op.
-  ///
-  /// Superseded by `documents`, which carries the same names plus their
-  /// chunk counts. Still populated — an older client reading only this
-  /// field keeps working — so the two are always the same length and in
-  /// the same order.
-  @$pb.TagNumber(3)
-  $pb.PbList<$core.String> get docs => $_getList(2);
-
   /// True when the KB's vectors live somewhere other than the local
   /// embedded store (a remote Eve node or an HTTP storage service).
   /// Phase 1 can report these but not query or ingest into them.
-  @$pb.TagNumber(4)
-  $core.bool get remote => $_getBF(3);
-  @$pb.TagNumber(4)
-  set remote($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasRemote() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearRemote() => $_clearField(4);
+  @$pb.TagNumber(3)
+  $core.bool get remote => $_getBF(2);
+  @$pb.TagNumber(3)
+  set remote($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRemote() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRemote() => $_clearField(3);
 
-  /// Documents with the size of each. Same set as `docs`; prefer this.
-  @$pb.TagNumber(5)
-  $pb.PbList<RagDoc> get documents => $_getList(4);
+  /// Documents ingested so far, each with its chunk count. Best-effort:
+  /// a KB whose metadata store can't be opened is still reported, with
+  /// an empty list, rather than failing the whole status op.
+  @$pb.TagNumber(4)
+  $pb.PbList<RagDoc> get documents => $_getList(3);
 }
 
 /// One ingested document, as reported by rag_status.
@@ -3368,7 +3361,9 @@ class RagInitRequest extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<RagInitRequest>(create);
   static RagInitRequest? _defaultInstance;
 
-  /// KB to create. Empty means "default".
+  /// KB to create. Empty means "default". Re-initialising an existing
+  /// KB keeps its data directory and documents; a remote KB answers
+  /// UNIMPLEMENTED.
   @$pb.TagNumber(1)
   $core.String get kb => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -3378,7 +3373,9 @@ class RagInitRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearKb() => $_clearField(1);
 
-  /// Ollama embedding model. Empty means the daemon's default.
+  /// Ollama embedding model. Empty means the daemon's default for a new
+  /// KB and the current model for an existing one. Changing the model of
+  /// a KB that holds documents fails with INVALID_ARGUMENT.
   @$pb.TagNumber(2)
   $core.String get embedModel => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -3433,8 +3430,8 @@ class RagInitReply extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<RagInitReply>(create);
   static RagInitReply? _defaultInstance;
 
-  /// The KB as it exists after init. `docs` is empty for a fresh KB
-  /// and populated when init was a no-op on an existing one.
+  /// The KB as it exists after init. `documents` is empty for a fresh
+  /// KB and populated when init refreshed an existing one.
   @$pb.TagNumber(1)
   RagKb get kb => $_getN(0);
   @$pb.TagNumber(1)
@@ -3519,9 +3516,13 @@ class RagIngestRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearDocName() => $_clearField(2);
 
-  /// Total bytes the rag_ingest_data frames will carry. The ingest
-  /// starts once exactly this many have arrived; a piece that runs past
-  /// it fails the ingest, as does a size above the limit (256 MiB).
+  /// Total bytes the rag_ingest_data frames will carry, above 0 and at
+  /// most 256 MiB. The ingest starts once exactly this many have
+  /// arrived. A piece carrying bytes past it fails the ingest; pieces
+  /// sent after exactly `size` bytes are discarded.
+  ///
+  /// A daemon receives at most 4 uploads at once; beyond that the
+  /// ingest fails with UNAVAILABLE before any piece is read.
   @$pb.TagNumber(3)
   $fixnum.Int64 get size => $_getI64(2);
   @$pb.TagNumber(3)
@@ -3534,6 +3535,11 @@ class RagIngestRequest extends $pb.GeneratedMessage {
 
 /// A piece of the document an ingest is uploading. Keep each well under
 /// the 4 MiB gRPC frame limit; 256 KiB is a good size.
+///
+/// Flow control is a window of 8 pieces: at most 8 may be unacknowledged
+/// (sent, with no RAG_PHASE_RECEIVING frame for them yet). The server
+/// buffers no more, so a ninth can fail the ingest with INVALID_ARGUMENT.
+/// An upload that sends nothing for 60 s fails the same way.
 class RagIngestData extends $pb.GeneratedMessage {
   factory RagIngestData({
     $core.List<$core.int>? data,
@@ -4063,7 +4069,7 @@ class RagDeleteRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearKb() => $_clearField(1);
 
-  /// Document name as reported in RagKb.docs — the display name the
+  /// Document name as reported in RagDoc.name — the display name the
   /// ingest recorded, not a filesystem path. Deleting by name rather
   /// than by chunk id keeps the client from having to know how a
   /// document was split.
