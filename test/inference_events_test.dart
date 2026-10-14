@@ -214,5 +214,13 @@ void main() {
       expect(log().model, isEmpty);
       expect(log().sessionId, isEmpty);
     });
+
+    test('a run sent with the panel closed is marked as such', () {
+      notifier().startRun(eventsRequested: false);
+      expect(log().running, isTrue);
+      expect(log().eventsRequested, isFalse);
+      notifier().endRun();
+      expect(log().eventsRequested, isFalse);
+    });
   });
 }
