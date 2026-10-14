@@ -15,9 +15,9 @@ import '../widgets/service_status_view.dart';
 
 /// Retrieval-augmented generation: knowledge bases, ingest, and retrieval.
 ///
-/// Four states, in priority order — daemon unreachable, RAG absent from the
-/// build, nothing initialised, and ready. They are ordered by how much they
-/// preclude: there is no point offering to initialise a KB on a daemon that
+/// Four states, in priority order — daemon unreachable (or still
+/// connecting), RAG absent from the build, nothing initialised, and ready.
+/// They are ordered by how much they preclude: there is no point offering to initialise a KB on a daemon that
 /// cannot do RAG, and none at all when the daemon isn't answering.
 ///
 /// "Nothing initialised" is a zero-length KB list rather than an error,
@@ -44,6 +44,11 @@ class RagTab extends ConsumerWidget {
       loading: () =>
           const ServiceStatusView(headline: 'Loading knowledge bases…'),
       error: (e, _) {
+        // The PID can be alive while the RPC (re)connects; that is not
+        // "nothing initialised".
+        if (e is RagNotConnected) {
+          return const ServiceStatusView(headline: 'Connecting to the daemon…');
+        }
         if (isRagUnavailable(e)) {
           return const ServiceStatusView(
             headline: 'RAG isn\'t available in this daemon',
