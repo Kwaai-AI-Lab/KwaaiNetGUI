@@ -51,6 +51,54 @@ class _ScriptedRpcClient implements KwaaiRpcClient {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+/// One scripted ingest per call, recorded so tests can settle each by hand.
+class _RecordingRpcClient implements KwaaiRpcClient {
+  final calls = <({String path, String kb, _Ingest ingest})>[];
+  final cancelled = <int>[];
+
+  @override
+  Future<RagIngestOperation> ragIngest({
+    required File file,
+    String kb = '',
+    String? docName,
+  }) async {
+    final ingest = _Ingest(100 + calls.length);
+    calls.add((path: file.path, kb: kb, ingest: ingest));
+    return RagIngestOperation(
+      id: ingest.id,
+      progress: ingest.progress.stream,
+      done: ingest.done.future,
+      onCancel: () async {
+        cancelled.add(ingest.id);
+        ingest.fail(SessionOpError(code: 4, message: 'cancelled'));
+      },
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _Ingest {
+  _Ingest(this.id);
+
+  final int id;
+  final progress = StreamController<pb.RagProgress>();
+  final done = Completer<pb.RagIngestReply>();
+
+  void finish(int chunks) {
+    if (!done.isCompleted) {
+      done.complete(pb.RagIngestReply(chunksIngested: chunks));
+    }
+    progress.close();
+  }
+
+  void fail(Object e) {
+    if (!done.isCompleted) done.completeError(e);
+    progress.close();
+  }
+}
+
 /// A container whose RPC layer is [_NoDaemonRpcClient], disposed with the
 /// test.
 ProviderContainer _queueContainer() {
@@ -357,6 +405,184 @@ void main() {
       expect(
         container.read(ragIngestQueueProvider).single.status,
         RagJobStatus.done,
+      );
+    });
+
+    test('the same path queued into two KBs runs two ingests', () async {
+      final client = _RecordingRpcClient();
+      final container = ProviderContainer(
+        overrides: [kwaaiRpcClientProvider.overrideWithValue(client)],
+      );
+      addTearDown(container.dispose);
+      final queue = container.read(ragIngestQueueProvider.notifier);
+
+      queue.enqueue(const ['/docs/a.pdf'], kb: 'alpha');
+      queue.enqueue(const ['/docs/a.pdf'], kb: 'beta');
+      await pumpEventQueue();
+      // One at a time: the second waits for the first to settle.
+      expect(client.calls.map((c) => c.kb), ['alpha']);
+      var jobs = container.read(ragIngestQueueProvider);
+      expect(jobs.map((j) => j.status), [
+        RagJobStatus.running,
+        RagJobStatus.queued,
+      ]);
+
+      client.calls[0].ingest.finish(3);
+      await pumpEventQueue();
+      expect(client.calls.map((c) => (c.path, c.kb)), [
+        ('/docs/a.pdf', 'alpha'),
+        ('/docs/a.pdf', 'beta'),
+      ]);
+      client.calls[1].ingest.finish(5);
+      await pumpEventQueue();
+
+      jobs = container.read(ragIngestQueueProvider);
+      expect(jobs.map((j) => j.status), [RagJobStatus.done, RagJobStatus.done]);
+      expect(jobs.map((j) => j.chunksIngested), [3, 5]);
+    });
+
+    test('per-row cancel cancels the running op by its id', () async {
+      final client = _RecordingRpcClient();
+      final container = ProviderContainer(
+        overrides: [kwaaiRpcClientProvider.overrideWithValue(client)],
+      );
+      addTearDown(container.dispose);
+      final queue = container.read(ragIngestQueueProvider.notifier);
+
+      queue.enqueue(const ['/docs/a.pdf', '/docs/b.pdf'], kb: 'default');
+      await pumpEventQueue();
+      final running = container.read(ragIngestQueueProvider).first;
+      expect(running.opId, 100);
+
+      await queue.cancel(running.id);
+      await pumpEventQueue();
+      expect(client.cancelled, [100]);
+      final jobs = container.read(ragIngestQueueProvider);
+      expect(jobs.first.status, RagJobStatus.cancelled);
+      // The next file starts once the cancelled one settles.
+      expect(jobs.last.status, RagJobStatus.running);
+    });
+
+    test('cancelling a queued job never starts it', () async {
+      final client = _RecordingRpcClient();
+      final container = ProviderContainer(
+        overrides: [kwaaiRpcClientProvider.overrideWithValue(client)],
+      );
+      addTearDown(container.dispose);
+      final queue = container.read(ragIngestQueueProvider.notifier);
+
+      queue.enqueue(const ['/docs/a.pdf', '/docs/b.pdf'], kb: 'default');
+      await pumpEventQueue();
+      await queue.cancel(container.read(ragIngestQueueProvider).last.id);
+      client.calls.single.ingest.finish(1);
+      await pumpEventQueue();
+
+      expect(client.calls, hasLength(1));
+      expect(client.cancelled, isEmpty);
+      expect(container.read(ragIngestQueueProvider).map((j) => j.status), [
+        RagJobStatus.done,
+        RagJobStatus.cancelled,
+      ]);
+    });
+
+    test('UNAVAILABLE before any upload ack reads as a busy daemon', () async {
+      final client = _RecordingRpcClient();
+      final container = ProviderContainer(
+        overrides: [kwaaiRpcClientProvider.overrideWithValue(client)],
+      );
+      addTearDown(container.dispose);
+      final queue = container.read(ragIngestQueueProvider.notifier);
+
+      queue.enqueue(const ['/docs/a.pdf'], kb: 'default');
+      await pumpEventQueue();
+      client.calls.single.ingest.fail(
+        SessionOpError(
+          code: kRagUnavailable,
+          message: '4 uploads already in flight; retry when one ends',
+        ),
+      );
+      await pumpEventQueue();
+
+      final job = container.read(ragIngestQueueProvider).single;
+      expect(job.status, RagJobStatus.failed);
+      expect(job.error, contains('too many uploads'));
+    });
+
+    test('UNAVAILABLE after the upload keeps the daemon\'s message', () async {
+      final client = _RecordingRpcClient();
+      final container = ProviderContainer(
+        overrides: [kwaaiRpcClientProvider.overrideWithValue(client)],
+      );
+      addTearDown(container.dispose);
+      final queue = container.read(ragIngestQueueProvider.notifier);
+
+      queue.enqueue(const ['/docs/a.pdf'], kb: 'default');
+      await pumpEventQueue();
+      final ingest = client.calls.single.ingest;
+      ingest.progress.add(
+        pb.RagProgress(
+          phase: pb.RagProgress_RagPhase.RAG_PHASE_RECEIVING,
+          done: 10,
+          total: 10,
+        ),
+      );
+      await pumpEventQueue();
+      ingest.fail(
+        SessionOpError(code: kRagUnavailable, message: 'start Ollama'),
+      );
+      await pumpEventQueue();
+
+      expect(
+        container.read(ragIngestQueueProvider).single.error,
+        'start Ollama',
+      );
+    });
+
+    test('survives its last watcher going away while it has rows', () async {
+      final client = _RecordingRpcClient();
+      final container = ProviderContainer(
+        overrides: [kwaaiRpcClientProvider.overrideWithValue(client)],
+      );
+      addTearDown(container.dispose);
+      // The document panel, mounted then unmounted mid-ingest.
+      final panel = container.listen(ragIngestQueueProvider, (_, _) {});
+      final queue = container.read(ragIngestQueueProvider.notifier);
+      queue.enqueue(const ['/docs/a.pdf', '/docs/b.pdf'], kb: 'default');
+      await pumpEventQueue();
+      panel.close();
+      await pumpEventQueue();
+
+      client.calls.single.ingest.finish(2);
+      await pumpEventQueue();
+      client.calls.last.ingest.finish(4);
+      await pumpEventQueue();
+
+      // Same notifier, both files ingested, results still there to show.
+      expect(container.read(ragIngestQueueProvider.notifier), same(queue));
+      expect(client.calls, hasLength(2));
+      expect(container.read(ragIngestQueueProvider).map((j) => j.status), [
+        RagJobStatus.done,
+        RagJobStatus.done,
+      ]);
+    });
+
+    test('is released once cleared', () async {
+      final client = _RecordingRpcClient();
+      final container = ProviderContainer(
+        overrides: [kwaaiRpcClientProvider.overrideWithValue(client)],
+      );
+      addTearDown(container.dispose);
+      final queue = container.read(ragIngestQueueProvider.notifier);
+      queue.enqueue(const ['/docs/a.pdf'], kb: 'default');
+      await pumpEventQueue();
+      client.calls.single.ingest.finish(1);
+      await pumpEventQueue();
+
+      queue.clearFinished();
+      await pumpEventQueue();
+      expect(
+        container.read(ragIngestQueueProvider.notifier),
+        isNot(same(queue)),
       );
     });
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,11 +83,12 @@ String? selectKb(List<pb.RagKb> kbs, String? selected) {
 /// `queued` is distinct from `running` because files are ingested one at a
 /// time: dropping ten files should show nine waiting rather than ten
 /// pretending to work.
-enum RagJobStatus { queued, running, done, failed }
+enum RagJobStatus { queued, running, done, failed, cancelled }
 
 /// One file's journey through ingest, as the UI needs to render it.
 class RagIngestJob {
   const RagIngestJob({
+    this.id = 0,
     required this.path,
     required this.name,
     required this.kb,
@@ -98,9 +100,13 @@ class RagIngestJob {
     this.chunksIngested = 0,
     this.vectorsUploaded = 0,
     this.error,
+    this.opId,
   });
 
-  /// Local file the GUI uploads; also the job's identity in the queue.
+  /// The job's identity in the queue; a path can be queued more than once.
+  final int id;
+
+  /// Local file the GUI uploads.
   final String path;
 
   /// Basename, for display.
@@ -130,6 +136,13 @@ class RagIngestJob {
   /// User-facing failure text, set only when [status] is failed.
   final String? error;
 
+  /// The daemon operation id while the ingest is running.
+  final int? opId;
+
+  /// Whether the job can still be cancelled.
+  bool get active =>
+      status == RagJobStatus.queued || status == RagJobStatus.running;
+
   /// Fraction complete for this phase, or null when it has no meaningful
   /// subdivision — which the caller should render as an indeterminate bar.
   double? get fraction {
@@ -146,8 +159,10 @@ class RagIngestJob {
     int? chunksIngested,
     int? vectorsUploaded,
     String? error,
+    int? opId,
   }) {
     return RagIngestJob(
+      id: id,
       path: path,
       name: name,
       kb: kb,
@@ -159,6 +174,7 @@ class RagIngestJob {
       chunksIngested: chunksIngested ?? this.chunksIngested,
       vectorsUploaded: vectorsUploaded ?? this.vectorsUploaded,
       error: error ?? this.error,
+      opId: opId ?? this.opId,
     );
   }
 }
@@ -168,11 +184,32 @@ class RagIngestJob {
 /// Files run one at a time rather than in parallel: each embeds through
 /// Ollama, so concurrency would contend on the same model and make every
 /// file slower while muddling whose progress is whose.
+///
+/// Kept alive while it holds rows, so an ingest outlives the panel that
+/// shows it (a connection flap, a status reload, leaving the tab).
 class RagIngestQueue extends StateNotifier<List<RagIngestJob>> {
   RagIngestQueue(this._ref) : super(const []);
 
   final Ref _ref;
   bool _draining = false;
+  int _nextId = 1;
+  KeepAliveLink? _keepAlive;
+
+  /// The running job and its op, and jobs whose cancel came before their op.
+  int? _running;
+  RagIngestOperation? _op;
+  final _cancelRequested = <int>{};
+
+  @override
+  set state(List<RagIngestJob> value) {
+    super.state = value;
+    if (value.isEmpty) {
+      _keepAlive?.close();
+      _keepAlive = null;
+    } else {
+      _keepAlive ??= _ref.keepAlive();
+    }
+  }
 
   /// Queue [paths] for ingest into [kb] and start draining if idle.
   ///
@@ -184,31 +221,55 @@ class RagIngestQueue extends StateNotifier<List<RagIngestJob>> {
   /// drain instead of the one they were dropped into.
   void enqueue(Iterable<String> paths, {required String kb}) {
     final added = [
-      for (final p in paths) RagIngestJob(path: p, name: basename(p), kb: kb),
+      for (final p in paths)
+        RagIngestJob(id: _nextId++, path: p, name: basename(p), kb: kb),
     ];
     if (added.isEmpty) return;
     state = [...state, ...added];
     _drain();
   }
 
-  /// Drop finished rows, keeping anything still queued or running.
-  void clearFinished() {
-    state = state
-        .where(
-          (j) =>
-              j.status == RagJobStatus.queued ||
-              j.status == RagJobStatus.running,
-        )
-        .toList(growable: false);
+  /// Cancel job [id]: a queued job never starts; a running one is cancelled
+  /// daemon-side and settles when the daemon confirms.
+  Future<void> cancel(int id) async {
+    final job = state.where((j) => j.id == id).firstOrNull;
+    if (job == null || !job.active) return;
+    if (job.status == RagJobStatus.queued) {
+      _update(id, (j) => j.copyWith(status: RagJobStatus.cancelled));
+      return;
+    }
+    _cancelRequested.add(id);
+    final op = _op;
+    if (op != null && _running == id) await _cancelOp(op);
   }
 
-  void _update(String path, RagIngestJob Function(RagIngestJob) f) {
-    // The drain loop outlives an autoDispose teardown (leaving the tab,
-    // toggling RAG off mid-ingest); late progress just has nowhere to go.
+  Future<void> _cancelOp(RagIngestOperation op) async {
+    try {
+      await op.cancel();
+    } catch (_) {
+      // Best-effort: a dead session fails the op on its own.
+    }
+  }
+
+  /// Drop finished rows, keeping anything still queued or running.
+  void clearFinished() {
+    state = state.where((j) => j.active).toList(growable: false);
+  }
+
+  @override
+  void dispose() {
+    // Only reachable with rows when the whole container goes (app exit).
+    final op = _op;
+    if (op != null) unawaited(_cancelOp(op));
+    super.dispose();
+  }
+
+  void _update(int id, RagIngestJob Function(RagIngestJob) f) {
+    // Late progress after the container is disposed has nowhere to go.
     if (!mounted) return;
     state = [
       for (final j in state)
-        if (j.path == path) f(j) else j,
+        if (j.id == id) f(j) else j,
     ];
   }
 
@@ -234,13 +295,21 @@ class RagIngestQueue extends StateNotifier<List<RagIngestJob>> {
   }
 
   Future<void> _run(RagIngestJob job) async {
-    _update(job.path, (j) => j.copyWith(status: RagJobStatus.running));
+    _update(job.id, (j) => j.copyWith(status: RagJobStatus.running));
+    _running = job.id;
     final client = _ref.read(kwaaiRpcClientProvider);
+    var uploading = false;
     try {
       final op = await client.ragIngest(file: File(job.path), kb: job.kb);
+      _op = op;
+      _update(job.id, (j) => j.copyWith(opId: op.id));
+      if (_cancelRequested.contains(job.id)) unawaited(_cancelOp(op));
       final sub = op.progress.listen((p) {
+        if (p.phase == pb.RagProgress_RagPhase.RAG_PHASE_RECEIVING) {
+          uploading = true;
+        }
         _update(
-          job.path,
+          job.id,
           (j) => j.copyWith(
             phase: p.phase,
             done: p.done,
@@ -252,7 +321,7 @@ class RagIngestQueue extends StateNotifier<List<RagIngestJob>> {
       try {
         final reply = await op.done;
         _update(
-          job.path,
+          job.id,
           (j) => j.copyWith(
             status: RagJobStatus.done,
             chunksIngested: reply.chunksIngested,
@@ -263,18 +332,42 @@ class RagIngestQueue extends StateNotifier<List<RagIngestJob>> {
         await sub.cancel();
       }
     } catch (e) {
-      _update(
-        job.path,
-        (j) => j.copyWith(status: RagJobStatus.failed, error: ragErrorText(e)),
-      );
+      if (_cancelRequested.contains(job.id) && _isCancelled(e)) {
+        _update(job.id, (j) => j.copyWith(status: RagJobStatus.cancelled));
+      } else {
+        _update(
+          job.id,
+          (j) => j.copyWith(
+            status: RagJobStatus.failed,
+            error: ragIngestErrorText(e, uploadStarted: uploading),
+          ),
+        );
+      }
+    } finally {
+      _op = null;
+      _running = null;
+      _cancelRequested.remove(job.id);
     }
   }
 }
+
+bool _isCancelled(Object e) => e is SessionOpError && e.code == 4;
 
 final ragIngestQueueProvider =
     StateNotifierProvider.autoDispose<RagIngestQueue, List<RagIngestJob>>(
       (ref) => RagIngestQueue(ref),
     );
+
+/// [ragErrorText] for an ingest. UNAVAILABLE before any piece was acked is
+/// the daemon's upload limit, not Ollama.
+String ragIngestErrorText(Object error, {required bool uploadStarted}) {
+  if (!uploadStarted &&
+      error is SessionOpError &&
+      error.code == kRagUnavailable) {
+    return 'Daemon busy: too many uploads at once. Retry when one finishes.';
+  }
+  return ragErrorText(error);
+}
 
 /// Basename of a path, for either separator.
 ///

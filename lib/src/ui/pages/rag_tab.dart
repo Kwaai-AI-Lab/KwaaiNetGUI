@@ -599,7 +599,12 @@ class _DocumentPanelState extends ConsumerState<_DocumentPanel> {
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             children: [
               if (jobs.isNotEmpty) ...[
-                for (final j in jobs) _IngestJobRow(job: j),
+                for (final j in jobs)
+                  _IngestJobRow(
+                    job: j,
+                    onCancel: () =>
+                        ref.read(ragIngestQueueProvider.notifier).cancel(j.id),
+                  ),
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -622,9 +627,10 @@ class _DocumentPanelState extends ConsumerState<_DocumentPanel> {
 
 /// One file's ingest progress or outcome.
 class _IngestJobRow extends StatelessWidget {
-  const _IngestJobRow({required this.job});
+  const _IngestJobRow({required this.job, required this.onCancel});
 
   final RagIngestJob job;
+  final VoidCallback onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -651,6 +657,9 @@ class _IngestJobRow extends StatelessWidget {
       case RagJobStatus.failed:
         statusText = job.error ?? 'Failed';
         statusColor = context.kwaai.semanticError;
+      case RagJobStatus.cancelled:
+        statusText = 'Cancelled';
+        statusColor = muted;
     }
 
     return Padding(
@@ -658,10 +667,31 @@ class _IngestJobRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            job.name,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  job.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              if (job.active)
+                SizedBox(
+                  width: 22,
+                  height: 18,
+                  child: IconButton(
+                    tooltip: 'Cancel',
+                    icon: const Icon(Icons.close, size: 14),
+                    onPressed: onCancel,
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(22, 22),
+                      padding: EdgeInsets.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 2),
           Text(
