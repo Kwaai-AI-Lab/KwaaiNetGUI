@@ -193,6 +193,7 @@ class _PeersTabState extends ConsumerState<PeersTab> {
             selectedPeerId: _selectedPeerId,
             onSelectPeer: _togglePeer,
             onConnect: _connectPeer,
+            snapshotAt: _lastArrived,
           ),
         ),
       ],
@@ -607,7 +608,10 @@ class _AddressLine extends StatefulWidget {
     required this.label,
     required this.values,
     this.itemLabel,
+    this.labelWidth = 74,
   });
+
+  final double labelWidth;
 
   /// What one entry is called, for the per-line copy buttons. The row label
   /// names the group ("Listening"), which reads wrong on a button that copies a
@@ -645,7 +649,10 @@ class _AddressLineState extends State<_AddressLine> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 74, child: Text(widget.label, style: labelStyle)),
+          SizedBox(
+            width: widget.labelWidth,
+            child: Text(widget.label, style: labelStyle),
+          ),
           Expanded(
             // Plain Text, not SelectableText. This page rebuilds on every
             // update *and* every stale tick, and each SelectableText builds a
@@ -742,6 +749,7 @@ class _TableSection extends StatefulWidget {
     required this.selectedPeerId,
     required this.onSelectPeer,
     required this.onConnect,
+    required this.snapshotAt,
   });
 
   final List<pb.ConnectedPeer> connected;
@@ -755,6 +763,9 @@ class _TableSection extends StatefulWidget {
   final String? selectedPeerId;
   final void Function(String peerId) onSelectPeer;
   final Future<bool> Function(String peerId) onConnect;
+
+  /// When the snapshot arrived, to age `last_contact_secs` in the DHT dialog.
+  final DateTime? snapshotAt;
 
   @override
   State<_TableSection> createState() => _TableSectionState();
@@ -859,6 +870,7 @@ class _TableSectionState extends State<_TableSection> {
                   selectedPeerId: widget.selectedPeerId,
                   onSelectPeer: widget.onSelectPeer,
                   onConnect: widget.onConnect,
+                  snapshotAt: widget.snapshotAt,
                 ),
         ),
         // Detail for the selected peer, pinned below the table rather than
@@ -1098,12 +1110,14 @@ class _PeerTable extends StatelessWidget {
     required this.selectedPeerId,
     required this.onSelectPeer,
     required this.onConnect,
+    required this.snapshotAt,
   });
 
   final List<PeerRow> rows;
   final String? selectedPeerId;
   final void Function(String peerId) onSelectPeer;
   final Future<bool> Function(String peerId) onConnect;
+  final DateTime? snapshotAt;
 
   @override
   Widget build(BuildContext context) {
@@ -1178,7 +1192,7 @@ class _PeerTable extends StatelessWidget {
                                 dialable: r.routingAddrs.isNotEmpty,
                               ),
                       ),
-                      DataCell(_DhtCell(row: r)),
+                      DataCell(_DhtCell(row: r, snapshotAt: snapshotAt)),
                       DataCell(
                         r.primary == null
                             ? Text('—', style: cellStyle)
@@ -1416,9 +1430,10 @@ class _StateMark extends StatelessWidget {
 /// Only when there *is* an entry. A dash has nothing to open, so it stays inert
 /// rather than offering an affordance that leads to an empty dialog.
 class _DhtCell extends StatefulWidget {
-  const _DhtCell({required this.row});
+  const _DhtCell({required this.row, required this.snapshotAt});
 
   final PeerRow row;
+  final DateTime? snapshotAt;
 
   @override
   State<_DhtCell> createState() => _DhtCellState();
@@ -1445,7 +1460,8 @@ class _DhtCellState extends State<_DhtCell> {
         // the peer.
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () => _showDhtEntryDialog(context, widget.row),
+          onTap: () =>
+              _showDhtEntryDialog(context, widget.row, widget.snapshotAt),
           child: Icon(
             _hovered ? Icons.search : Icons.check,
             size: 14,
@@ -1457,10 +1473,14 @@ class _DhtCellState extends State<_DhtCell> {
   }
 }
 
-Future<void> _showDhtEntryDialog(BuildContext context, PeerRow row) {
+Future<void> _showDhtEntryDialog(
+  BuildContext context,
+  PeerRow row,
+  DateTime? snapshotAt,
+) {
   return showDialog<void>(
     context: context,
-    builder: (_) => _DhtEntryDialog(row: row),
+    builder: (_) => _DhtEntryDialog(row: row, snapshotAt: snapshotAt),
   );
 }
 
@@ -1468,11 +1488,13 @@ Future<void> _showDhtEntryDialog(BuildContext context, PeerRow row) {
 /// still says something.
 ///
 /// Public for `test/peers_dht_entry_test.dart`. `null` is not "0 seconds ago"
-/// — it is a peer no dial has ever succeeded against, which for a routing entry
-/// is a normal state and a materially different one, so it gets its own words
-/// rather than a number.
-String formatLastContact(int? secs) {
-  if (secs == null) return 'Never — no dial has succeeded';
+/// — it is a peer we have never connected to in either direction, which for a
+/// routing entry is a normal state, so it gets its own words rather than a
+/// number. [sinceSnapshot] ages the value: the daemon does not resend it as it
+/// grows, so it is only as fresh as the snapshot that carried it.
+String formatLastContact(int? secs, {Duration sinceSnapshot = Duration.zero}) {
+  if (secs == null) return 'Never connected';
+  secs += math.max(0, sinceSnapshot.inSeconds);
   if (secs < 60) return '${secs}s ago';
   if (secs < 3600) return '${secs ~/ 60}m ago';
   if (secs < 86400) return '${secs ~/ 3600}h ago';
@@ -1518,9 +1540,10 @@ String kadStatusSummary({
 /// cannot change, a full bucket refuses new peers outright, and a pending node
 /// means one is queued behind a disconnected occupant.
 class _DhtEntryDialog extends StatelessWidget {
-  const _DhtEntryDialog({required this.row});
+  const _DhtEntryDialog({required this.row, required this.snapshotAt});
 
   final PeerRow row;
+  final DateTime? snapshotAt;
 
   @override
   Widget build(BuildContext context) {
@@ -1559,10 +1582,13 @@ class _DhtEntryDialog extends StatelessWidget {
                 ),
               ),
               _DhtField(
-                label: 'Last dialled',
+                label: 'Last connected',
                 child: Text(
                   formatLastContact(
                     entry.hasLastContactSecs() ? entry.lastContactSecs : null,
+                    sinceSnapshot: snapshotAt == null
+                        ? Duration.zero
+                        : DateTime.now().difference(snapshotAt!),
                   ),
                   style: theme.textTheme.bodySmall,
                 ),
@@ -1602,7 +1628,7 @@ class _DhtEntryDialog extends StatelessWidget {
                   child: SelectableText(entry.distance, style: _mono(context)),
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(left: 74, top: 4),
+                  padding: const EdgeInsets.only(left: _dhtLabelWidth, top: 4),
                   child: Text(
                     // Spelled out because the two numbers above look unrelated
                     // until you know one is the log of the other.
@@ -1635,6 +1661,7 @@ class _DhtEntryDialog extends StatelessWidget {
                   label: 'Known at',
                   itemLabel: 'address',
                   values: entry.addrs,
+                  labelWidth: _dhtLabelWidth,
                 ),
             ],
           ),
@@ -1656,8 +1683,10 @@ TextStyle? _mono(BuildContext context) => Theme.of(context).textTheme.bodySmall
       fontFamilyFallback: const ['Consolas', 'monospace'],
     );
 
-/// One labelled line in the DHT dialog, on the same 74px label column the
-/// expanded peer panel uses so the two read as one surface.
+/// The DHT dialog's label column: wide enough for "Last connected".
+const _dhtLabelWidth = 96.0;
+
+/// One labelled line in the DHT dialog.
 class _DhtField extends StatelessWidget {
   const _DhtField({required this.label, required this.child});
 
@@ -1673,7 +1702,7 @@ class _DhtField extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 74,
+            width: _dhtLabelWidth,
             child: Text(
               label,
               style: theme.textTheme.bodySmall?.copyWith(

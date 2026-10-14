@@ -84,8 +84,20 @@ void main() {
     /// ordinary state — and rendering it as "0s ago" would assert the
     /// opposite of what is true.
     test('absent is never, not zero', () {
-      expect(formatLastContact(null), contains('Never'));
+      expect(formatLastContact(null), 'Never connected');
       expect(formatLastContact(0), '0s ago');
+    });
+
+    // The daemon does not resend the value as it grows.
+    test('ages by the time since the snapshot', () {
+      expect(
+        formatLastContact(120, sinceSnapshot: const Duration(minutes: 3)),
+        '5m ago',
+      );
+      expect(
+        formatLastContact(null, sinceSnapshot: const Duration(minutes: 3)),
+        'Never connected',
+      );
     });
 
     test('coarsens with age', () {
@@ -137,6 +149,7 @@ void main() {
 
     expect(find.text('DHT routing entry'), findsOneWidget);
     expect(find.textContaining('251'), findsOneWidget);
+    expect(find.text('Last connected'), findsOneWidget);
     expect(find.text('2m ago'), findsOneWidget);
     expect(find.textContaining('/ip4/198.18.0.32/tcp/8080'), findsOneWidget);
   });
