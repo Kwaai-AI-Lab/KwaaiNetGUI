@@ -148,6 +148,7 @@ class _ChatTab extends StatelessWidget {
         Expanded(
           child: _ChatBody(path: path, onOpenSettings: onOpenSettings),
         ),
+        _ChatSlowBar(path: path),
         _ChatErrorBar(path: path),
         _ChatInputBar(path: path),
       ],
@@ -254,11 +255,22 @@ class _MainTopBar extends StatelessWidget {
             ),
           ],
           const Spacer(),
+          // No tooltip here, deliberately. This is the one control that both
+          // carries a tooltip and pushes an opaque route (Settings). Once that
+          // route covers the page, the tooltip's owner sits inside
+          // TickerMode(enabled: false), so the fade-out started when the
+          // pointer left never ticks, and the tooltip's OverlayPortal child
+          // stays mounted offstage. The overlay only relays out onstage
+          // entries' portal children, yet the stuck one re-dirties itself
+          // every frame — so the next window resize trips
+          // `size == theater.size` in overlay.dart (Flutter 3.44). Debug-only,
+          // but it halts the debugger every time. Repro with a failing test:
+          // ../flutter-tooltip-resize-repro. The icon keeps its semantic
+          // label for assistive tech.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: IconButton(
-              tooltip: 'Settings',
-              icon: const Icon(Icons.settings),
+              icon: const Icon(Icons.settings, semanticLabel: 'Settings'),
               onPressed: onOpenSettings,
             ),
           ),
@@ -828,6 +840,69 @@ class _ChatTranscriptState extends ConsumerState<_ChatTranscript> {
   }
 }
 
+/// Tells the user a run is taking a while, without calling it a failure.
+///
+/// Distributed prefill on a large model genuinely runs into minutes, and
+/// the run is usually healthy — so this informs and leaves the decision
+/// alone. Stopping is already one click away on the composer.
+class _ChatSlowBar extends ConsumerWidget {
+  const _ChatSlowBar({required this.path});
+
+  final ChatPath path;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notice = ref.watch(chatSlowNoticeProvider(path));
+    if (notice == null) return const SizedBox.shrink();
+
+    final warn = context.kwaai.statusTransitioning;
+    // "Still working" only when the daemon has actually said so recently.
+    // Without telemetry there is no evidence either way, and claiming
+    // progress we cannot see would be worse than admitting the silence.
+    final headline = notice.active
+        ? 'Still working — ${_humanElapsed(notice.elapsed)} so far. '
+              'Peers can take a while on the first token.'
+        : 'Waiting on the daemon — ${_humanElapsed(notice.elapsed)} so far.';
+
+    return Padding(
+      // Matches _ChatErrorBadge so the two bars line up with the composer.
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: warn.withValues(alpha: 0.10),
+          border: Border.all(color: warn.withValues(alpha: 0.35)),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.hourglass_top, size: 16, color: warn),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                headline,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: warn),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "45s", "1m 30s" — short enough to sit inline in a one-line bar.
+String _humanElapsed(Duration d) {
+  if (d.inMinutes < 1) return '${d.inSeconds}s';
+  final mins = d.inMinutes;
+  final secs = d.inSeconds % 60;
+  return secs == 0 ? '${mins}m' : '${mins}m ${secs}s';
+}
+
 /// Full-width error bar pinned directly above the composer.
 ///
 /// Errors used to render inline in the transcript, where a `Flexible`
@@ -980,7 +1055,8 @@ class _ChatErrorBadgeState extends State<_ChatErrorBadge> {
                     details,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: dest.withValues(alpha: 0.85),
-                      fontFamily: 'monospace',
+                      fontFamily: kwaaiMonoFamily,
+                      fontFamilyFallback: kwaaiMonoFallback,
                     ),
                   ),
                 ),

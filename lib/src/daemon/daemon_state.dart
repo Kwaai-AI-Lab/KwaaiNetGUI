@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../chat/kwaai_rpc_client.dart';
 import '../settings.dart';
 import 'daemon_controller.dart';
+import 'features_state.dart';
 import 'paths.dart';
 import 'status_watcher.dart';
 
@@ -160,6 +161,9 @@ class DaemonTransitionNotifier extends Notifier<DaemonTransition> {
     _log('start() called');
     _lastError = null;
     ref.read(daemonErrorProvider.notifier).clear();
+    // A start loads the config from disk, satisfying any pending
+    // restart-to-apply prompt; this is the one funnel every start uses.
+    ref.read(restartNeededProvider.notifier).clear();
     state = DaemonTransition.starting;
 
     var r = await ref.read(daemonControllerProvider).start();

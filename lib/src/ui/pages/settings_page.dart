@@ -159,8 +159,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     ref.invalidate(binaryVersionForModeProvider);
                     // If a daemon is already running, the binary swap
                     // doesn't take effect until the user restarts —
-                    // surface the prompt so they know. The bar
-                    // self-clears when the service is stopped.
+                    // surface the prompt so they know. It clears on the
+                    // next start (or by dismissing the bar).
                     final running =
                         ref.read(daemonStatusProvider).valueOrNull?.running ??
                         false;
@@ -262,11 +262,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   ],
                 ),
               ),
-              // Pinned to the bottom of the Settings card: surfaces when
-              // the user has applied feature changes that need a daemon
-              // restart. Persistent across the Status / Features /
-              // Appearance tabs.
-              const _RestartNeededBar(),
+              // Pinned to the bottom of the Settings card, persistent
+              // across tabs: restart-needed prompt + error/update/Apply.
+              _RestartNeededBar(settings: widget.settings),
             ],
           );
 
@@ -1304,7 +1302,10 @@ class _SystemPathResult extends StatelessWidget {
           const TextSpan(text: 'Binary found at: '),
           TextSpan(
             text: path,
-            style: const TextStyle(fontFamily: 'monospace'),
+            style: const TextStyle(
+              fontFamily: kwaaiMonoFamily,
+              fontFamilyFallback: kwaaiMonoFallback,
+            ),
           ),
         ],
       ),
@@ -2170,38 +2171,32 @@ class _CapacityFieldState extends State<_CapacityField> {
   }
 }
 
-/// Pinned bar at the bottom of the Settings shell card. Visible only when
-/// the user has applied feature changes that need a service restart.
-/// Which pinned bar the Settings shell shows. Declaration order is priority:
-/// a daemon error or unsaved work outranks an update, which can wait.
-/// (Bootstrap connectivity is deliberately absent: that banner is app-level,
-/// mounted above the Navigator, so it persists across routes.)
-enum SettingsBottomBar { error, restartNeeded, updateReady, apply, none }
+/// Which pinned status bar the Settings shell shows. Declaration order is
+/// priority: a daemon error or unsaved work outranks an update, which can
+/// wait. Restart-needed is deliberately not in this chain — it renders as
+/// its own bar above whichever of these shows, never gated on service state.
+enum SettingsBottomBar { error, updateReady, apply, none }
 
 /// The bottom bar's priority chain, as a pure decision so the ordering can be
 /// tested without standing up the whole Settings page.
 SettingsBottomBar settingsBottomBar({
   required bool hasError,
-  required bool needsRestart,
-  required bool serviceRunning,
   required bool updateReady,
   required bool dirty,
 }) {
   if (hasError) return SettingsBottomBar.error;
-  // A restart prompt only means anything while the service is up.
-  if (needsRestart && serviceRunning) return SettingsBottomBar.restartNeeded;
   if (updateReady) return SettingsBottomBar.updateReady;
   if (dirty) return SettingsBottomBar.apply;
   return SettingsBottomBar.none;
 }
 
-/// Bottom status bar of the Settings card. Shows either a daemon error
-/// (red) or a restart-needed prompt (orange) — error takes priority.
-/// Empty when neither applies. Replaces the old `_RestartNeededBar` and
-/// the in-card error Card, so the user always sees these in the same
-/// spot regardless of which Settings tab they're on.
+/// Bottom bars of the Settings card, pinned in the same spot regardless of
+/// which Settings tab is showing: the restart-needed prompt (rendered
+/// whenever it is marked), stacked above the one-slot priority bar.
 class _RestartNeededBar extends ConsumerWidget {
-  const _RestartNeededBar();
+  const _RestartNeededBar({required this.settings});
+
+  final Settings settings;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2214,15 +2209,12 @@ class _RestartNeededBar extends ConsumerWidget {
       bottomRight: const Radius.circular(kShellOuterRadius),
     );
 
-    // Compose the bottom bar by priority. Apply (the active tab has
+    // Compose the status bar by priority. Apply (the active tab has
     // unsaved edits) is the most common case, so it sits at the bottom
-    // even when no error/restart message is present. When there *is* a
-    // status, Apply moves into the bar's trailing action slot, so the
-    // user only ever sees one pinned bar.
+    // even when no error/update message is present. When there *is* a
+    // status, Apply moves into the bar's trailing action slot.
     final err = ref.watch(daemonErrorProvider);
     final needsRestart = ref.watch(restartNeededProvider);
-    final running =
-        ref.watch(daemonStatusProvider).valueOrNull?.running ?? false;
     final transition = ref.watch(daemonTransitionProvider);
     final busy = transition != DaemonTransition.none;
 
@@ -2238,72 +2230,79 @@ class _RestartNeededBar extends ConsumerWidget {
         draft != null &&
         ref.read(featuresDraftProvider.notifier).isDirty(snapshot);
 
-    if (needsRestart && !running) {
-      // Restart prompt only makes sense when the service is running —
-      // clear it silently otherwise.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(restartNeededProvider.notifier).clear();
-      });
-    }
-
     final applyAction = dirty
         ? KwaaiButton(label: 'Apply', onPressed: () => _applyDraft(ref))
         : null;
 
     // An update can wait; an error or unsaved work cannot.
     final staged = ref.watch(updateStageProvider);
-    switch (settingsBottomBar(
+    final bottom = settingsBottomBar(
       hasError: err != null,
-      needsRestart: needsRestart,
-      serviceRunning: running,
       updateReady: staged is UpdateReady,
       dirty: dirty,
-    )) {
-      case SettingsBottomBar.error:
-        return KwaaiStatusBar(
-          severity: KwaaiStatusSeverity.error,
-          message: err!,
-          action: applyAction,
-          onDismiss: () => ref.read(daemonErrorProvider.notifier).clear(),
-          bottomRadius: bottomRadius,
-        );
-      case SettingsBottomBar.restartNeeded:
-        return KwaaiStatusBar(
-          severity: KwaaiStatusSeverity.info,
-          message: 'Restart the service to apply your changes.',
-          action:
-              applyAction ??
-              KwaaiButton(
-                label: 'Restart service',
-                onPressed: busy ? null : () => _restart(ref),
+    );
+    // When the only status is Apply and the restart bar is up, fold Apply
+    // into the restart bar's action slot instead of stacking a duplicate bar.
+    final foldApply = needsRestart && bottom == SettingsBottomBar.apply;
+    final Widget? statusBar = switch (bottom) {
+      SettingsBottomBar.error => KwaaiStatusBar(
+        severity: KwaaiStatusSeverity.error,
+        message: err!,
+        action: applyAction,
+        onDismiss: () => ref.read(daemonErrorProvider.notifier).clear(),
+        bottomRadius: bottomRadius,
+      ),
+      SettingsBottomBar.updateReady => KwaaiStatusBar(
+        severity: KwaaiStatusSeverity.info,
+        message:
+            'KwaaiNet ${(staged as UpdateReady).version} is ready to '
+            'install.',
+        action:
+            applyAction ??
+            KwaaiButton(
+              label: 'Restart now',
+              onPressed: () =>
+                  ref.read(updateStageProvider.notifier).installAndRestart(),
+            ),
+        bottomRadius: bottomRadius,
+      ),
+      // No status — render a neutral bar so Apply stays pinned at the
+      // bottom of the settings shell whatever tab the user is on.
+      SettingsBottomBar.apply =>
+        foldApply
+            ? null
+            : _BareApplyBar(
+                onApply: () => _applyDraft(ref),
+                bottomRadius: bottomRadius,
               ),
-          bottomRadius: bottomRadius,
-        );
-      case SettingsBottomBar.updateReady:
-        return KwaaiStatusBar(
-          severity: KwaaiStatusSeverity.info,
-          message:
-              'KwaaiNet ${(staged as UpdateReady).version} is ready to '
-              'install.',
-          action:
-              applyAction ??
-              KwaaiButton(
-                label: 'Restart now',
-                onPressed: () =>
-                    ref.read(updateStageProvider.notifier).installAndRestart(),
-              ),
-          bottomRadius: bottomRadius,
-        );
-      case SettingsBottomBar.apply:
-        // No status — render a neutral bar so Apply stays pinned at the
-        // bottom of the settings shell whatever tab the user is on.
-        return _BareApplyBar(
-          onApply: () => _applyDraft(ref),
-          bottomRadius: bottomRadius,
-        );
-      case SettingsBottomBar.none:
-        return const SizedBox.shrink();
-    }
+      SettingsBottomBar.none => null,
+    };
+
+    // Marked → rendered, with no service-state gate (one kept silently
+    // eating the prompt). An externally managed daemon isn't ours to
+    // restart, so there the text stands alone and dismiss replaces the
+    // clear a GUI-driven restart would do.
+    final restartBar = needsRestart
+        ? KwaaiStatusBar(
+            severity: KwaaiStatusSeverity.info,
+            message: 'Restart the service to apply your changes.',
+            action: foldApply
+                ? applyAction
+                : (settings.mode == DaemonMode.external
+                      ? null
+                      : KwaaiButton(
+                          label: 'Restart service',
+                          onPressed: busy ? null : () => _restart(ref),
+                        )),
+            onDismiss: () => ref.read(restartNeededProvider.notifier).clear(),
+            bottomRadius: statusBar == null ? bottomRadius : null,
+          )
+        : null;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [?restartBar, ?statusBar],
+    );
   }
 
   /// Stop the daemon, then start it. The transition provider clears its
@@ -2320,8 +2319,8 @@ class _RestartNeededBar extends ConsumerWidget {
         await Future<void>.delayed(const Duration(milliseconds: 200));
       }
     }
+    // start() clears the restart-needed prompt itself.
     await transition.start();
-    ref.read(restartNeededProvider.notifier).clear();
   }
 }
 

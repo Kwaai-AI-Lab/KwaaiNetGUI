@@ -366,7 +366,30 @@ class SessionClient {
   // Internals
   // -------------------------------------------------------------------
 
-  Stream<String> _tokensFromFrames(Stream<pb.ServerFrame> frames) {
+  /// Closes [notices] when the stream it transforms ends, however it ends.
+  ///
+  /// The notice controller outlives the watchdog that feeds it, so without
+  /// this a caller listening for notices would never see `onDone` and any
+  /// "still working" indicator would stay up after the answer arrived.
+  StreamTransformer<String, String> _closeOnDone(
+    StreamController<SessionSlowNotice> notices,
+  ) {
+    return StreamTransformer<String, String>.fromHandlers(
+      handleDone: (sink) {
+        if (!notices.isClosed) notices.close();
+        sink.close();
+      },
+      handleError: (e, st, sink) {
+        if (!notices.isClosed) notices.close();
+        sink.addError(e, st);
+      },
+    );
+  }
+
+  Stream<String> _tokensFromFrames(
+    Stream<pb.ServerFrame> frames, {
+    void Function(SessionSlowNotice)? onSlow,
+  }) {
     return watchdogged<pb.ServerFrame, String>(
       frames,
       extract: (f) {
@@ -374,6 +397,11 @@ class SessionClient {
         final t = f.token;
         return t.text.isEmpty ? null : t.text;
       },
+      // Any frame proves the daemon is alive, but only a token is the
+      // answer actually arriving — which is what the slow notice is
+      // waiting on, and what silences it.
+      counts: (f) => f.whichBody() == pb.ServerFrame_Body.token,
+      onSlow: onSlow,
     );
   }
 
@@ -395,15 +423,29 @@ class SessionClient {
             reason: 'session not open',
           ),
         ),
+        slow: const Stream<SessionSlowNotice>.empty(),
       );
     }
     final id = _nextId++;
     final controller = StreamController<pb.ServerFrame>();
     _routers[id] = controller;
     _outbound!.add(build(id));
+
+    // Broadcast: notices are ticks with no value once missed, so there is
+    // nothing to buffer for a late listener — and a caller that ignores
+    // them entirely must not stall the timer.
+    final slow = StreamController<SessionSlowNotice>.broadcast();
+    void emitSlow(SessionSlowNotice n) {
+      if (!slow.isClosed) slow.add(n);
+    }
+
     return SessionOperation(
       id: id,
-      tokens: _tokensFromFrames(controller.stream),
+      tokens: _tokensFromFrames(
+        controller.stream,
+        onSlow: emitSlow,
+      ).transform(_closeOnDone(slow)),
+      slow: slow.stream,
     );
   }
 
@@ -426,14 +468,55 @@ class SessionClient {
 }
 
 /// How long to wait for the daemon's *first* frame before declaring the
-/// request dead. Generous: the daemon may still be loading a model, resolving
-/// peers, or queueing behind another request.
-const kFirstFrameTimeout = Duration(seconds: 90);
+/// request dead.
+///
+/// Deliberately long. Without telemetry the daemon says nothing at all while
+/// it resolves peers and runs prefill, and on a distributed model that is
+/// routinely minutes — a 90s cap here killed healthy runs a few seconds
+/// before their first token. This is a backstop for a wedged daemon, not a
+/// bound on how long a real answer may take, so the user is told the run is
+/// slow (see [kSlowNotice]) and left to decide.
+const kFirstFrameTimeout = Duration(minutes: 10);
 
 /// How long to tolerate silence *after* the stream has started producing.
 /// Once tokens are flowing a long gap means the far end stopped — a healthy
 /// generation does not pause this long between tokens.
-const kStallTimeout = Duration(seconds: 45);
+///
+/// This is a *silence* deadline, not a slowness one: it measures the gap
+/// since the last frame of any kind, so a run that keeps reporting progress
+/// never trips it however long it takes.
+const kStallTimeout = Duration(minutes: 10);
+
+/// How long a run may go without producing anything before the user is told
+/// it is taking a while.
+///
+/// A notice, not a failure — mesh prefill on a large model genuinely runs
+/// into minutes, and the run is often healthy. The user decides whether to
+/// wait or cancel.
+const kSlowNotice = Duration(seconds: 30);
+
+/// How often the "still working" notice refreshes its elapsed time.
+const kSlowNoticeTick = Duration(seconds: 5);
+
+/// Progress report from a long-running operation that has not failed.
+///
+/// Distinct from [SessionOpError] precisely because it is not an error: it
+/// carries how long the operation has been running and whether the daemon is
+/// still visibly doing work, so the UI can inform without alarming.
+class SessionSlowNotice {
+  const SessionSlowNotice({required this.elapsed, required this.active});
+
+  /// Time since the operation started.
+  final Duration elapsed;
+
+  /// Whether the daemon has reported activity (progress events) recently.
+  ///
+  /// True means the run is demonstrably alive and merely slow. False means
+  /// nothing has arrived — it may still be healthy, since a daemon without
+  /// telemetry says nothing during prefill, but there is no evidence either
+  /// way.
+  final bool active;
+}
 
 /// Wraps [source] in a silence watchdog, mapping each element through
 /// [extract] (null = consume the element without emitting).
@@ -449,19 +532,41 @@ const kStallTimeout = Duration(seconds: 45);
 /// an ordinary operation error the UI already knows how to display. The timer
 /// resets on *every* element, so a slow-but-alive stream is never killed.
 ///
-/// The deadline is [kFirstFrameTimeout] until the first element arrives and
-/// [kStallTimeout] thereafter — "never started" and "stopped mid-answer"
-/// warrant different patience.
+/// The deadline measures *silence*, not slowness. Any element — a token or a
+/// progress event — resets it, so an operation that keeps reporting is never
+/// killed no matter how long it takes. Distributed prefill on a large model
+/// genuinely runs into minutes, and failing such a run threw away work that
+/// was about to succeed.
+///
+/// [kFirstFrameTimeout] applies until the first element arrives and
+/// [kStallTimeout] thereafter, both generous: they exist to eventually
+/// release a wedged operation, not to bound how long a healthy one may take.
+///
+/// [counts] marks the elements that represent real output (tokens), as
+/// opposed to mere liveness (progress events). It drives [onSlow], which
+/// reports how long output has been awaited so the UI can say the run is
+/// taking a while — a notice, not a failure. The user cancels if they want
+/// to stop; nothing here decides that for them.
 Stream<Out> watchdogged<In, Out>(
   Stream<In> source, {
   required Out? Function(In) extract,
+  bool Function(In)? counts,
+  void Function(SessionSlowNotice)? onSlow,
   Duration firstTimeout = kFirstFrameTimeout,
   Duration stallTimeout = kStallTimeout,
+  Duration slowAfter = kSlowNotice,
+  Duration slowTick = kSlowNoticeTick,
 }) {
   final out = StreamController<Out>();
   StreamSubscription<In>? sub;
   Timer? watchdog;
+  Timer? slowTimer;
   var sawElement = false;
+  var sawOutput = false;
+  final started = Stopwatch();
+  // When the last frame of any kind arrived, which is what "the daemon is
+  // still working" means — as opposed to output, which may lag far behind.
+  var lastFrame = Duration.zero;
 
   void fail() {
     final waited = sawElement ? stallTimeout : firstTimeout;
@@ -472,8 +577,8 @@ Stream<Out> watchdogged<In, Out>(
         code: 3,
         message: sawElement
             ? 'The daemon stopped responding mid-answer '
-                  '(no data for ${waited.inSeconds}s).'
-            : 'The daemon did not respond within ${waited.inSeconds}s.',
+                  '(nothing for ${waited.inMinutes} min).'
+            : 'The daemon did not respond within ${waited.inMinutes} min.',
       ),
     );
     sub?.cancel();
@@ -485,28 +590,73 @@ Stream<Out> watchdogged<In, Out>(
     watchdog = Timer(sawElement ? stallTimeout : firstTimeout, fail);
   }
 
+  void stopSlowNotices() {
+    slowTimer?.cancel();
+    slowTimer = null;
+  }
+
+  void emitSlow() {
+    if (onSlow == null || sawOutput) return;
+    onSlow(
+      SessionSlowNotice(
+        elapsed: started.elapsed,
+        // Recent frames are the evidence. Allow a window rather than a
+        // strict "since the last tick" so a run reporting every few
+        // seconds doesn't flicker between active and not.
+        active: started.elapsed - lastFrame < slowAfter,
+      ),
+    );
+  }
+
+  void startSlowNotices() {
+    if (onSlow == null) return;
+    stopSlowNotices();
+    slowTimer = Timer(slowAfter, () {
+      emitSlow();
+      slowTimer = Timer.periodic(slowTick, (_) {
+        if (sawOutput) {
+          stopSlowNotices();
+          return;
+        }
+        emitSlow();
+      });
+    });
+  }
+
   out.onListen = () {
+    started.start();
     arm();
+    startSlowNotices();
     sub = source.listen(
       (e) {
         sawElement = true;
+        lastFrame = started.elapsed;
         arm();
+        // Real output ends the notices: once tokens flow the user can see
+        // for themselves that it is working.
+        if (counts?.call(e) ?? true) {
+          sawOutput = true;
+          stopSlowNotices();
+        }
         final mapped = extract(e);
         if (mapped != null) out.add(mapped);
       },
       onError: (Object e, StackTrace st) {
         watchdog?.cancel();
+        stopSlowNotices();
         out.addError(e, st);
         out.close();
       },
       onDone: () {
         watchdog?.cancel();
+        stopSlowNotices();
         out.close();
       },
     );
   };
   out.onCancel = () async {
     watchdog?.cancel();
+    stopSlowNotices();
     await sub?.cancel();
   };
   return out.stream;
@@ -519,7 +669,11 @@ Stream<Out> watchdogged<In, Out>(
 /// can only drop its own subscription while the daemon keeps generating
 /// into a channel nobody reads.
 class SessionOperation {
-  SessionOperation({required this.id, required this.tokens});
+  SessionOperation({
+    required this.id,
+    required this.tokens,
+    this.slow = const Stream<SessionSlowNotice>.empty(),
+  });
 
   /// Server-side operation id, or null when the session was already
   /// closed and no frame was ever sent. Null means "nothing to cancel";
@@ -528,6 +682,14 @@ class SessionOperation {
   final int? id;
 
   final Stream<String> tokens;
+
+  /// Periodic notices while the operation is slow to produce output.
+  ///
+  /// Not errors — the operation is still running, and on a distributed
+  /// model a first token legitimately takes minutes. Emission starts after
+  /// [kSlowNotice], repeats every [kSlowNoticeTick], and stops for good at
+  /// the first token. Broadcast, so ignoring it is free.
+  final Stream<SessionSlowNotice> slow;
 }
 
 /// An in-flight block-coverage subscription: its update stream plus the
