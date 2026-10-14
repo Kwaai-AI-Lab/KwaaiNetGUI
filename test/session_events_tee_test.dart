@@ -149,5 +149,42 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 20));
       expect(await op.events.length, 2);
     });
+
+    /// A wedged daemon never sends a terminator, so the watchdog is the only
+    /// thing that ends the run — and it has to end the events side too.
+    testWidgets('a watchdog failure closes the events stream', (tester) async {
+      final op = client.shardRunOp('hi', events: true);
+      final id = op.id!;
+
+      Object? tokenError;
+      var eventsDone = false;
+      op.tokens.listen((_) {}, onError: (Object e) => tokenError = e);
+      op.events.listen((_) {}, onDone: () => eventsDone = true);
+
+      await tester.pump();
+      stub.inbound.add(_event(id, pb.InferencePhase.INFERENCE_PHASE_RESOLVED));
+      await tester.pump();
+      expect(eventsDone, isFalse);
+
+      await tester.pump(kStallTimeout + const Duration(seconds: 1));
+      expect(tokenError, isA<SessionOpError>());
+      expect(eventsDone, isTrue, reason: 'the panel would spin forever');
+    });
+
+    test('cancelling the tokens closes the events stream', () async {
+      final op = client.shardRunOp('hi', events: true);
+      final id = op.id!;
+
+      final eventsDone = Completer<void>();
+      final sub = op.tokens.listen((_) {});
+      op.events.listen((_) {}, onDone: eventsDone.complete);
+
+      await Future<void>.delayed(Duration.zero);
+      stub.inbound.add(_event(id, pb.InferencePhase.INFERENCE_PHASE_RESOLVED));
+      await Future<void>.delayed(Duration.zero);
+
+      await sub.cancel();
+      await eventsDone.future.timeout(const Duration(seconds: 1));
+    });
   });
 }

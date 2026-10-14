@@ -108,6 +108,14 @@ What a vast and fascinating topic! Here are some bullet points about the univers
     ref.read(chatSlowNoticeProvider(_path).notifier).state = null;
   }
 
+  /// Stop the panel's spinner on every path that ends a run, rather than
+  /// trusting the event stream to close.
+  void _endEventsRun() {
+    if (_path == ChatPath.shardRun) {
+      ref.read(inferenceEventsProvider.notifier).endRun();
+    }
+  }
+
   /// Send [prompt] and stream the response into a new assistant message.
   /// Returns when the stream completes.
   Future<void> send(String prompt) async {
@@ -184,6 +192,7 @@ What a vast and fascinating topic! Here are some bullet points about the univers
         assistant.streaming = false;
         _flushBump();
         _clearSlow();
+        _endEventsRun();
         _sub = null;
         _operationId = null;
         if (!completer.isCompleted) completer.complete();
@@ -193,6 +202,7 @@ What a vast and fascinating topic! Here are some bullet points about the univers
         assistant.streaming = false;
         _flushBump();
         _clearSlow();
+        _endEventsRun();
         _sub = null;
         // Stream finished on its own: there is nothing left to cancel,
         // so drop the id to keep a later stop from targeting a
@@ -231,11 +241,7 @@ What a vast and fascinating topic! Here are some bullet points about the univers
     // message wasn't mid-stream, so it can't fire after teardown.
     _flushBump();
     _clearSlow();
-    // Dropping the token subscription does not close the event stream, so
-    // end the run explicitly or the panel keeps claiming it is live.
-    if (_path == ChatPath.shardRun) {
-      ref.read(inferenceEventsProvider.notifier).endRun();
-    }
+    _endEventsRun();
   }
 
   /// Drop the transcript and abort any in-flight stream. Backs the

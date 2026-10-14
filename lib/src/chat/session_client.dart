@@ -481,7 +481,7 @@ class SessionClient {
     // discovery a caller most wants to see.
     final frames = StreamController<pb.ServerFrame>();
     final events = StreamController<pb.InferenceEvent>();
-    controller.stream.listen(
+    final tee = controller.stream.listen(
       (f) {
         if (f.whichBody() == pb.ServerFrame_Body.inferenceEvent) {
           if (!events.isClosed) events.add(f.inferenceEvent);
@@ -508,6 +508,12 @@ class SessionClient {
         if (!frames.isClosed) frames.close();
       },
     );
+    // The token side ending (stop, watchdog, done) ends the run: release
+    // the router and close events, or the panel waits on a wedged daemon.
+    frames.onCancel = () {
+      tee.cancel();
+      if (!events.isClosed) events.close();
+    };
 
     return SessionOperation(
       id: id,
