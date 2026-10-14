@@ -40,10 +40,9 @@ class MainPage extends ConsumerStatefulWidget {
 }
 
 class _MainPageState extends ConsumerState<MainPage> {
-  /// Index into the currently-visible tab list (`_visibleTabs(...)`).
-  /// Reset to 0 when the visible tab list shrinks so we never point
-  /// past the end.
-  int _selectedTab = 0;
+  /// Label of the selected tab, or null for the first. By label rather than
+  /// index, so toggling a tab on or off doesn't move the selection.
+  String? _selectedLabel;
 
   /// Tabs that are visible based on current settings. The first entry
   /// is always the main chat (shard_run). Additional entries appear
@@ -79,7 +78,7 @@ class _MainPageState extends ConsumerState<MainPage> {
   void _onOpenAtChat() {
     if (!mounted) return;
     Navigator.of(context).popUntil((r) => r.isFirst);
-    setState(() => _selectedTab = 0);
+    setState(() => _selectedLabel = null);
   }
 
   @override
@@ -88,9 +87,13 @@ class _MainPageState extends ConsumerState<MainPage> {
     // a pushed Settings route, so the request still lands there.
     ref.listen<int>(openAtChatProvider, (_, _) => _onOpenAtChat());
     final tabs = _visibleTabs(ref);
-    // Clamp selection in case the user just turned off the tab they
+    // Fall back to the first tab if the user just turned off the one they
     // were on (e.g. disabled Local chat from Settings).
-    if (_selectedTab >= tabs.length) _selectedTab = 0;
+    var selectedTab = tabs.indexWhere((t) => t.label == _selectedLabel);
+    if (selectedTab < 0) {
+      selectedTab = 0;
+      _selectedLabel = null;
+    }
 
     return AppShell(
       child: ShellCard(
@@ -109,22 +112,31 @@ class _MainPageState extends ConsumerState<MainPage> {
             _MainTopBar(
               onOpenSettings: _openSettings,
               tabs: tabs.length > 1 ? tabs : const [],
-              selectedTab: _selectedTab,
-              onSelectTab: (i) => setState(() => _selectedTab = i),
+              selectedTab: selectedTab,
+              onSelectTab: (i) =>
+                  setState(() => _selectedLabel = tabs[i].label),
               // The KB picker belongs to the RAG tab alone; on any other
               // tab there is nothing for it to scope.
-              showKbPicker: tabs[_selectedTab].path == null,
+              showKbPicker: tabs[selectedTab].path == null,
             ),
             const _UpdateBanner(),
             Expanded(
               child: IndexedStack(
-                index: _selectedTab,
+                index: selectedTab,
+                // Keyed so a tab keeps its state when another is toggled in
+                // or out ahead of it.
                 children: [
                   for (final t in tabs)
-                    if (t.path case final path?)
-                      _ChatTab(path: path, onOpenSettings: _openSettings)
-                    else
-                      const RagTab(),
+                    KeyedSubtree(
+                      key: ValueKey(t.label),
+                      child: switch (t.path) {
+                        final path? => _ChatTab(
+                          path: path,
+                          onOpenSettings: _openSettings,
+                        ),
+                        null => const RagTab(),
+                      },
+                    ),
                 ],
               ),
             ),
