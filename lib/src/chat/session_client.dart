@@ -189,12 +189,23 @@ class SessionClient {
   /// As [shardRun], but also exposes the operation id so the caller can
   /// [cancel] it. Stopping generation needs the id, and `_open` would
   /// otherwise allocate and discard it.
-  SessionOperation shardRunOp(String prompt, {String role = 'user'}) => _openOp(
+  ///
+  /// Set [events] to also receive [SessionOperation.events] — the daemon's
+  /// account of which peers served which blocks. It is off by default
+  /// because the daemon does real work to produce it, so it is only worth
+  /// asking for when something is going to display it.
+  SessionOperation shardRunOp(
+    String prompt, {
+    String role = 'user',
+    bool events = false,
+  }) => _openOp(
     (id) => pb.ClientFrame()
       ..id = Int64(id)
       ..shardRun = (pb.ShardRunRequest()
         ..role = role
-        ..content = prompt),
+        ..content = prompt
+        ..events = events),
+    withEvents: events,
   );
 
   /// `kwaainet generate <PROMPT>` — single-node local inference. Used
@@ -409,7 +420,13 @@ class SessionClient {
   /// return the per-id stream.
   /// As [_open], but keeps the allocated operation id so the caller can
   /// cancel the operation server-side.
-  SessionOperation _openOp(pb.ClientFrame Function(int id) build) {
+  ///
+  /// With [withEvents], the operation's frames feed two streams instead of
+  /// one — see the tee below.
+  SessionOperation _openOp(
+    pb.ClientFrame Function(int id) build, {
+    bool withEvents = false,
+  }) {
     ensureOpen();
     if (_closed || _outbound == null) {
       // No frame was sent, so there is no server-side operation to
@@ -423,6 +440,7 @@ class SessionClient {
             reason: 'session not open',
           ),
         ),
+        events: const Stream<pb.InferenceEvent>.empty(),
         slow: const Stream<SessionSlowNotice>.empty(),
       );
     }
@@ -431,20 +449,79 @@ class SessionClient {
     _routers[id] = controller;
     _outbound!.add(build(id));
 
-    // Broadcast: notices are ticks with no value once missed, so there is
-    // nothing to buffer for a late listener — and a caller that ignores
-    // them entirely must not stall the timer.
+    // Broadcast, unlike the frame sinks: notices are ticks with no value
+    // once missed, so there is nothing to buffer for a late listener — and
+    // a caller that ignores them entirely must not stall the timer.
     final slow = StreamController<SessionSlowNotice>.broadcast();
     void emitSlow(SessionSlowNotice n) {
       if (!slow.isClosed) slow.add(n);
     }
 
+    if (!withEvents) {
+      return SessionOperation(
+        id: id,
+        tokens: _tokensFromFrames(
+          controller.stream,
+          onSlow: emitSlow,
+        ).transform(_closeOnDone(slow)),
+        events: const Stream<pb.InferenceEvent>.empty(),
+        slow: slow.stream,
+      );
+    }
+
+    // One router, two consumers. The router is single-subscription (see
+    // [_handleFrame]), so it cannot simply be listened to twice; instead
+    // subscribe once here and fan each frame out.
+    //
+    // Both sinks are plain controllers rather than broadcast ones, and
+    // that matters: a plain controller buffers while it has no listener,
+    // so nothing is lost in the window between this method returning and
+    // the caller subscribing. A broadcast controller would drop those
+    // first frames, which on a fast local daemon is exactly the chain
+    // discovery a caller most wants to see.
+    final frames = StreamController<pb.ServerFrame>();
+    final events = StreamController<pb.InferenceEvent>();
+    final tee = controller.stream.listen(
+      (f) {
+        if (f.whichBody() == pb.ServerFrame_Body.inferenceEvent) {
+          if (!events.isClosed) events.add(f.inferenceEvent);
+        }
+        // Forward every frame, not just tokens: the token pipeline's
+        // watchdog treats any frame as proof the daemon is alive.
+        if (!frames.isClosed) frames.add(f);
+      },
+      // Errors go to *both* sinks. Sending them only downstream of the
+      // tokens would leave anything watching events waiting forever on a
+      // run that has already failed.
+      onError: (Object e, StackTrace st) {
+        if (!events.isClosed) {
+          events.addError(e, st);
+          events.close();
+        }
+        if (!frames.isClosed) {
+          frames.addError(e, st);
+          frames.close();
+        }
+      },
+      onDone: () {
+        if (!events.isClosed) events.close();
+        if (!frames.isClosed) frames.close();
+      },
+    );
+    // The token side ending (stop, watchdog, done) ends the run: release
+    // the router and close events, or the panel waits on a wedged daemon.
+    frames.onCancel = () {
+      tee.cancel();
+      if (!events.isClosed) events.close();
+    };
+
     return SessionOperation(
       id: id,
       tokens: _tokensFromFrames(
-        controller.stream,
+        frames.stream,
         onSlow: emitSlow,
       ).transform(_closeOnDone(slow)),
+      events: events.stream,
       slow: slow.stream,
     );
   }
@@ -672,6 +749,7 @@ class SessionOperation {
   SessionOperation({
     required this.id,
     required this.tokens,
+    this.events = const Stream<pb.InferenceEvent>.empty(),
     this.slow = const Stream<SessionSlowNotice>.empty(),
   });
 
@@ -682,6 +760,16 @@ class SessionOperation {
   final int? id;
 
   final Stream<String> tokens;
+
+  /// The daemon's running account of how this operation is being served —
+  /// chain discovery, the pinned route, per-block peer dispatch.
+  ///
+  /// Empty unless the operation asked for events, and empty against a
+  /// daemon too old to send them: proto3 drops the unknown request field
+  /// silently, so "no events" and "not supported" look identical here and
+  /// have to be told apart further up. Interleaved with [tokens] and
+  /// closed by the same terminator.
+  final Stream<pb.InferenceEvent> events;
 
   /// Periodic notices while the operation is slow to produce output.
   ///

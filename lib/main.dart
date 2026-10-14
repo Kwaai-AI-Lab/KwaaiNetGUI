@@ -112,6 +112,11 @@ Future<void> main() async {
       // the main page's tab bar reflects the user's last choice on
       // first paint.
       localChatEnabledProvider.overrideWith((_) => settings.localChatEnabled),
+      // Same for the inference panel, so it is already open on first paint
+      // if that is how the user left it.
+      inferencePanelEnabledProvider.overrideWith(
+        (_) => settings.inferencePanelEnabled,
+      ),
       // Seed the skipped-version mirror so the update banner suppresses a
       // previously-skipped release on first paint.
       skippedVersionProvider.overrideWith((_) => settings.skippedVersion),
