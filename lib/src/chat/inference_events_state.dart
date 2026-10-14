@@ -185,6 +185,11 @@ class InferenceEventsNotifier extends Notifier<InferenceRunLog> {
 
   /// Begin a run: clears the previous one and marks this one in flight.
   void startRun() {
+    _clearWorking();
+    state = InferenceRunLog(running: true, startedAt: DateTime.now());
+  }
+
+  void _clearWorking() {
     _sub?.cancel();
     _sub = null;
     _bumpTimer?.cancel();
@@ -199,7 +204,6 @@ class InferenceEventsNotifier extends Notifier<InferenceRunLog> {
     _sessionId = '';
     _totalBlocks = 0;
     _dropped = 0;
-    state = InferenceRunLog(running: true, startedAt: DateTime.now());
   }
 
   /// Consume a run's event stream. Ends the run when it closes or errors.
@@ -268,17 +272,7 @@ class InferenceEventsNotifier extends Notifier<InferenceRunLog> {
 
   /// Clear everything — backs the transcript's "new chat".
   void reset() {
-    _sub?.cancel();
-    _sub = null;
-    _bumpTimer?.cancel();
-    _bumpTimer = null;
-    _events = [];
-    _chain = [];
-    _hopStatus = {};
-    _hopMs = {};
-    _sawAny = false;
-    _sawComplete = false;
-    _dropped = 0;
+    _clearWorking();
     state = const InferenceRunLog();
   }
 

@@ -173,7 +173,8 @@ class _Header extends StatelessWidget {
               maxLines: 1,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: dim,
-                fontFamily: 'monospace',
+                fontFamily: kwaaiMonoFamily,
+                fontFamilyFallback: kwaaiMonoFallback,
                 fontSize: 10,
               ),
             ),
