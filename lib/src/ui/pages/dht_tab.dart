@@ -626,6 +626,16 @@ class _RecordDetail extends StatelessWidget {
           const SizedBox(height: 8),
           _RecordFacts(record: record),
           const SizedBox(height: 8),
+          if (!loading && error == null && detail?.valuesTruncated == true) ...[
+            _WarningLine(
+              text: isDict
+                  ? 'Values incomplete — showing ${detail!.subkeys.length} of '
+                        '${detail!.subkeyCount} subkeys; the rest did not fit '
+                        'in one reply.'
+                  : 'Value withheld — it is too large for one reply.',
+            ),
+            const SizedBox(height: 6),
+          ],
           if (loading)
             Row(
               children: [
@@ -649,9 +659,13 @@ class _RecordDetail extends StatelessWidget {
               title: recordLabel(record),
               subkeyCount: detail!.subkeyCount,
               subkeys: detail!.subkeys,
+              truncated: detail!.valuesTruncated,
             )
           else if (detail!.hasValue())
             _ValueView(title: recordLabel(record), value: detail!.value)
+          // The warning above already says why; claim nothing further.
+          else if (detail!.valuesTruncated)
+            const SizedBox.shrink()
           else
             Text('The daemon returned no value for this record.', style: muted),
         ],
@@ -709,12 +723,16 @@ class _SubkeyList extends StatelessWidget {
     required this.title,
     required this.subkeyCount,
     required this.subkeys,
+    required this.truncated,
   });
 
   /// The record's label, which each subkey's viewer titles itself with.
   final String title;
   final int subkeyCount;
   final List<pb.DhtSubkey> subkeys;
+
+  /// The daemon withheld the subkeys past [subkeys]: a prefix, not the whole.
+  final bool truncated;
 
   @override
   Widget build(BuildContext context) {
@@ -724,7 +742,7 @@ class _SubkeyList extends StatelessWidget {
     );
     if (subkeys.isEmpty) {
       return Text(
-        subkeyCount > 0
+        subkeyCount > 0 || truncated
             ? 'This answer did not include its $subkeyCount subkey values.'
             : 'This dictionary holds no subkeys.',
         style: muted,
@@ -746,6 +764,11 @@ class _SubkeyList extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
+        if (truncated)
+          Text(
+            '${subkeyCount - subkeys.length} more not included in this reply.',
+            style: muted,
+          ),
       ],
     );
   }
@@ -997,6 +1020,31 @@ class _RawToggle extends StatelessWidget {
       ],
       selected: {raw},
       onSelectionChanged: (s) => onChanged(s.first),
+    );
+  }
+}
+
+/// A one-line warning in the header's style.
+class _WarningLine extends StatelessWidget {
+  const _WarningLine({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final warning = context.kwaai.semanticWarning;
+    return Row(
+      children: [
+        Icon(Icons.warning_amber_outlined, size: 14, color: warning),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            text,
+            style: theme.textTheme.bodySmall?.copyWith(color: warning),
+          ),
+        ),
+      ],
     );
   }
 }
