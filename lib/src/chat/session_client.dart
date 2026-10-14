@@ -351,6 +351,31 @@ class SessionClient {
     return NetworkOperation(id: id, updates: updates);
   }
 
+  /// `dht_records` — one-shot listing of this node's own hivemind store.
+  /// [includeValues] requires [keyIds]; the daemon rejects it otherwise.
+  Future<pb.DhtRecordsReply> dhtRecords({
+    bool includeValues = false,
+    List<String> keyIds = const [],
+  }) async {
+    final frames = _open(
+      (id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..dhtRecords = (pb.DhtRecordsRequest()
+          ..includeValues = includeValues
+          ..keyIds.addAll(keyIds)),
+    );
+    pb.DhtRecordsReply? reply;
+    await for (final f in frames) {
+      if (f.whichBody() == pb.ServerFrame_Body.dhtRecords) {
+        reply = f.dhtRecords;
+      }
+    }
+    if (reply == null) {
+      throw SessionOpError(code: 0, message: 'dhtRecords returned no reply');
+    }
+    return reply;
+  }
+
   /// Cancel an in-flight operation. The target operation's stream will
   /// error with SessionOpError(code=CANCELLED).
   Future<void> cancel(int operationId) async {

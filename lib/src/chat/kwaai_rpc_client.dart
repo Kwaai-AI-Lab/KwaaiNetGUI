@@ -445,6 +445,16 @@ class KwaaiRpcClient {
     }
   }
 
+  /// One-shot listing of this node's own hivemind store. Throws on failure —
+  /// the view must tell UNIMPLEMENTED apart from an empty store.
+  Future<pb.DhtRecordsReply> dhtRecords({
+    bool includeValues = false,
+    List<String> keyIds = const [],
+  }) async {
+    final session = await _sessionOrInit();
+    return session.dhtRecords(includeValues: includeValues, keyIds: keyIds);
+  }
+
   /// Version of the *running* daemon, read from `StatusReply.version`.
   ///
   /// Returns null when the daemon isn't reachable, or when it predates the

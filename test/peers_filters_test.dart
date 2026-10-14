@@ -171,7 +171,7 @@ void main() {
     PeerRow row(List<pb.ConnectedPeer> conns) => PeerRow(
       peerId: id,
       connections: conns,
-      inRoutingTable: true,
+      routing: pb.RoutingPeer(peerId: id),
       isBootstrap: false,
       isTrustedRelay: false,
     );
