@@ -72,9 +72,12 @@ _FakeClient _fakeClient({pb.DhtRecord? detailRecord}) {
   return _FakeClient(detail: _reply([record]));
 }
 
-/// Counts how many times the listing was (re)requested, and can make every
-/// request after the first fail.
+/// Counts how many times the listing was (re)requested. [errorsFirst] fail
+/// the opening requests in order; [errorAfterFirst] fails every later one.
 class _Listing {
+  _Listing({this.errorsFirst = const []});
+
+  final List<Object> errorsFirst;
   int requests = 0;
   Object? errorAfterFirst;
 }
@@ -89,6 +92,8 @@ Widget _host(
   overrides: [
     dhtRecordsProvider.overrideWith((ref) {
       final n = ++(listing ?? _Listing()).requests;
+      final early = listing?.errorsFirst ?? const [];
+      if (n <= early.length) return Stream.error(early[n - 1]);
       final err = listing?.errorAfterFirst;
       return n > 1 && err != null ? Stream.error(err) : Stream.value(reply);
     }),
@@ -115,6 +120,9 @@ Finder _textWith(String fragment) => find.byWidgetPredicate(
 
 final _refresh = find.widgetWithIcon(IconButton, Icons.refresh);
 
+SessionOpError _starting(pb.Error_Code code) =>
+    SessionOpError(code: code.value, message: 'the p2p node is still starting');
+
 void main() {
   group('formatExpiry', () {
     test('counts down in the largest useful unit', () {
@@ -125,7 +133,7 @@ void main() {
     });
 
     // A dictionary keeps subkeys past their expiration.
-    test('reads an expired record as expired, not as a negative countdown', () {
+    test('reads an expired subkey as expired, not as a negative countdown', () {
       expect(formatExpiry(-90), 'expired 1m ago');
     });
   });
@@ -249,22 +257,34 @@ void main() {
       expect(_textWith('true and complete answer'), findsOneWidget);
     });
 
-    testWidgets('marks an expired record in the table and the detail', (
-      tester,
-    ) async {
+    // Records are never expired (the listing filters them); subkeys can be.
+    testWidgets('marks an expired subkey in the detail', (tester) async {
+      pb.DhtRecord dict() => _record(
+        keyId: 'ff02',
+        keyName: 'Llama.0',
+        kind: pb.DhtRecordKind.DHT_RECORD_KIND_DICTIONARY,
+        subkeyCount: 1,
+      );
       await tester.pumpWidget(
         _host(
-          _reply([_named()..expiresInSecs = -90]),
-          client: _fakeClient(detailRecord: _named()..expiresInSecs = -90),
+          _reply([dict()]),
+          client: _fakeClient(
+            detailRecord: dict()
+              ..subkeys.add(
+                pb.DhtSubkey()
+                  ..subkey = '"12D3KooWServer"'
+                  ..expiresInSecs = -90
+                  ..valueBytes = Int64(9)
+                  ..value = _value('[1]'),
+              ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('expired 1m ago'), findsOneWidget);
-
-      await tester.tap(find.text('_petals.models'));
+      await tester.tap(find.text('Llama.0'));
       await tester.pumpAndSettle();
-      expect(_textWith('Expired 1m ago ('), findsOneWidget);
-      expect(_textWith('Expires expired'), findsNothing);
+      expect(_textWith('12D3KooWServer · expired 1m ago'), findsOneWidget);
+      expect(_textWith('Expires in 5m ('), findsOneWidget);
     });
 
     testWidgets('labels an undecoded value opaque in panel and dialog', (
@@ -298,8 +318,8 @@ void main() {
     testWidgets('a failed refresh keeps the rows but says so', (tester) async {
       final listing = _Listing()
         ..errorAfterFirst = SessionOpError(
-          code: 6,
-          message: 'dht_records is not available on this p2p backend',
+          code: pb.Error_Code.INTERNAL.value,
+          message: 'store lock poisoned',
         );
       await tester.pumpWidget(_host(_reply([_named()]), listing: listing));
       await tester.pumpAndSettle();
@@ -320,10 +340,147 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('_petals.models'), findsOneWidget);
       expect(_textWith('The daemon is unreachable'), findsOneWidget);
+      // Unreachable is why Refresh is off, and the banner says so.
+      expect(tester.widget<IconButton>(_refresh).onPressed, isNull);
+    });
+
+    testWidgets('a node restarting under the rows is retried', (tester) async {
+      final listing = _Listing()
+        ..errorAfterFirst = _starting(pb.Error_Code.UNAVAILABLE);
+      await tester.pumpWidget(_host(_reply([_named()]), listing: listing));
+      await tester.pumpAndSettle();
+      await tester.tap(_refresh);
+      await tester.pump();
+      await tester.pump();
+      expect(_textWith('the p2p node is still starting'), findsOneWidget);
+      expect(listing.requests, 2);
+
+      await tester.pump(const Duration(seconds: 2));
+      expect(listing.requests, 3);
     });
   });
 
-  testWidgets('band 1 fits a 560px window', (tester) async {
+  test('retries back off while the node starts, then hold steady', () {
+    expect(
+      [for (var i = 0; i < 6; i++) startingRetryDelay(i).inSeconds],
+      [2, 4, 8, 15, 15, 15],
+    );
+  });
+
+  group('not available yet', () {
+    for (final code in [
+      pb.Error_Code.UNAVAILABLE,
+      pb.Error_Code.UNIMPLEMENTED,
+    ]) {
+      testWidgets('${code.name} reads as starting and retries by itself', (
+        tester,
+      ) async {
+        final listing = _Listing(
+          errorsFirst: [_starting(code), _starting(code)],
+        );
+        await tester.pumpWidget(_host(_reply([_named()]), listing: listing));
+        await tester.pump();
+        expect(find.text('The p2p node is still starting'), findsOneWidget);
+        expect(_textWith('native_p2p'), findsNothing);
+        expect(_textWith('Go p2p'), findsNothing);
+        expect(listing.requests, 1);
+
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pump();
+        expect(listing.requests, 2);
+        // Backed off: the second retry waits 4s, not 2s.
+        await tester.pump(const Duration(seconds: 3));
+        expect(listing.requests, 2);
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump();
+        expect(listing.requests, 3);
+        expect(find.text('_petals.models'), findsOneWidget);
+      });
+    }
+
+    testWidgets('Retry now skips the wait', (tester) async {
+      final listing = _Listing(
+        errorsFirst: [_starting(pb.Error_Code.UNAVAILABLE)],
+      );
+      await tester.pumpWidget(_host(_reply([_named()]), listing: listing));
+      await tester.pump();
+      await tester.tap(find.text('Retry now'));
+      await tester.pump();
+      await tester.pump();
+      expect(listing.requests, 2);
+      expect(find.text('_petals.models'), findsOneWidget);
+      // The cancelled timer must not fire a third request.
+      await tester.pump(const Duration(seconds: 30));
+      expect(listing.requests, 2);
+    });
+
+    testWidgets('an old daemon is told to update, and not retried', (
+      tester,
+    ) async {
+      final listing = _Listing(
+        errorsFirst: [
+          SessionOpError(
+            code: pb.Error_Code.INVALID_ARGUMENT.value,
+            message: 'ClientFrame missing body',
+          ),
+        ],
+      );
+      await tester.pumpWidget(_host(_reply([_named()]), listing: listing));
+      await tester.pumpAndSettle();
+      expect(find.text('DHT records are not available'), findsOneWidget);
+      expect(
+        find.text(
+          'This daemon is too old to list DHT records — update kwaainet',
+        ),
+        findsOneWidget,
+      );
+      expect(_textWith('ClientFrame'), findsNothing);
+      await tester.pump(const Duration(seconds: 30));
+      expect(listing.requests, 1);
+    });
+
+    testWidgets('another INVALID_ARGUMENT is not blamed on the version', (
+      tester,
+    ) async {
+      final listing = _Listing(
+        errorsFirst: [
+          SessionOpError(
+            code: pb.Error_Code.INVALID_ARGUMENT.value,
+            message: 'key_ids: not hex',
+          ),
+        ],
+      );
+      await tester.pumpWidget(_host(_reply([_named()]), listing: listing));
+      await tester.pumpAndSettle();
+      expect(_textWith('too old'), findsNothing);
+      expect(find.text('Key_ids: not hex'), findsOneWidget);
+    });
+
+    testWidgets('a failed first listing can be retried by hand', (
+      tester,
+    ) async {
+      final listing = _Listing(
+        errorsFirst: [
+          SessionOpError(
+            code: pb.Error_Code.INTERNAL.value,
+            message: 'store lock poisoned',
+          ),
+        ],
+      );
+      await tester.pumpWidget(_host(_reply([_named()]), listing: listing));
+      await tester.pumpAndSettle();
+      expect(find.text('DHT records are not available'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 30));
+      expect(listing.requests, 1);
+
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+      expect(listing.requests, 2);
+      expect(find.text('_petals.models'), findsOneWidget);
+    });
+  });
+
+  testWidgets('the header fits a 560px window', (tester) async {
     await tester.pumpWidget(
       _host(_reply([_record(keyId: 'ff01')]), width: 560),
     );
