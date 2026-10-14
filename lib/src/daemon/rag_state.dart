@@ -39,12 +39,20 @@ final ragStatusProvider = FutureProvider.autoDispose<pb.RagStatusUpdate>((
   final client = ref.watch(kwaaiRpcClientProvider);
   final conn = ref.watch(kwaaiRpcConnectionProvider).valueOrNull;
   if (conn != RpcConnection.connected) {
-    // Not an error: the tab shows the daemon-unavailable view for this,
-    // and an empty status would wrongly read as "initialise me".
-    return pb.RagStatusUpdate();
+    // An empty status would read as "no KBs, initialise one"; the daemon's
+    // PID can be alive while the RPC is still (re)connecting.
+    throw const RagNotConnected();
   }
   return client.ragStatus();
 });
+
+/// [ragStatusProvider]'s error while the RPC connection is not up.
+class RagNotConnected implements Exception {
+  const RagNotConnected();
+
+  @override
+  String toString() => 'Not connected to the daemon.';
+}
 
 /// Name of the KB the RAG tab is showing, or null for "pick the default".
 ///

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kwaainet_gui/src/chat/generated/kwaai.pb.dart' as pb;
+import 'package:kwaainet_gui/src/chat/kwaai_rpc_client.dart';
 import 'package:kwaainet_gui/src/chat/session_client.dart';
 import 'package:kwaainet_gui/src/daemon/daemon_state.dart';
 import 'package:kwaainet_gui/src/daemon/rag_state.dart';
@@ -379,11 +380,36 @@ void main() {
     expect(find.textContaining('chunks ·'), findsNothing);
   });
 
+  testWidgets('a connection flap reads as connecting, not as no KBs', (
+    tester,
+  ) async {
+    // The PID is alive (daemonAvailable) but the RPC is still connecting.
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          daemonAvailableProvider.overrideWithValue(true),
+          kwaaiRpcClientProvider.overrideWithValue(_NoCallsRpcClient()),
+          kwaaiRpcConnectionProvider.overrideWith(
+            (ref) => Stream.value(RpcConnection.connecting),
+          ),
+        ],
+        child: MaterialApp(
+          theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
+          home: const Scaffold(body: RagTab()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Connecting to the daemon…'), findsOneWidget);
+    expect(find.text('RAG isn\'t set up yet'), findsNothing);
+    expect(find.text('Initialize RAG'), findsNothing);
+  });
+
   group('RagKbPicker', () {
     testWidgets('lists every KB and marks the selected one', (tester) async {
-      await tester.pumpWidget(
-        _pickerHost([_kb(), _kb(name: 'archive')]),
-      );
+      await tester.pumpWidget(_pickerHost([_kb(), _kb(name: 'archive')]));
       await tester.pumpAndSettle();
 
       expect(find.text('default'), findsOneWidget);
@@ -414,6 +440,12 @@ Widget _pickerHost(List<pb.RagKb> kbs) {
       home: const Scaffold(body: Row(children: [RagKbPicker()])),
     ),
   );
+}
+
+/// Fails the test on any call: the tab must not reach the daemon here.
+class _NoCallsRpcClient implements KwaaiRpcClient {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 pb.RagChunk _chunk({
