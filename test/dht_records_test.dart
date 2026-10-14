@@ -512,6 +512,59 @@ void main() {
     });
   });
 
+  group('truncated values', () {
+    pb.DhtSubkey sub(String id) => pb.DhtSubkey()
+      ..subkey = '"$id"'
+      ..expiresInSecs = 60
+      ..valueBytes = Int64(3)
+      ..value = _value('[1]');
+
+    testWidgets('a dictionary shows the prefix it got, not the whole', (
+      tester,
+    ) async {
+      pb.DhtRecord dict() => _record(
+        keyId: 'ff02',
+        keyName: 'Llama.0',
+        kind: pb.DhtRecordKind.DHT_RECORD_KIND_DICTIONARY,
+        subkeyCount: 300,
+      );
+      final client = _fakeClient(
+        detailRecord: dict()
+          ..subkeys.addAll([sub('12D3KooWA'), sub('12D3KooWB')])
+          ..valuesTruncated = true,
+      );
+      await tester.pumpWidget(_host(_reply([dict()]), client: client));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Llama.0'));
+      await tester.pumpAndSettle();
+      expect(_textWith('showing 2 of 300 subkeys'), findsOneWidget);
+      expect(_textWith('298 more not included'), findsOneWidget);
+      expect(_textWith('12D3KooWA ·'), findsOneWidget);
+    });
+
+    testWidgets('a withheld value is not read as an empty one', (tester) async {
+      final client = _fakeClient(
+        detailRecord: _named()..valuesTruncated = true,
+      );
+      await tester.pumpWidget(_host(_reply([_named()]), client: client));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('_petals.models'));
+      await tester.pumpAndSettle();
+      expect(_textWith('Value withheld'), findsOneWidget);
+      expect(_textWith('returned no value'), findsNothing);
+    });
+
+    testWidgets('a whole reply carries no warning', (tester) async {
+      await tester.pumpWidget(_host(_reply([_named()])));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('_petals.models'));
+      await tester.pumpAndSettle();
+      expect(find.text('{"llama": 32}'), findsOneWidget);
+      expect(_textWith('withheld'), findsNothing);
+      expect(_textWith('incomplete'), findsNothing);
+    });
+  });
+
   group('value dialog', () {
     testWidgets('shows the whole rendered value', (tester) async {
       final long = '{"x":"${'y' * 400}"}';

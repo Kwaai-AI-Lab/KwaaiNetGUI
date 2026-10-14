@@ -84,7 +84,7 @@ void main() {
     /// ordinary state — and rendering it as "0s ago" would assert the
     /// opposite of what is true.
     test('absent is never, not zero', () {
-      expect(formatLastContact(null), 'Never connected');
+      expect(formatLastContact(null), 'Never connected, or not recently');
       expect(formatLastContact(0), '0s ago');
     });
 
@@ -96,7 +96,7 @@ void main() {
       );
       expect(
         formatLastContact(null, sinceSnapshot: const Duration(minutes: 3)),
-        'Never connected',
+        'Never connected, or not recently',
       );
     });
 

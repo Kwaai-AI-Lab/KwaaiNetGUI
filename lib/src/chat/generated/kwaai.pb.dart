@@ -2117,9 +2117,9 @@ class RoutingPeer extends $pb.GeneratedMessage {
   /// XOR distance from our own key to this peer's, big-endian hex, 64
   /// digits, no leading `0x`.
   ///
-  /// The DHT's own metric, and the only way to check that a lookup
-  /// actually walked closer. Fixed for the life of the entry, so it costs
-  /// nothing in subscription churn.
+  /// The DHT's own metric: it decides which bucket the entry sits in and
+  /// which peers a walk asks first. Fixed for the life of the entry, so it
+  /// costs nothing in subscription churn.
   @$pb.TagNumber(10)
   $core.String get distance => $_getSZ(9);
   @$pb.TagNumber(10)
@@ -2130,8 +2130,9 @@ class RoutingPeer extends $pb.GeneratedMessage {
   void clearDistance() => $_clearField(10);
 
   /// Seconds since we last *established* a connection to this peer, in
-  /// either direction. Absent means never — which is a real and common
-  /// state for a routing entry: kad holds a peer the moment a configured
+  /// either direction. Absent means never connected, or not within the
+  /// node's bounded recency cache (1024 peers, oldest dropped first). Never
+  /// is a real and common state: kad holds a peer the moment a configured
   /// address is seeded into it, before any dial has succeeded.
   ///
   /// Deliberately not part of the subscription's change identity, for the
@@ -3021,6 +3022,13 @@ class DhtRecordsRequest extends $pb.GeneratedMessage {
   /// Fill in `value` and `subkeys`. Requires a non-empty `key_ids`:
   /// values run to a megabyte each, so a whole-store listing carrying
   /// them could not fit one frame. INVALID_ARGUMENT otherwise.
+  ///
+  /// Values are attached in reply order until about 3 MiB of value data
+  /// has been included, each value charged the larger of its raw and
+  /// rendered size (a subkey's own bytes count too); once one does not
+  /// fit, no further value is attached. A dictionary returns at most 256
+  /// subkeys, in subkey byte order. Anything withheld sets
+  /// `values_truncated` on its record and on the reply.
   @$pb.TagNumber(1)
   $core.bool get includeValues => $_getBF(0);
   @$pb.TagNumber(1)
@@ -3031,7 +3039,8 @@ class DhtRecordsRequest extends $pb.GeneratedMessage {
   void clearIncludeValues() => $_clearField(1);
 
   /// Restrict the listing to these DHT ids (hex, as reported in
-  /// DhtRecord.key_id). Empty lists everything.
+  /// DhtRecord.key_id; either case, optional `0x`). Empty lists
+  /// everything. An id that is not hex is INVALID_ARGUMENT.
   @$pb.TagNumber(2)
   $pb.PbList<$core.String> get keyIds => $_getList(1);
 
@@ -3053,12 +3062,14 @@ class DhtRecordsReply extends $pb.GeneratedMessage {
     $core.Iterable<DhtRecord>? records,
     $core.Iterable<DhtKnownKey>? knownKeys,
     $core.int? totalRecords,
+    $core.bool? valuesTruncated,
   }) {
     final result = create();
     if (serverTime != null) result.serverTime = serverTime;
     if (records != null) result.records.addAll(records);
     if (knownKeys != null) result.knownKeys.addAll(knownKeys);
     if (totalRecords != null) result.totalRecords = totalRecords;
+    if (valuesTruncated != null) result.valuesTruncated = valuesTruncated;
     return result;
   }
 
@@ -3082,6 +3093,7 @@ class DhtRecordsReply extends $pb.GeneratedMessage {
         subBuilder: DhtKnownKey.create)
     ..aI(4, _omitFieldNames ? '' : 'totalRecords',
         fieldType: $pb.PbFieldType.OU3)
+    ..aOB(5, _omitFieldNames ? '' : 'valuesTruncated')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3136,6 +3148,17 @@ class DhtRecordsReply extends $pb.GeneratedMessage {
   $core.bool hasTotalRecords() => $_has(3);
   @$pb.TagNumber(4)
   void clearTotalRecords() => $_clearField(4);
+
+  /// Some record's `values_truncated` is set: `include_values` was asked
+  /// and the reply's value budget or subkey cap withheld something.
+  @$pb.TagNumber(5)
+  $core.bool get valuesTruncated => $_getBF(4);
+  @$pb.TagNumber(5)
+  set valuesTruncated($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasValuesTruncated() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearValuesTruncated() => $_clearField(5);
 }
 
 /// A plaintext key name and the DHT id it hashes to.
@@ -3223,6 +3246,7 @@ class DhtRecord extends $pb.GeneratedMessage {
     $fixnum.Int64? dictMaxsize,
     DhtValueView? value,
     $core.Iterable<DhtSubkey>? subkeys,
+    $core.bool? valuesTruncated,
   }) {
     final result = create();
     if (keyId != null) result.keyId = keyId;
@@ -3237,6 +3261,7 @@ class DhtRecord extends $pb.GeneratedMessage {
     if (dictMaxsize != null) result.dictMaxsize = dictMaxsize;
     if (value != null) result.value = value;
     if (subkeys != null) result.subkeys.addAll(subkeys);
+    if (valuesTruncated != null) result.valuesTruncated = valuesTruncated;
     return result;
   }
 
@@ -3273,6 +3298,7 @@ class DhtRecord extends $pb.GeneratedMessage {
         subBuilder: DhtValueView.create)
     ..pPM<DhtSubkey>(12, _omitFieldNames ? '' : 'subkeys',
         subBuilder: DhtSubkey.create)
+    ..aOB(13, _omitFieldNames ? '' : 'valuesTruncated')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3431,9 +3457,23 @@ class DhtRecord extends $pb.GeneratedMessage {
   DhtValueView ensureValue() => $_ensure(10);
 
   /// Per-subkey breakdown, when `include_values` was set and this is a
-  /// dictionary. Each subkey expires independently of the record.
+  /// dictionary. Each subkey expires independently of the record. A
+  /// prefix in subkey byte order: fewer than `subkey_count` entries
+  /// means the rest were withheld, and `values_truncated` is set.
   @$pb.TagNumber(12)
   $pb.PbList<DhtSubkey> get subkeys => $_getList(11);
+
+  /// `include_values` was asked but part of this record's value was
+  /// withheld: a regular record's `value`, or the subkeys past
+  /// `subkeys.len()`. See DhtRecordsRequest.include_values.
+  @$pb.TagNumber(13)
+  $core.bool get valuesTruncated => $_getBF(12);
+  @$pb.TagNumber(13)
+  set valuesTruncated($core.bool value) => $_setBool(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasValuesTruncated() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearValuesTruncated() => $_clearField(13);
 }
 
 class DhtSubkey extends $pb.GeneratedMessage {

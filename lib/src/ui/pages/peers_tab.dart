@@ -1488,12 +1488,12 @@ Future<void> _showDhtEntryDialog(
 /// still says something.
 ///
 /// Public for `test/peers_dht_entry_test.dart`. `null` is not "0 seconds ago"
-/// — it is a peer we have never connected to in either direction, which for a
-/// routing entry is a normal state, so it gets its own words rather than a
-/// number. [sinceSnapshot] ages the value: the daemon does not resend it as it
+/// — it is a peer we have never connected to (or one aged out of the daemon's
+/// 1024-peer recency cache), a normal state for a routing entry, so it gets
+/// its own words rather than a number. [sinceSnapshot] ages the value: the daemon does not resend it as it
 /// grows, so it is only as fresh as the snapshot that carried it.
 String formatLastContact(int? secs, {Duration sinceSnapshot = Duration.zero}) {
-  if (secs == null) return 'Never connected';
+  if (secs == null) return 'Never connected, or not recently';
   secs += math.max(0, sinceSnapshot.inSeconds);
   if (secs < 60) return '${secs}s ago';
   if (secs < 3600) return '${secs ~/ 60}m ago';

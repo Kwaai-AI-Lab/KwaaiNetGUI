@@ -938,6 +938,7 @@ const DhtRecordsReply$json = {
       '10': 'knownKeys'
     },
     {'1': 'total_records', '3': 4, '4': 1, '5': 13, '10': 'totalRecords'},
+    {'1': 'values_truncated', '3': 5, '4': 1, '5': 8, '10': 'valuesTruncated'},
   ],
 };
 
@@ -946,7 +947,8 @@ final $typed_data.Uint8List dhtRecordsReplyDescriptor = $convert.base64Decode(
     'Cg9EaHRSZWNvcmRzUmVwbHkSHwoLc2VydmVyX3RpbWUYASABKAlSCnNlcnZlclRpbWUSLQoHcm'
     'Vjb3JkcxgCIAMoCzITLmt3YWFpLnYxLkRodFJlY29yZFIHcmVjb3JkcxI0Cgprbm93bl9rZXlz'
     'GAMgAygLMhUua3dhYWkudjEuRGh0S25vd25LZXlSCWtub3duS2V5cxIjCg10b3RhbF9yZWNvcm'
-    'RzGAQgASgNUgx0b3RhbFJlY29yZHM=');
+    'RzGAQgASgNUgx0b3RhbFJlY29yZHMSKQoQdmFsdWVzX3RydW5jYXRlZBgFIAEoCFIPdmFsdWVz'
+    'VHJ1bmNhdGVk');
 
 @$core.Deprecated('Use dhtKnownKeyDescriptor instead')
 const DhtKnownKey$json = {
@@ -1017,6 +1019,7 @@ const DhtRecord$json = {
       '6': '.kwaai.v1.DhtSubkey',
       '10': 'subkeys'
     },
+    {'1': 'values_truncated', '3': 13, '4': 1, '5': 8, '10': 'valuesTruncated'},
   ],
   '8': [
     {'1': '_latest_expiration'},
@@ -1035,8 +1038,8 @@ final $typed_data.Uint8List dhtRecordDescriptor = $convert.base64Decode(
     'xhdGVzdF9leHBpcmF0aW9uGAkgASgBSABSEGxhdGVzdEV4cGlyYXRpb26IAQESJgoMZGljdF9t'
     'YXhzaXplGAogASgESAFSC2RpY3RNYXhzaXpliAEBEjEKBXZhbHVlGAsgASgLMhYua3dhYWkudj'
     'EuRGh0VmFsdWVWaWV3SAJSBXZhbHVliAEBEi0KB3N1YmtleXMYDCADKAsyEy5rd2FhaS52MS5E'
-    'aHRTdWJrZXlSB3N1YmtleXNCFAoSX2xhdGVzdF9leHBpcmF0aW9uQg8KDV9kaWN0X21heHNpem'
-    'VCCAoGX3ZhbHVl');
+    'aHRTdWJrZXlSB3N1YmtleXMSKQoQdmFsdWVzX3RydW5jYXRlZBgNIAEoCFIPdmFsdWVzVHJ1bm'
+    'NhdGVkQhQKEl9sYXRlc3RfZXhwaXJhdGlvbkIPCg1fZGljdF9tYXhzaXplQggKBl92YWx1ZQ==');
 
 @$core.Deprecated('Use dhtSubkeyDescriptor instead')
 const DhtSubkey$json = {
