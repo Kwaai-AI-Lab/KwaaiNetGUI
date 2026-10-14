@@ -1,5 +1,24 @@
 import 'package:flutter/material.dart';
 
+/// The face to use for code, peer ids, hashes, and log output.
+///
+/// Flutter does *not* resolve a generic `'monospace'` family on macOS — the
+/// engine finds no such face and silently falls back to the proportional UI
+/// font, so `fontFamily: 'monospace'` renders identically to setting nothing
+/// at all. Measured with a TextPainter in a real macOS window: at 14px,
+/// `'monospace'` lays out "iii" at 10.4px and "mmm" at 36.5px (the same
+/// widths as the default face), while `'Menlo'` gives both 25.3px.
+///
+/// So name a real face and let [kwaaiMonoFallback] cover the other
+/// platforms. Menlo ships with macOS; Consolas with Windows; the generic
+/// alias is last and is what actually works on Linux.
+const String kwaaiMonoFamily = 'Menlo';
+
+/// Fallbacks for [kwaaiMonoFamily], in order. Always pass both — a bare
+/// `fontFamily: kwaaiMonoFamily` renders proportionally anywhere Menlo is
+/// absent, which is the same bug one platform over.
+const List<String> kwaaiMonoFallback = <String>['Consolas', 'monospace'];
+
 /// Semantic colors for the kwaainet-gui app. Use [Theme.of(context).kwaai] to
 /// read these; see [KwaaiBuildContext] below.
 class KwaaiThemeExtension extends ThemeExtension<KwaaiThemeExtension> {

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
 
@@ -47,10 +48,16 @@ class SessionClient {
 
   bool _closed = false;
 
+  // Writers waiting for the paused outbound stream to resume.
+  Completer<void>? _writable;
+
   /// Opens the bidi stream if not already open. Idempotent.
   void ensureOpen() {
     if (_outbound != null || _closed) return;
-    final out = StreamController<pb.ClientFrame>();
+    final out = StreamController<pb.ClientFrame>(
+      onListen: _wakeWriters,
+      onResume: _wakeWriters,
+    );
     _outbound = out;
     final inbound = _stub.session(out.stream);
     _log('opened Session stream');
@@ -107,6 +114,7 @@ class SessionClient {
     }
     _outbound?.close();
     _outbound = null;
+    _wakeWriters();
     _inboundSub?.cancel();
     _inboundSub = null;
   }
@@ -351,6 +359,352 @@ class SessionClient {
     return NetworkOperation(id: id, updates: updates);
   }
 
+  /// `kwaainet rag status` — the knowledge bases this daemon holds.
+  ///
+  /// An empty `kbs` list means RAG is compiled in but nothing has been
+  /// initialised yet. A daemon built without the `rag` feature answers
+  /// UNIMPLEMENTED instead — and so does one too old to know the frame at
+  /// all, since an unknown body is not a body it can act on. The two are
+  /// indistinguishable on the wire and mean the same thing to a user, so
+  /// callers treat both as "this daemon can't do RAG".
+  Future<pb.RagStatusUpdate> ragStatus() async {
+    final frames = _open(
+      (id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..ragStatus = pb.RagStatusRequest(),
+    );
+    pb.RagStatusUpdate? reply;
+    await for (final f in frames) {
+      if (f.whichBody() == pb.ServerFrame_Body.ragStatus) {
+        reply = f.ragStatus;
+      }
+    }
+    if (reply == null) {
+      throw SessionOpError(code: 0, message: 'ragStatus returned no update');
+    }
+    return reply;
+  }
+
+  /// `kwaainet rag init` — create a knowledge base.
+  ///
+  /// Empty [kb] means "default". Empty [embedModel] means the daemon's
+  /// default for a new KB and the current model for an existing one, so the
+  /// reply is what the KB actually became. Init on an existing KB keeps its
+  /// documents.
+  ///
+  /// Errors with UNAVAILABLE when Ollama isn't reachable or the embedding
+  /// model is missing, INVALID_ARGUMENT when [embedModel] would change the
+  /// model of a KB holding documents, and UNIMPLEMENTED for a remote KB.
+  /// Their messages are written for a user, so callers should show them.
+  Future<pb.RagInitReply> ragInit({
+    String kb = '',
+    String embedModel = '',
+  }) async {
+    final frames = _open(
+      (id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..ragInit = (pb.RagInitRequest()
+          ..kb = kb
+          ..embedModel = embedModel),
+    );
+    pb.RagInitReply? reply;
+    await for (final f in frames) {
+      if (f.whichBody() == pb.ServerFrame_Body.ragInit) {
+        reply = f.ragInit;
+      }
+    }
+    if (reply == null) {
+      throw SessionOpError(code: 0, message: 'ragInit returned no reply');
+    }
+    return reply;
+  }
+
+  /// `kwaainet rag query` — retrieve chunks for [text].
+  ///
+  /// [topK] 0 means the server default (20) and [minScore] 0 keeps
+  /// everything, so the defaults here send neither and let the daemon
+  /// decide. Errors with NOT_FOUND when the KB was never initialised.
+  Future<pb.RagQueryReply> ragQuery({
+    required String text,
+    String kb = '',
+    int topK = 0,
+    double minScore = 0,
+  }) async {
+    final frames = _open(
+      (id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..ragQuery = (pb.RagQueryRequest()
+          ..kb = kb
+          ..text = text
+          ..topK = topK
+          ..minScore = minScore),
+    );
+    pb.RagQueryReply? reply;
+    await for (final f in frames) {
+      if (f.whichBody() == pb.ServerFrame_Body.ragQuery) {
+        reply = f.ragQuery;
+      }
+    }
+    if (reply == null) {
+      throw SessionOpError(code: 0, message: 'ragQuery returned no reply');
+    }
+    return reply;
+  }
+
+  /// `kwaainet rag delete` — remove [docName] and every chunk it produced.
+  ///
+  /// [docName] is a `RagDoc.name` from `RagKb.documents`, not a path: the
+  /// daemon deletes what it recorded at ingest, so a caller passes back
+  /// what a status reply gave it.
+  ///
+  /// Errors with NOT_FOUND both when the KB was never initialised and when
+  /// it simply doesn't hold that document — the daemon deliberately does
+  /// not treat a missing document as a successful no-op, so a stale list
+  /// row can't report a delete that never happened.
+  Future<pb.RagDeleteReply> ragDelete({
+    required String docName,
+    String kb = '',
+  }) async {
+    final frames = _open(
+      (id) => pb.ClientFrame()
+        ..id = Int64(id)
+        ..ragDelete = (pb.RagDeleteRequest()
+          ..kb = kb
+          ..docName = docName),
+    );
+    pb.RagDeleteReply? reply;
+    await for (final f in frames) {
+      if (f.whichBody() == pb.ServerFrame_Body.ragDelete) {
+        reply = f.ragDelete;
+      }
+    }
+    if (reply == null) {
+      throw SessionOpError(code: 0, message: 'ragDelete returned no reply');
+    }
+    return reply;
+  }
+
+  /// `kwaainet rag ingest` — upload [file] into the KB, embedding as it goes.
+  ///
+  /// The bytes travel over the session: a RagIngest frame announcing
+  /// [docName] (default: the file's basename, whose extension picks the
+  /// daemon's parser) and the size, then the file as rag_ingest_data pieces
+  /// of at most [pieceBytes] under the same id. The file is streamed, never
+  /// held whole in memory: at most [maxUnackedPieces] pieces go unacknowledged
+  /// by the daemon's per-piece RECEIVING progress before the read pauses.
+  ///
+  /// Unlike the other three ops this is long-running and reports as it
+  /// works, so it returns an operation rather than a bare Future: progress
+  /// frames arrive on [RagIngestOperation.progress] and the terminal reply
+  /// completes [RagIngestOperation.done]. Both come off the same router, so
+  /// a caller may ignore progress entirely and still get the reply. A read
+  /// failure mid-upload cancels the op and completes [done] with that error.
+  /// An empty file, or one over [kRagIngestMaxBytes], fails without sending.
+  ///
+  /// [maxUnackedPieces] exists for tests and may only lower the daemon's 8.
+  RagIngestOperation ragIngest({
+    required File file,
+    String kb = '',
+    String? docName,
+    int pieceBytes = kRagIngestPieceBytes,
+    int maxUnackedPieces = kRagIngestMaxUnackedPieces,
+  }) {
+    ensureOpen();
+    if (_closed || _outbound == null) {
+      final ended = SessionEndedError(
+        kind: SessionEndKind.localClose,
+        reason: 'session not open',
+      );
+      return _failedIngest(ended);
+    }
+    final int size;
+    try {
+      size = file.lengthSync();
+    } on FileSystemException catch (e) {
+      return _failedIngest(e);
+    }
+    if (size == 0) return _failedIngest(RagFileRejected('The file is empty.'));
+    if (size > kRagIngestMaxBytes) {
+      return _failedIngest(
+        RagFileRejected('Files over 256 MB can\'t be added.'),
+      );
+    }
+    final id = _nextId++;
+    final controller = StreamController<pb.ServerFrame>();
+    _routers[id] = controller;
+    final out = _outbound!;
+    out.add(
+      pb.ClientFrame()
+        ..id = Int64(id)
+        ..ragIngest = (pb.RagIngestRequest()
+          ..kb = kb
+          ..docName = (docName == null || docName.isEmpty)
+              ? _basename(file.path)
+              : docName
+          ..size = Int64(size)),
+    );
+
+    // One router feeding two consumers, as in [_openOp]: the router is
+    // single-subscription so it cannot be listened to twice. A plain
+    // controller (not broadcast) buffers until the caller subscribes, so
+    // early progress on a fast local ingest isn't dropped in the gap
+    // between this returning and the UI listening.
+    final progress = StreamController<pb.RagProgress>();
+    final done = Completer<pb.RagIngestReply>();
+
+    // Pieces the daemon has acknowledged, one RECEIVING frame each, in order.
+    var acked = 0;
+    var cancelled = false;
+    Completer<void>? ackWaiter;
+    void wakeUploader() {
+      final w = ackWaiter;
+      ackWaiter = null;
+      w?.complete();
+    }
+
+    controller.stream.listen(
+      (f) {
+        switch (f.whichBody()) {
+          case pb.ServerFrame_Body.ragProgress:
+            final p = f.ragProgress;
+            if (p.phase == pb.RagProgress_RagPhase.RAG_PHASE_RECEIVING) {
+              acked++;
+              wakeUploader();
+            }
+            if (!progress.isClosed) progress.add(p);
+          case pb.ServerFrame_Body.ragIngest:
+            if (!done.isCompleted) done.complete(f.ragIngest);
+          default:
+            break;
+        }
+      },
+      onError: (Object e, StackTrace st) {
+        // The error goes to the Future, which is what a caller awaits;
+        // progress merely closes. Sending it to both would surface the
+        // same failure twice, and an unhandled error on a progress
+        // stream nobody listened to would escape as an uncaught async
+        // error.
+        if (!done.isCompleted) done.completeError(e, st);
+        if (!progress.isClosed) progress.close();
+      },
+      onDone: () {
+        if (!progress.isClosed) progress.close();
+        // Done without a terminal reply: the daemon ended the operation
+        // without saying what it did. Better a clear error than a Future
+        // that never settles and a spinner that never stops.
+        if (!done.isCompleted) {
+          done.completeError(
+            SessionOpError(code: 0, message: 'ragIngest returned no reply'),
+          );
+        }
+      },
+    );
+
+    // Stops on any end of the op: daemon reply/error, a cancel, or teardown.
+    bool stopped() =>
+        cancelled || done.isCompleted || !identical(_outbound, out);
+    // Wake a window wait on any end too, so it can see stopped() and return.
+    done.future.then(
+      (_) => wakeUploader(),
+      onError: (Object _) => wakeUploader(),
+    );
+    // Never above the daemon's buffer: a ninth unacked piece fails the ingest.
+    final window = maxUnackedPieces.clamp(1, kRagIngestMaxUnackedPieces);
+    Future<void> room(int sent) async {
+      while (!stopped() && sent - acked >= window) {
+        await (ackWaiter ??= Completer<void>()).future;
+      }
+    }
+
+    unawaited(
+      _uploadIngestData(
+        id,
+        out,
+        file,
+        size,
+        pieceBytes,
+        stopped,
+        room,
+      ).catchError((Object e, StackTrace st) {
+        if (stopped()) return;
+        done.completeError(e, st);
+        if (!progress.isClosed) progress.close();
+        // Tell the daemon to stop waiting for bytes that will never come.
+        unawaited(cancel(id).catchError((Object _) {}));
+      }),
+    );
+
+    return RagIngestOperation(
+      id: id,
+      progress: progress.stream,
+      done: done.future,
+      onCancel: () async {
+        if (cancelled || done.isCompleted) return;
+        // Stop sending now; [done] settles with the daemon's CANCELLED.
+        cancelled = true;
+        wakeUploader();
+        await cancel(id);
+      },
+    );
+  }
+
+  RagIngestOperation _failedIngest(Object error) => RagIngestOperation(
+    id: null,
+    progress: const Stream<pb.RagProgress>.empty(),
+    done: Future<pb.RagIngestReply>.error(error),
+  );
+
+  /// Send [file] as rag_ingest_data frames under [id], pausing the read until
+  /// [room] admits each piece. Throws if the read fails or the file's length
+  /// no longer matches the announced [size].
+  Future<void> _uploadIngestData(
+    int id,
+    StreamController<pb.ClientFrame> out,
+    File file,
+    int size,
+    int pieceBytes,
+    bool Function() stopped,
+    Future<void> Function(int sentPieces) room,
+  ) async {
+    var sent = 0;
+    var pieces = 0;
+    // Leaving the loop early cancels openRead's subscription: the read stops.
+    await for (final piece in ragPieces(file.openRead(), pieceBytes)) {
+      await room(pieces);
+      if (stopped()) return;
+      sent += piece.length;
+      if (sent > size) {
+        throw FileSystemException('file grew during upload', file.path);
+      }
+      out.add(
+        pb.ClientFrame()
+          ..id = Int64(id)
+          ..ragIngestData = (pb.RagIngestData()..data = piece),
+      );
+      pieces++;
+      await _outboundWritable();
+    }
+    if (!stopped() && sent != size) {
+      throw FileSystemException('file shrank during upload', file.path);
+    }
+  }
+
+  /// Completes once the outbound stream can take more: on resume while it is
+  /// paused (e.g. the rpc not yet listening), else after one event-loop turn.
+  Future<void> _outboundWritable() {
+    final out = _outbound;
+    if (out == null || !out.isPaused) {
+      return Future<void>.delayed(Duration.zero);
+    }
+    return (_writable ??= Completer<void>()).future;
+  }
+
+  void _wakeWriters() {
+    final w = _writable;
+    _writable = null;
+    w?.complete();
+  }
+
   /// Cancel an in-flight operation. The target operation's stream will
   /// error with SessionOpError(code=CANCELLED).
   Future<void> cancel(int operationId) async {
@@ -424,6 +778,36 @@ class SessionClient {
     return controller.stream;
   }
 }
+
+/// Size of each rag_ingest_data piece; well under the daemon's 4 MiB frame cap.
+const kRagIngestPieceBytes = 256 * 1024;
+
+/// Most upload pieces in flight unacknowledged: the daemon buffers 8, and a
+/// ninth fails the ingest. grpc-dart hides HTTP/2 flow control, so this also
+/// bounds memory.
+const kRagIngestMaxUnackedPieces = 8;
+
+/// Largest document the daemon accepts.
+const kRagIngestMaxBytes = 256 * 1024 * 1024;
+
+/// Regroup [source]'s chunks into pieces of exactly [size] bytes (the last
+/// may be shorter). Pull-driven: the source pauses while a piece is pending.
+Stream<Uint8List> ragPieces(Stream<List<int>> source, int size) async* {
+  final buf = BytesBuilder(copy: false);
+  await for (final chunk in source) {
+    buf.add(chunk);
+    if (buf.length < size) continue;
+    final bytes = buf.takeBytes();
+    var off = 0;
+    for (; off + size <= bytes.length; off += size) {
+      yield Uint8List.sublistView(bytes, off, off + size);
+    }
+    if (off < bytes.length) buf.add(Uint8List.sublistView(bytes, off));
+  }
+  if (buf.isNotEmpty) yield buf.takeBytes();
+}
+
+String _basename(String path) => path.split(RegExp(r'[/\\]')).last;
 
 /// How long to wait for the daemon's *first* frame before declaring the
 /// request dead. Generous: the daemon may still be loading a model, resolving
@@ -558,6 +942,49 @@ class NetworkOperation {
 
   final int? id;
   final Stream<pb.NetworkUpdate> updates;
+}
+
+/// An in-flight RAG ingest: its progress feed, the terminal reply, and the
+/// server operation id needed to [SessionClient.cancel] it. Same id
+/// semantics as [SessionOperation] — null means no frame was ever sent.
+///
+/// Unlike the subscription operations this exposes a Future as well as a
+/// Stream, because an ingest has a definite result (how much was stored)
+/// rather than running until cancelled. [progress] is optional detail;
+/// [done] is the outcome and carries any error.
+class RagIngestOperation {
+  RagIngestOperation({
+    required this.id,
+    required this.progress,
+    required this.done,
+    this.onCancel,
+  });
+
+  final int? id;
+
+  /// What [cancel] runs; null for an op that never sent anything.
+  final Future<void> Function()? onCancel;
+
+  /// Stop uploading and send a Cancel for [id]; [done] then fails CANCELLED.
+  Future<void> cancel() async => onCancel?.call();
+
+  /// Phase/counter updates while the ingest runs. Closes when the
+  /// operation ends, however it ends. Safe to ignore.
+  final Stream<pb.RagProgress> progress;
+
+  /// Chunks stored and vectors uploaded, or an error — including
+  /// SessionOpError(code=UNAVAILABLE) when Ollama went away mid-ingest.
+  final Future<pb.RagIngestReply> done;
+}
+
+/// A file the daemon would refuse, rejected before anything is sent.
+class RagFileRejected implements Exception {
+  RagFileRejected(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 /// Thrown into a per-op stream when the server emits Error for that id.

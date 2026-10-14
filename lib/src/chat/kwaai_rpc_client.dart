@@ -494,6 +494,77 @@ class KwaaiRpcClient {
   @visibleForTesting
   String? get debugConnectionPath => _connectionPath;
 
+  /// The knowledge bases this daemon holds.
+  ///
+  /// Errors rather than returning null on failure: the RAG view has to tell
+  /// "no KBs yet" (an empty list, which is an init prompt) apart from "this
+  /// daemon can't do RAG" (SessionOpError code=UNIMPLEMENTED, which is a
+  /// dead end), and a null would collapse both into one.
+  ///
+  /// As with the other Session ops this doesn't reset the channel on
+  /// failure — the provider re-runs when connectivity returns.
+  Future<pb.RagStatusUpdate> ragStatus() async {
+    final session = await _sessionOrInit();
+    return session.ragStatus().timeout(const Duration(seconds: 10));
+  }
+
+  /// Create a knowledge base. Empty [kb] means "default"; empty
+  /// [embedModel] keeps an existing KB's model, or the daemon's default.
+  ///
+  /// No timeout: init pulls the embedding model on first use, which on a
+  /// cold Ollama is a multi-minute download. Cutting that off would leave
+  /// the daemon still working while the GUI reported failure.
+  Future<pb.RagInitReply> ragInit({
+    String kb = '',
+    String embedModel = '',
+  }) async {
+    final session = await _sessionOrInit();
+    return session.ragInit(kb: kb, embedModel: embedModel);
+  }
+
+  /// Retrieve chunks for [text]. [topK] 0 means the server default.
+  Future<pb.RagQueryReply> ragQuery({
+    required String text,
+    String kb = '',
+    int topK = 0,
+    double minScore = 0,
+  }) async {
+    final session = await _sessionOrInit();
+    return session
+        .ragQuery(text: text, kb: kb, topK: topK, minScore: minScore)
+        .timeout(const Duration(seconds: 60));
+  }
+
+  /// Remove [docName] from the KB, along with every chunk it produced.
+  ///
+  /// Generous timeout for a delete: it touches three stores (metadata,
+  /// vectors, keyword index) and the vector store's in-memory graph is
+  /// rebuilt on first use, so a cold KB pays that open before deleting
+  /// anything.
+  Future<pb.RagDeleteReply> ragDelete({
+    required String docName,
+    String kb = '',
+  }) async {
+    final session = await _sessionOrInit();
+    return session
+        .ragDelete(docName: docName, kb: kb)
+        .timeout(const Duration(seconds: 60));
+  }
+
+  /// Upload [file] to the daemon and ingest it; see [SessionClient.ragIngest].
+  ///
+  /// Returns the operation so the caller can render progress; no timeout,
+  /// since embedding a large document legitimately takes minutes and the
+  /// progress feed already shows whether it is moving.
+  Future<RagIngestOperation> ragIngest({
+    required File file,
+    String kb = '',
+    String? docName,
+  }) async {
+    final session = await _sessionOrInit();
+    return session.ragIngest(file: file, kb: kb, docName: docName);
+  }
+
   Future<void> _resetChannel({bool silent = false}) async {
     final ch = _channel;
     final path = _connectionPath;
