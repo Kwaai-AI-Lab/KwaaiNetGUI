@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -407,6 +408,53 @@ void main() {
     expect(find.text('Initialize RAG'), findsNothing);
   });
 
+  testWidgets('an ingest row\'s Cancel cancels that ingest', (tester) async {
+    final client = _IngestRpcClient();
+    final container = ProviderContainer(
+      overrides: [
+        daemonAvailableProvider.overrideWithValue(true),
+        kwaaiRpcClientProvider.overrideWithValue(client),
+        ragStatusProvider.overrideWith(
+          (ref) async => _status([
+            _kb(docs: const ['handbook.pdf']),
+          ]),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
+          home: const Scaffold(
+            body: SizedBox(width: 900, height: 700, child: RagTab()),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(ragIngestQueueProvider.notifier).enqueue(const [
+      '/docs/a.pdf',
+    ], kb: 'default');
+    // pump, not pumpAndSettle: a running row's bar is indeterminate.
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('a.pdf'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Cancel'));
+    // The queue awaits a subscription cancel, whose future settles on the
+    // real event loop rather than the tester's fake one.
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+
+    expect(client.cancelled, [7]);
+    expect(find.text('Cancelled'), findsOneWidget);
+    // Settled rows offer no cancel.
+    expect(find.byTooltip('Cancel'), findsNothing);
+  });
+
   group('RagKbPicker', () {
     testWidgets('lists every KB and marks the selected one', (tester) async {
       await tester.pumpWidget(_pickerHost([_kb(), _kb(name: 'archive')]));
@@ -444,6 +492,32 @@ Widget _pickerHost(List<pb.RagKb> kbs) {
 
 /// Fails the test on any call: the tab must not reach the daemon here.
 class _NoCallsRpcClient implements KwaaiRpcClient {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Every ingest is op 7, which runs until cancelled.
+class _IngestRpcClient implements KwaaiRpcClient {
+  final cancelled = <int>[];
+
+  @override
+  Future<RagIngestOperation> ragIngest({
+    required File file,
+    String kb = '',
+    String? docName,
+  }) async {
+    final done = Completer<pb.RagIngestReply>();
+    return RagIngestOperation(
+      id: 7,
+      progress: const Stream.empty(),
+      done: done.future,
+      onCancel: () async {
+        cancelled.add(7);
+        done.completeError(SessionOpError(code: 4, message: 'cancelled'));
+      },
+    );
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
