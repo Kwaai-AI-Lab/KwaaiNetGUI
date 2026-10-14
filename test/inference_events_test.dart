@@ -200,5 +200,19 @@ void main() {
       expect(log().running, isFalse);
       expect(log().sawAnyEvent, isFalse);
     });
+
+    test('reset forgets the previous run\'s model and session', () async {
+      notifier().startRun();
+      await feed([
+        _event(pb.InferencePhase.INFERENCE_PHASE_RESOLVED)
+          ..model = 'old-model'
+          ..sessionId = 'old-session',
+      ]);
+      notifier().reset();
+      // Any later publish must not resurrect the discarded run's header.
+      notifier().endRun();
+      expect(log().model, isEmpty);
+      expect(log().sessionId, isEmpty);
+    });
   });
 }
