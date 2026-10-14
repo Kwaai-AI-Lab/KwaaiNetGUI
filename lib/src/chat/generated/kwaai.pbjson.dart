@@ -284,15 +284,6 @@ const ServerFrame$json = {
       '10': 'status'
     },
     {
-      '1': 'inference_event',
-      '3': 19,
-      '4': 1,
-      '5': 11,
-      '6': '.kwaai.v1.InferenceEvent',
-      '9': 0,
-      '10': 'inferenceEvent'
-    },
-    {
       '1': 'block_coverage',
       '3': 15,
       '4': 1,
@@ -328,6 +319,15 @@ const ServerFrame$json = {
       '9': 0,
       '10': 'storage'
     },
+    {
+      '1': 'inference_event',
+      '3': 19,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.InferenceEvent',
+      '9': 0,
+      '10': 'inferenceEvent'
+    },
   ],
   '8': [
     {'1': 'body'},
@@ -340,12 +340,12 @@ final $typed_data.Uint8List serverFrameDescriptor = $convert.base64Decode(
     'BpbmdSZXBseUgAUgRwb25nEisKBXRva2VuGAsgASgLMhMua3dhYWkudjEuQ2hhdFRva2VuSABS'
     'BXRva2VuEiQKBGRvbmUYDCABKAsyDi5rd2FhaS52MS5Eb25lSABSBGRvbmUSJwoFZXJyb3IYDS'
     'ABKAsyDy5rd2FhaS52MS5FcnJvckgAUgVlcnJvchIvCgZzdGF0dXMYDiABKAsyFS5rd2FhaS52'
-    'MS5TdGF0dXNSZXBseUgAUgZzdGF0dXMSQwoPaW5mZXJlbmNlX2V2ZW50GBMgASgLMhgua3dhYW'
-    'kudjEuSW5mZXJlbmNlRXZlbnRIAFIOaW5mZXJlbmNlRXZlbnQSRgoOYmxvY2tfY292ZXJhZ2UY'
-    'DyABKAsyHS5rd2FhaS52MS5CbG9ja0NvdmVyYWdlVXBkYXRlSABSDWJsb2NrQ292ZXJhZ2USMw'
-    'oHbmV0d29yaxgRIAEoCzIXLmt3YWFpLnYxLk5ldHdvcmtVcGRhdGVIAFIHbmV0d29yaxIyCgdj'
-    'b25uZWN0GBIgASgLMhYua3dhYWkudjEuQ29ubmVjdFJlcGx5SABSB2Nvbm5lY3QSMwoHc3Rvcm'
-    'FnZRgQIAEoCzIXLmt3YWFpLnYxLlN0b3JhZ2VVcGRhdGVIAFIHc3RvcmFnZUIGCgRib2R5');
+    'MS5TdGF0dXNSZXBseUgAUgZzdGF0dXMSRgoOYmxvY2tfY292ZXJhZ2UYDyABKAsyHS5rd2FhaS'
+    '52MS5CbG9ja0NvdmVyYWdlVXBkYXRlSABSDWJsb2NrQ292ZXJhZ2USMwoHbmV0d29yaxgRIAEo'
+    'CzIXLmt3YWFpLnYxLk5ldHdvcmtVcGRhdGVIAFIHbmV0d29yaxIyCgdjb25uZWN0GBIgASgLMh'
+    'Yua3dhYWkudjEuQ29ubmVjdFJlcGx5SABSB2Nvbm5lY3QSMwoHc3RvcmFnZRgQIAEoCzIXLmt3'
+    'YWFpLnYxLlN0b3JhZ2VVcGRhdGVIAFIHc3RvcmFnZRJDCg9pbmZlcmVuY2VfZXZlbnQYEyABKA'
+    'syGC5rd2FhaS52MS5JbmZlcmVuY2VFdmVudEgAUg5pbmZlcmVuY2VFdmVudEIGCgRib2R5');
 
 @$core.Deprecated('Use cancelDescriptor instead')
 const Cancel$json = {
@@ -1044,6 +1044,15 @@ const InferenceEvent$json = {
       '6': '.kwaai.v1.InferenceHop',
       '10': 'hops'
     },
+    {
+      '1': 'dropped_events',
+      '3': 80,
+      '4': 1,
+      '5': 13,
+      '9': 10,
+      '10': 'droppedEvents',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_block_start'},
@@ -1056,6 +1065,7 @@ const InferenceEvent$json = {
     {'1': '_attempt'},
     {'1': '_seq_pos'},
     {'1': '_peer_count'},
+    {'1': '_dropped_events'},
   ],
 };
 
@@ -1075,10 +1085,11 @@ final $typed_data.Uint8List inferenceEventDescriptor = $convert.base64Decode(
     'FQb3OIAQESLgoHZmFpbHVyZRgyIAEoDjIULmt3YWFpLnYxLkhvcEZhaWx1cmVSB2ZhaWx1cmUS'
     'FAoFbW9kZWwYPCABKAlSBW1vZGVsEh0KCmRodF9wcmVmaXgYPSABKAlSCWRodFByZWZpeBIiCg'
     'pwZWVyX2NvdW50GD4gASgNSAlSCXBlZXJDb3VudIgBARIdCgpjaXJjdWl0X2lkGD8gASgJUglj'
-    'aXJjdWl0SWQSKgoEaG9wcxhGIAMoCzIWLmt3YWFpLnYxLkluZmVyZW5jZUhvcFIEaG9wc0IOCg'
-    'xfYmxvY2tfc3RhcnRCDAoKX2Jsb2NrX2VuZEIPCg1fdG90YWxfYmxvY2tzQhEKD19jb3ZlcmVk'
-    'X2Jsb2Nrc0IOCgxfZHVyYXRpb25fbXNCDgoMX3Rva2VuX2luZGV4QhIKEF9jYW5kaWRhdGVfaW'
-    '5kZXhCCgoIX2F0dGVtcHRCCgoIX3NlcV9wb3NCDQoLX3BlZXJfY291bnQ=');
+    'aXJjdWl0SWQSKgoEaG9wcxhGIAMoCzIWLmt3YWFpLnYxLkluZmVyZW5jZUhvcFIEaG9wcxIqCg'
+    '5kcm9wcGVkX2V2ZW50cxhQIAEoDUgKUg1kcm9wcGVkRXZlbnRziAEBQg4KDF9ibG9ja19zdGFy'
+    'dEIMCgpfYmxvY2tfZW5kQg8KDV90b3RhbF9ibG9ja3NCEQoPX2NvdmVyZWRfYmxvY2tzQg4KDF'
+    '9kdXJhdGlvbl9tc0IOCgxfdG9rZW5faW5kZXhCEgoQX2NhbmRpZGF0ZV9pbmRleEIKCghfYXR0'
+    'ZW1wdEIKCghfc2VxX3Bvc0INCgtfcGVlcl9jb3VudEIRCg9fZHJvcHBlZF9ldmVudHM=');
 
 @$core.Deprecated('Use chatMessageDescriptor instead')
 const ChatMessage$json = {

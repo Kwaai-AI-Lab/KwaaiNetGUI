@@ -215,15 +215,18 @@ class InferencePhase extends $pb.ProtobufEnum {
       InferencePhase._(8, _omitEnumNames ? '' : 'INFERENCE_PHASE_HOP_OK');
 
   /// A hop failed. Sets everything HOP_START does, plus duration_ms,
-  /// message (the error) and failure. Followed by either a HOP_START
-  /// for the next candidate at the same block_start, or a
-  /// PATH_REBUILD when no candidate is left.
+  /// message (the error) and failure. Followed by a HOP_START for the
+  /// next candidate at the same block_start; when none is left, by
+  /// PATH_REBUILD, or by the operation's Error if this token's one
+  /// rebuild was already spent.
   static const InferencePhase INFERENCE_PHASE_HOP_FAILED =
       InferencePhase._(9, _omitEnumNames ? '' : 'INFERENCE_PHASE_HOP_FAILED');
 
-  /// Every candidate for a block position failed; the path is being
-  /// rebuilt and the token retried. The KV cache is lost at this
-  /// point, so output may degrade. Sets: block_start, message, attempt.
+  /// No candidate could serve block_start, so the path is being rebuilt
+  /// and the token retried once. Usually follows HOP_FAILED, but comes
+  /// alone when no peer covered block_start at all. The KV cache is
+  /// lost, so output may degrade. Sets: block_start, message, attempt,
+  /// token_index, is_prefill, session_id, seq_pos.
   static const InferencePhase INFERENCE_PHASE_PATH_REBUILD = InferencePhase._(
       10, _omitEnumNames ? '' : 'INFERENCE_PHASE_PATH_REBUILD');
 
@@ -235,7 +238,8 @@ class InferencePhase extends $pb.ProtobufEnum {
       11, _omitEnumNames ? '' : 'INFERENCE_PHASE_TOKEN_SAMPLED');
 
   /// Generation finished. Sets: token_index (total generated),
-  /// duration_ms (whole run) and message (the stop reason).
+  /// duration_ms (whole run), message (the stop reason) and
+  /// dropped_events. Never itself dropped.
   static const InferencePhase INFERENCE_PHASE_COMPLETE =
       InferencePhase._(12, _omitEnumNames ? '' : 'INFERENCE_PHASE_COMPLETE');
 

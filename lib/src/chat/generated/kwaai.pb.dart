@@ -563,10 +563,6 @@ class ServerFrame extends $pb.GeneratedMessage {
   /// only when ShardRunRequest.events was set. Interleaved with
   /// `token` bodies on the same id, and never terminal — the
   /// operation still ends with Done or Error.
-  ///
-  /// Tags 15-18 are claimed by in-flight work (block coverage,
-  /// storage discovery, network, connect); this starts at 19 so
-  /// the two land together without renumbering.
   @$pb.TagNumber(19)
   InferenceEvent get inferenceEvent => $_getN(10);
   @$pb.TagNumber(19)
@@ -1024,8 +1020,9 @@ class ShardRunRequest extends $pb.GeneratedMessage {
   /// channel with the tokens, so producing them unasked adds
   /// backpressure to the path the user is actually waiting on.
   ///
-  /// A daemon predating this field ignores it and emits no events. See
-  /// InferenceEvent for how a client tells that apart from a quiet run.
+  /// A daemon predating this field ignores it. One that honours it emits
+  /// RESOLVED before any token or Done, so a token or Done with no event
+  /// before it means an old daemon.
   @$pb.TagNumber(5)
   $core.bool get events => $_getBF(4);
   @$pb.TagNumber(5)
@@ -3026,6 +3023,7 @@ class InferenceEvent extends $pb.GeneratedMessage {
     $core.int? peerCount,
     $core.String? circuitId,
     $core.Iterable<InferenceHop>? hops,
+    $core.int? droppedEvents,
   }) {
     final result = create();
     if (elapsedMs != null) result.elapsedMs = elapsedMs;
@@ -3052,6 +3050,7 @@ class InferenceEvent extends $pb.GeneratedMessage {
     if (peerCount != null) result.peerCount = peerCount;
     if (circuitId != null) result.circuitId = circuitId;
     if (hops != null) result.hops.addAll(hops);
+    if (droppedEvents != null) result.droppedEvents = droppedEvents;
     return result;
   }
 
@@ -3102,6 +3101,8 @@ class InferenceEvent extends $pb.GeneratedMessage {
     ..aOS(63, _omitFieldNames ? '' : 'circuitId')
     ..pPM<InferenceHop>(70, _omitFieldNames ? '' : 'hops',
         subBuilder: InferenceHop.create)
+    ..aI(80, _omitFieldNames ? '' : 'droppedEvents',
+        fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3274,9 +3275,9 @@ class InferenceEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(43)
   void clearAttempt() => $_clearField(43);
 
-  /// Whether the action this event reports succeeded. Only meaningful
-  /// for PEER_DIAL, where a failed dial is routine rather than fatal —
-  /// the peer may still be reachable when the hop is actually made.
+  /// Whether the action this event reports succeeded. Meaningful for
+  /// PEER_DIAL, where a failed dial is routine rather than fatal (the
+  /// peer may still be reachable at hop time); always true on HOP_OK.
   @$pb.TagNumber(44)
   $core.bool get ok => $_getBF(15);
   @$pb.TagNumber(44)
@@ -3369,6 +3370,18 @@ class InferenceEvent extends $pb.GeneratedMessage {
   /// ── Route (CHAIN_PINNED only) ──
   @$pb.TagNumber(70)
   $pb.PbList<InferenceHop> get hops => $_getList(23);
+
+  /// ── Delivery (COMPLETE only) ──
+  /// Progress events dropped because this client fell behind. Non-zero
+  /// means some earlier events are missing, not that they never happened.
+  @$pb.TagNumber(80)
+  $core.int get droppedEvents => $_getIZ(24);
+  @$pb.TagNumber(80)
+  set droppedEvents($core.int value) => $_setUnsignedInt32(24, value);
+  @$pb.TagNumber(80)
+  $core.bool hasDroppedEvents() => $_has(24);
+  @$pb.TagNumber(80)
+  void clearDroppedEvents() => $_clearField(80);
 }
 
 class ChatMessage extends $pb.GeneratedMessage {
