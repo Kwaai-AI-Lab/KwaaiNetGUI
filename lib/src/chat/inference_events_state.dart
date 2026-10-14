@@ -73,6 +73,7 @@ class InferenceRunLog {
     this.totalBlocks = 0,
     this.droppedFromFront = 0,
     this.startedAt,
+    this.eventsRequested = true,
   });
 
   /// Most recent events, oldest first, capped at [kMaxInferenceEvents].
@@ -120,6 +121,10 @@ class InferenceRunLog {
 
   final DateTime? startedAt;
 
+  /// False for a run sent while the panel was closed, which the panel then
+  /// labels instead of showing the previous run's log as current.
+  final bool eventsRequested;
+
   InferenceRunLog copyWith({
     List<pb.InferenceEvent>? events,
     List<InferenceHopView>? chain,
@@ -133,6 +138,7 @@ class InferenceRunLog {
     int? totalBlocks,
     int? droppedFromFront,
     DateTime? startedAt,
+    bool? eventsRequested,
   }) => InferenceRunLog(
     events: events ?? this.events,
     chain: chain ?? this.chain,
@@ -146,6 +152,7 @@ class InferenceRunLog {
     totalBlocks: totalBlocks ?? this.totalBlocks,
     droppedFromFront: droppedFromFront ?? this.droppedFromFront,
     startedAt: startedAt ?? this.startedAt,
+    eventsRequested: eventsRequested ?? this.eventsRequested,
   );
 }
 
@@ -184,9 +191,15 @@ class InferenceEventsNotifier extends Notifier<InferenceRunLog> {
   }
 
   /// Begin a run: clears the previous one and marks this one in flight.
-  void startRun() {
+  ///
+  /// [eventsRequested] is false when the run asked the daemon for nothing.
+  void startRun({bool eventsRequested = true}) {
     _clearWorking();
-    state = InferenceRunLog(running: true, startedAt: DateTime.now());
+    state = InferenceRunLog(
+      running: true,
+      startedAt: DateTime.now(),
+      eventsRequested: eventsRequested,
+    );
   }
 
   void _clearWorking() {
@@ -293,6 +306,7 @@ class InferenceEventsNotifier extends Notifier<InferenceRunLog> {
       totalBlocks: _totalBlocks,
       droppedFromFront: _dropped,
       startedAt: state.startedAt,
+      eventsRequested: state.eventsRequested,
     );
   }
 

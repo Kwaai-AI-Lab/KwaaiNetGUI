@@ -108,8 +108,8 @@ What a vast and fascinating topic! Here are some bullet points about the univers
     ref.read(chatSlowNoticeProvider(_path).notifier).state = null;
   }
 
-  /// Stop the panel's spinner on every path that ends a run, rather than
-  /// trusting the event stream to close.
+  /// Stop the panel's spinner on every path that ends a run; a run sent
+  /// without events has no event stream to end it.
   void _endEventsRun() {
     if (_path == ChatPath.shardRun) {
       ref.read(inferenceEventsProvider.notifier).endRun();
@@ -135,7 +135,11 @@ What a vast and fascinating topic! Here are some bullet points about the univers
     final wantEvents =
         _path == ChatPath.shardRun && ref.read(inferencePanelEnabledProvider);
     final eventsNotifier = ref.read(inferenceEventsProvider.notifier);
-    if (wantEvents) eventsNotifier.startRun();
+    // Every distributed run starts one, so a panel opened mid-run never
+    // passes off the previous run's log as this one's.
+    if (_path == ChatPath.shardRun) {
+      eventsNotifier.startRun(eventsRequested: wantEvents);
+    }
 
     // Slow-run notices. The subscription is kept so it can be torn down
     // with the run — the notice stream is broadcast and closes itself, but

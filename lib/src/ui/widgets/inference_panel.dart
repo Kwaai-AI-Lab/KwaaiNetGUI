@@ -551,9 +551,14 @@ class _EmptyStateState extends State<_EmptyState> {
     final waitedOut = _graceElapsed;
 
     final String message;
-    if (!log.running && !log.sawAnyEvent) {
+    if (log.startedAt == null) {
       message = 'Send a message to see how it is routed.';
-    } else if (log.running && !log.sawAnyEvent && waitedOut) {
+    } else if (!log.eventsRequested) {
+      message =
+          'The panel was closed when this message was sent.\n'
+          'Send another to see how it is routed.';
+    } else if (!log.sawAnyEvent && (waitedOut || !log.running)) {
+      // A finished run with no events says the same as a long silence.
       message =
           'This daemon does not report inference events.\n'
           'Update it to see block-level routing.';

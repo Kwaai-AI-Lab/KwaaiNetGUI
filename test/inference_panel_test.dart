@@ -248,4 +248,37 @@ void main() {
       findsOneWidget,
     );
   });
+
+  /// The explanation must outlast the run, or a user who looks once the
+  /// answer is in sees only the idle prompt.
+  testWidgets('keeps the old-daemon message after the run ends', (
+    tester,
+  ) async {
+    final notifier = container.read(inferenceEventsProvider.notifier);
+    notifier.startRun();
+    await tester.pumpWidget(_host(container));
+
+    // Ends inside the grace period, with nothing heard.
+    notifier.endRun();
+    await tester.pump();
+    expect(
+      find.textContaining('does not report inference events'),
+      findsOneWidget,
+    );
+
+    await tester.pump(const Duration(seconds: 9));
+    expect(
+      find.textContaining('does not report inference events'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('labels a run sent while the panel was closed', (tester) async {
+    final notifier = container.read(inferenceEventsProvider.notifier);
+    notifier.startRun(eventsRequested: false);
+    await tester.pumpWidget(_host(container));
+    await tester.pump(const Duration(seconds: 9));
+    expect(find.textContaining('panel was closed'), findsOneWidget);
+    expect(find.textContaining('does not report'), findsNothing);
+  });
 }
