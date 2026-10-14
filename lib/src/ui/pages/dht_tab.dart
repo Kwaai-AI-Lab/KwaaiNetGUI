@@ -632,7 +632,7 @@ class _RecordDetail extends StatelessWidget {
                   ? 'Values incomplete — showing ${detail!.subkeys.length} of '
                         '${detail!.subkeyCount} subkeys; the rest did not fit '
                         'in one reply.'
-                  : 'Value withheld — it is too large for one reply.',
+                  : 'Value withheld — it did not fit in this reply.',
             ),
             const SizedBox(height: 6),
           ],
