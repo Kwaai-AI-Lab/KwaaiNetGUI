@@ -387,14 +387,15 @@ class SessionClient {
 
   /// `kwaainet rag init` — create a knowledge base.
   ///
-  /// Empty [kb] means "default" and empty [embedModel] means the daemon's
-  /// configured default; both are resolved daemon-side, so the reply is
-  /// what the KB actually became rather than what was asked for. Init on an
-  /// existing KB is a no-op that returns it with its documents intact.
+  /// Empty [kb] means "default". Empty [embedModel] means the daemon's
+  /// default for a new KB and the current model for an existing one, so the
+  /// reply is what the KB actually became. Init on an existing KB keeps its
+  /// documents.
   ///
   /// Errors with UNAVAILABLE when Ollama isn't reachable or the embedding
-  /// model is missing; that message is written for a user to act on, so
-  /// callers should show it rather than replacing it.
+  /// model is missing, INVALID_ARGUMENT when [embedModel] would change the
+  /// model of a KB holding documents, and UNIMPLEMENTED for a remote KB.
+  /// Their messages are written for a user, so callers should show them.
   Future<pb.RagInitReply> ragInit({
     String kb = '',
     String embedModel = '',
@@ -452,7 +453,7 @@ class SessionClient {
 
   /// `kwaainet rag delete` — remove [docName] and every chunk it produced.
   ///
-  /// [docName] is a name as it appears in `RagKb.docs`, not a path: the
+  /// [docName] is a `RagDoc.name` from `RagKb.documents`, not a path: the
   /// daemon deletes what it recorded at ingest, so a caller passes back
   /// what a status reply gave it.
   ///
@@ -489,8 +490,8 @@ class SessionClient {
   /// [docName] (default: the file's basename, whose extension picks the
   /// daemon's parser) and the size, then the file as rag_ingest_data pieces
   /// of at most [pieceBytes] under the same id. The file is streamed, never
-  /// held whole in memory: at most [windowBytes] go unacknowledged by the
-  /// daemon's per-piece RECEIVING progress before the read pauses.
+  /// held whole in memory: at most [maxUnackedPieces] pieces go unacknowledged
+  /// by the daemon's per-piece RECEIVING progress before the read pauses.
   ///
   /// Unlike the other three ops this is long-running and reports as it
   /// works, so it returns an operation rather than a bare Future: progress
@@ -498,12 +499,15 @@ class SessionClient {
   /// completes [RagIngestOperation.done]. Both come off the same router, so
   /// a caller may ignore progress entirely and still get the reply. A read
   /// failure mid-upload cancels the op and completes [done] with that error.
+  /// An empty file, or one over [kRagIngestMaxBytes], fails without sending.
+  ///
+  /// [maxUnackedPieces] exists for tests and may only lower the daemon's 8.
   RagIngestOperation ragIngest({
     required File file,
     String kb = '',
     String? docName,
     int pieceBytes = kRagIngestPieceBytes,
-    int windowBytes = kRagIngestWindowBytes,
+    int maxUnackedPieces = kRagIngestMaxUnackedPieces,
   }) {
     ensureOpen();
     if (_closed || _outbound == null) {
@@ -518,6 +522,12 @@ class SessionClient {
       size = file.lengthSync();
     } on FileSystemException catch (e) {
       return _failedIngest(e);
+    }
+    if (size == 0) return _failedIngest(RagFileRejected('The file is empty.'));
+    if (size > kRagIngestMaxBytes) {
+      return _failedIngest(
+        RagFileRejected('Files over 256 MB can\'t be added.'),
+      );
     }
     final id = _nextId++;
     final controller = StreamController<pb.ServerFrame>();
@@ -542,8 +552,9 @@ class SessionClient {
     final progress = StreamController<pb.RagProgress>();
     final done = Completer<pb.RagIngestReply>();
 
-    // Bytes the daemon has acknowledged; the uploader waits on [ackWaiter].
+    // Pieces the daemon has acknowledged, one RECEIVING frame each, in order.
     var acked = 0;
+    var cancelled = false;
     Completer<void>? ackWaiter;
     void wakeUploader() {
       final w = ackWaiter;
@@ -556,9 +567,8 @@ class SessionClient {
         switch (f.whichBody()) {
           case pb.ServerFrame_Body.ragProgress:
             final p = f.ragProgress;
-            if (p.phase == pb.RagProgress_RagPhase.RAG_PHASE_RECEIVING &&
-                p.done > acked) {
-              acked = p.done;
+            if (p.phase == pb.RagProgress_RagPhase.RAG_PHASE_RECEIVING) {
+              acked++;
               wakeUploader();
             }
             if (!progress.isClosed) progress.add(p);
@@ -591,16 +601,17 @@ class SessionClient {
     );
 
     // Stops on any end of the op: daemon reply/error, a cancel, or teardown.
-    bool stopped() => done.isCompleted || !identical(_outbound, out);
+    bool stopped() =>
+        cancelled || done.isCompleted || !identical(_outbound, out);
     // Wake a window wait on any end too, so it can see stopped() and return.
     done.future.then(
       (_) => wakeUploader(),
       onError: (Object _) => wakeUploader(),
     );
-    // A window smaller than one piece could never admit it.
-    final window = windowBytes < pieceBytes ? pieceBytes : windowBytes;
-    Future<void> room(int sent, int len) async {
-      while (!stopped() && sent - acked + len > window) {
+    // Never above the daemon's buffer: a ninth unacked piece fails the ingest.
+    final window = maxUnackedPieces.clamp(1, kRagIngestMaxUnackedPieces);
+    Future<void> room(int sent) async {
+      while (!stopped() && sent - acked >= window) {
         await (ackWaiter ??= Completer<void>()).future;
       }
     }
@@ -627,6 +638,13 @@ class SessionClient {
       id: id,
       progress: progress.stream,
       done: done.future,
+      onCancel: () async {
+        if (cancelled || done.isCompleted) return;
+        // Stop sending now; [done] settles with the daemon's CANCELLED.
+        cancelled = true;
+        wakeUploader();
+        await cancel(id);
+      },
     );
   }
 
@@ -646,12 +664,13 @@ class SessionClient {
     int size,
     int pieceBytes,
     bool Function() stopped,
-    Future<void> Function(int sent, int len) room,
+    Future<void> Function(int sentPieces) room,
   ) async {
     var sent = 0;
+    var pieces = 0;
     // Leaving the loop early cancels openRead's subscription: the read stops.
     await for (final piece in ragPieces(file.openRead(), pieceBytes)) {
-      await room(sent, piece.length);
+      await room(pieces);
       if (stopped()) return;
       sent += piece.length;
       if (sent > size) {
@@ -662,6 +681,7 @@ class SessionClient {
           ..id = Int64(id)
           ..ragIngestData = (pb.RagIngestData()..data = piece),
       );
+      pieces++;
       await _outboundWritable();
     }
     if (!stopped() && sent != size) {
@@ -762,9 +782,13 @@ class SessionClient {
 /// Size of each rag_ingest_data piece; well under the daemon's 4 MiB frame cap.
 const kRagIngestPieceBytes = 256 * 1024;
 
-/// Most upload bytes allowed in flight unacknowledged (8 pieces). grpc-dart
-/// does not surface HTTP/2 flow control, so this is what bounds memory.
-const kRagIngestWindowBytes = 8 * kRagIngestPieceBytes;
+/// Most upload pieces in flight unacknowledged: the daemon buffers 8, and a
+/// ninth fails the ingest. grpc-dart hides HTTP/2 flow control, so this also
+/// bounds memory.
+const kRagIngestMaxUnackedPieces = 8;
+
+/// Largest document the daemon accepts.
+const kRagIngestMaxBytes = 256 * 1024 * 1024;
 
 /// Regroup [source]'s chunks into pieces of exactly [size] bytes (the last
 /// may be shorter). Pull-driven: the source pauses while a piece is pending.
@@ -933,9 +957,16 @@ class RagIngestOperation {
     required this.id,
     required this.progress,
     required this.done,
+    this.onCancel,
   });
 
   final int? id;
+
+  /// What [cancel] runs; null for an op that never sent anything.
+  final Future<void> Function()? onCancel;
+
+  /// Stop uploading and send a Cancel for [id]; [done] then fails CANCELLED.
+  Future<void> cancel() async => onCancel?.call();
 
   /// Phase/counter updates while the ingest runs. Closes when the
   /// operation ends, however it ends. Safe to ignore.
@@ -944,6 +975,16 @@ class RagIngestOperation {
   /// Chunks stored and vectors uploaded, or an error — including
   /// SessionOpError(code=UNAVAILABLE) when Ollama went away mid-ingest.
   final Future<pb.RagIngestReply> done;
+}
+
+/// A file the daemon would refuse, rejected before anything is sent.
+class RagFileRejected implements Exception {
+  RagFileRejected(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 /// Thrown into a per-op stream when the server emits Error for that id.

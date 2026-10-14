@@ -94,11 +94,24 @@ void main() {
     },
   );
 
-  test('an empty file sends no data frames', () async {
-    final file = writeFile('empty.txt', 0);
+  test('an empty file fails without sending anything', () async {
+    // The daemon rejects size 0, so don't announce one.
+    final op = session.ragIngest(file: writeFile('empty.txt', 0));
+    expect(op.id, isNull);
+    await expectLater(op.done, throwsA(isA<RagFileRejected>()));
+    await pumpEventQueue();
+    expect(service.frames, isEmpty);
+  });
+
+  test('a file over 256 MiB fails without sending anything', () async {
+    final file = File('${tmp.path}/huge.pdf');
+    // Sparse: only the length is read before the check.
+    file.openSync(mode: FileMode.write)
+      ..truncateSync(kRagIngestMaxBytes + 1)
+      ..closeSync();
     final op = session.ragIngest(file: file);
-    await op.done.timeout(const Duration(seconds: 5));
-    expect(service.frames.single.ragIngest.size.toInt(), 0);
+    expect(op.id, isNull);
+    await expectLater(op.done, throwsA(isA<RagFileRejected>()));
   });
 
   test('a read that comes up short fails the ingest and cancels it', () async {
@@ -139,27 +152,29 @@ void main() {
     expect(seen.last.total, 5000);
   });
 
-  group('in-flight window', () {
+  group('piece window', () {
     const piece = 1000;
-    const window = 4 * piece;
     const pieces = 20;
 
-    test('stalls at the window until acks arrive, then completes', () async {
+    test('sends exactly 8 unacked pieces, then completes on acks', () async {
       service.withholdAcks = true;
-      final file = writeFile('slow.txt', piece * pieces);
-      final op = session.ragIngest(
-        file: file,
-        pieceBytes: piece,
-        windowBytes: window,
-      );
+      final file = writeFile('slow.txt', piece * pieces + 17);
+      final op = session.ragIngest(file: file, pieceBytes: piece);
 
-      await service.receivedAtLeast(window);
+      await service.receivedAtLeast(kRagIngestMaxUnackedPieces * piece);
       // Room for a violation to show: nothing more may arrive unacked.
       await Future<void>.delayed(const Duration(milliseconds: 100));
-      expect(service.received, window);
+      expect(service.pieces, kRagIngestMaxUnackedPieces);
+
+      // One ack reopens exactly one slot.
+      service.ackOne();
+      await service.receivedAtLeast(9 * piece);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(service.pieces, 9);
 
       service.releaseAcks();
       await op.done.timeout(const Duration(seconds: 5));
+      expect(service.pieces, pieces + 1);
       final joined = [
         for (final f in service.frames.where((f) => f.hasRagIngestData()))
           ...f.ragIngestData.data,
@@ -167,26 +182,44 @@ void main() {
       expect(joined, file.readAsBytesSync());
     });
 
-    test('a window under one piece still admits a piece', () async {
-      final file = writeFile('tiny-window.txt', 3 * piece);
+    test('a larger window is capped at the daemon\'s 8', () async {
+      service.withholdAcks = true;
+      final file = writeFile('capped.txt', piece * pieces);
       final op = session.ragIngest(
         file: file,
         pieceBytes: piece,
-        windowBytes: 1,
+        maxUnackedPieces: 32,
       );
+      await service.receivedAtLeast(kRagIngestMaxUnackedPieces * piece);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(service.pieces, kRagIngestMaxUnackedPieces);
+
+      service.releaseAcks();
       await op.done.timeout(const Duration(seconds: 5));
-      expect(service.received, 3 * piece);
+    });
+
+    test('a smaller window may lower it', () async {
+      service.withholdAcks = true;
+      final file = writeFile('narrow.txt', piece * pieces);
+      final op = session.ragIngest(
+        file: file,
+        pieceBytes: piece,
+        maxUnackedPieces: 2,
+      );
+      await service.receivedAtLeast(2 * piece);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(service.pieces, 2);
+
+      service.releaseAcks();
+      await op.done.timeout(const Duration(seconds: 5));
+      expect(service.received, piece * pieces);
     });
 
     test('a daemon error while stalled ends the op promptly', () async {
       service.withholdAcks = true;
       final file = writeFile('fails.txt', piece * pieces);
-      final op = session.ragIngest(
-        file: file,
-        pieceBytes: piece,
-        windowBytes: window,
-      );
-      await service.receivedAtLeast(window);
+      final op = session.ragIngest(file: file, pieceBytes: piece);
+      await service.receivedAtLeast(kRagIngestMaxUnackedPieces * piece);
 
       service.failIngest();
       await expectLater(
@@ -194,18 +227,14 @@ void main() {
         throwsA(isA<SessionOpError>()),
       );
       await Future<void>.delayed(const Duration(milliseconds: 100));
-      expect(service.received, window);
+      expect(service.pieces, kRagIngestMaxUnackedPieces);
     });
 
     test('closing the session while stalled ends the op promptly', () async {
       service.withholdAcks = true;
       final file = writeFile('closes.txt', piece * pieces);
-      final op = session.ragIngest(
-        file: file,
-        pieceBytes: piece,
-        windowBytes: window,
-      );
-      await service.receivedAtLeast(window);
+      final op = session.ragIngest(file: file, pieceBytes: piece);
+      await service.receivedAtLeast(kRagIngestMaxUnackedPieces * piece);
 
       await session.close();
       await expectLater(
@@ -213,21 +242,47 @@ void main() {
         throwsA(isA<SessionEndedError>()),
       );
     });
+
+    test('cancel sends Cancel for the op id and stops sending', () async {
+      service.withholdAcks = true;
+      final file = writeFile('cancel.txt', piece * pieces);
+      final op = session.ragIngest(file: file, pieceBytes: piece);
+      await service.receivedAtLeast(kRagIngestMaxUnackedPieces * piece);
+
+      await op.cancel();
+      final cancel = await service.cancel.future.timeout(
+        const Duration(seconds: 5),
+      );
+      expect(cancel.targetId.toInt(), op.id);
+      await expectLater(
+        op.done.timeout(const Duration(seconds: 2)),
+        throwsA(isA<SessionOpError>().having((e) => e.code, 'code', 4)),
+      );
+      // Acks arriving after the cancel must not release more pieces.
+      service.releaseAcks();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(service.pieces, kRagIngestMaxUnackedPieces);
+    });
   });
 }
 
 /// Records ClientFrames and plays the daemon: acks each piece with RECEIVING
 /// progress (unless [withholdAcks]) and replies once the full size arrives.
+/// A Cancel ends the ingest with CANCELLED, as the daemon does.
 class _IngestService extends pbgrpc.KwaaiNetServiceBase {
   final frames = <pb.ClientFrame>[];
   final cancel = Completer<pb.Cancel>();
   bool withholdAcks = false;
   int received = 0;
+  int pieces = 0;
 
   final _out = StreamController<pb.ServerFrame>();
   final _progress = StreamController<int>.broadcast();
+  // Byte offset at the end of each piece not yet acked, in order.
+  final _unacked = <int>[];
   Int64 _id = Int64.ZERO;
   int _size = -1;
+  bool _ended = false;
 
   Future<void> receivedAtLeast(int n) async {
     if (received >= n) return;
@@ -236,9 +291,16 @@ class _IngestService extends pbgrpc.KwaaiNetServiceBase {
         .timeout(const Duration(seconds: 5));
   }
 
+  void ackOne() {
+    if (_unacked.isNotEmpty) _ack(_unacked.removeAt(0));
+  }
+
   void releaseAcks() {
     withholdAcks = false;
-    _ack();
+    while (_unacked.isNotEmpty) {
+      ackOne();
+    }
+    if (received == _size) _reply();
   }
 
   void failIngest() => _out.add(
@@ -249,12 +311,12 @@ class _IngestService extends pbgrpc.KwaaiNetServiceBase {
         ..message = 'cancelled'),
   );
 
-  void _ack() => _out.add(
+  void _ack(int done) => _out.add(
     pb.ServerFrame()
       ..id = _id
       ..ragProgress = pb.RagProgress(
         phase: pb.RagProgress_RagPhase.RAG_PHASE_RECEIVING,
-        done: received,
+        done: done,
         total: _size,
       ),
   );
@@ -268,6 +330,13 @@ class _IngestService extends pbgrpc.KwaaiNetServiceBase {
       (f) {
         if (f.hasCancel()) {
           if (!cancel.isCompleted) cancel.complete(f.cancel);
+          _ended = true;
+          failIngest();
+          _out.add(
+            pb.ServerFrame()
+              ..id = f.id
+              ..done = pb.Done(),
+          );
           return;
         }
         frames.add(f);
@@ -276,28 +345,36 @@ class _IngestService extends pbgrpc.KwaaiNetServiceBase {
           _size = f.ragIngest.size.toInt();
         } else if (f.hasRagIngestData()) {
           received += f.ragIngestData.data.length;
+          pieces++;
           _progress.add(received);
-          if (!withholdAcks) _ack();
+          if (withholdAcks) {
+            _unacked.add(received);
+          } else {
+            _ack(received);
+          }
         }
-        if (received == _size) {
-          _out
-            ..add(
-              pb.ServerFrame()
-                ..id = _id
-                ..ragIngest = pb.RagIngestReply(chunksIngested: 1),
-            )
-            ..add(
-              pb.ServerFrame()
-                ..id = _id
-                ..done = pb.Done(),
-            );
-          _size = -1;
-        }
+        if (received == _size && _unacked.isEmpty) _reply();
       },
       onError: (Object _) => _out.close(),
       onDone: _out.close,
     );
     return _out.stream;
+  }
+
+  void _reply() {
+    if (_ended) return;
+    _out
+      ..add(
+        pb.ServerFrame()
+          ..id = _id
+          ..ragIngest = pb.RagIngestReply(chunksIngested: 1),
+      )
+      ..add(
+        pb.ServerFrame()
+          ..id = _id
+          ..done = pb.Done(),
+      );
+    _size = -1;
   }
 
   @override

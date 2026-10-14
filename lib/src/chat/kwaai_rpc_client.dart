@@ -509,7 +509,7 @@ class KwaaiRpcClient {
   }
 
   /// Create a knowledge base. Empty [kb] means "default"; empty
-  /// [embedModel] means the daemon's configured default.
+  /// [embedModel] keeps an existing KB's model, or the daemon's default.
   ///
   /// No timeout: init pulls the embedding model on first use, which on a
   /// cold Ollama is a multi-minute download. Cutting that off would leave
