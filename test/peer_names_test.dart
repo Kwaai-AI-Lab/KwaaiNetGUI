@@ -82,6 +82,56 @@ void main() {
       await sub.cancel();
     });
 
+    test('a source that errors after emitting keeps its names', () async {
+      final blocks = StreamController<Map<String, String>>();
+      final storage = StreamController<Map<String, String>>();
+      final out = <Map<String, String>>[];
+      var closed = false;
+      final sub = mergePeerNameStreams(
+        blocks.stream,
+        storage.stream,
+      ).listen(out.add, onDone: () => closed = true);
+
+      storage.add({'C': 'gamma'});
+      await pumpEventQueue();
+      storage.addError(StateError('UNIMPLEMENTED'));
+      await storage.close();
+      await pumpEventQueue();
+      expect(closed, isFalse, reason: 'blocks is still open');
+
+      blocks.add({'A': 'alpha'});
+      await blocks.close();
+      await pumpEventQueue();
+
+      expect(out.last, {'A': 'alpha', 'C': 'gamma'});
+      expect(closed, isTrue);
+      await sub.cancel();
+    });
+
+    test('an unchanged merge is not re-emitted', () async {
+      final blocks = StreamController<Map<String, String>>();
+      final storage = StreamController<Map<String, String>>();
+      final out = <Map<String, String>>[];
+      final sub = mergePeerNameStreams(
+        blocks.stream,
+        storage.stream,
+      ).listen(out.add);
+
+      blocks.add({'A': 'alpha'});
+      await pumpEventQueue();
+      blocks.add({'A': 'alpha'});
+      storage.add(const {});
+      await pumpEventQueue();
+      storage.add({'C': 'gamma'});
+      await pumpEventQueue();
+
+      expect(out, [
+        {'A': 'alpha'},
+        {'A': 'alpha', 'C': 'gamma'},
+      ]);
+      await sub.cancel();
+    });
+
     test('cancelling the result cancels both sources', () async {
       var cancelled = 0;
       final blocks = StreamController<Map<String, String>>(

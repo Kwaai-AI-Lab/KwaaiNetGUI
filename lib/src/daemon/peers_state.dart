@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../chat/generated/kwaai.pb.dart' as pb;
@@ -37,6 +38,9 @@ final peersProvider = StreamProvider.autoDispose<pb.NetworkUpdate>((
 /// Derived from the block-coverage and storage-registry feeds rather than its
 /// own RPC, at a 60 s cadence with storage probes skipped: watching this must
 /// not start the Sharding tab's 5 s crawl or dial every Eve.
+///
+/// Coverage is read for this node's own model only, so a name shows just for
+/// peers serving that model or in the VPK registry; anyone else reads '—'.
 final peerNamesProvider = StreamProvider.autoDispose<Map<String, String>>((
   ref,
 ) {
@@ -72,8 +76,8 @@ Map<String, String> mergePeerNames(
 ) => {...storage, ...blocks};
 
 /// Emits [mergePeerNames] of the latest map from each source whenever either
-/// updates. A source's error or end keeps its last names; cancelling the
-/// result cancels both sources.
+/// updates and the result changed. A source's error is logged and its end
+/// keeps its last names; cancelling the result cancels both sources.
 Stream<Map<String, String>> mergePeerNameStreams(
   Stream<Map<String, String>> blocks,
   Stream<Map<String, String>> storage,
@@ -82,9 +86,16 @@ Stream<Map<String, String>> mergePeerNameStreams(
   var fromStorage = const <String, String>{};
   final subs = <StreamSubscription<Map<String, String>>>[];
   late final StreamController<Map<String, String>> out;
+  Map<String, String>? last;
   var open = 2;
   void done() {
     if (--open == 0) out.close();
+  }
+
+  void emit() {
+    final merged = mergePeerNames(fromBlocks, fromStorage);
+    if (last != null && mapEquals(last, merged)) return;
+    out.add(last = merged);
   }
 
   out = StreamController<Map<String, String>>(
@@ -93,9 +104,9 @@ Stream<Map<String, String>> mergePeerNameStreams(
         blocks.listen(
           (names) {
             fromBlocks = names;
-            out.add(mergePeerNames(fromBlocks, fromStorage));
+            emit();
           },
-          onError: (Object _) {},
+          onError: (Object e) => debugPrint('peer names: blocks feed: $e'),
           onDone: done,
         ),
       );
@@ -103,9 +114,9 @@ Stream<Map<String, String>> mergePeerNameStreams(
         storage.listen(
           (names) {
             fromStorage = names;
-            out.add(mergePeerNames(fromBlocks, fromStorage));
+            emit();
           },
-          onError: (Object _) {},
+          onError: (Object e) => debugPrint('peer names: storage feed: $e'),
           onDone: done,
         ),
       );

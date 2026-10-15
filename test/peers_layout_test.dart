@@ -54,7 +54,12 @@ pb.NetworkUpdate _update({int connected = 3, int routing = 3}) {
 
 Widget _host(pb.NetworkUpdate update, {Size size = const Size(900, 700)}) {
   return ProviderScope(
-    overrides: [peersProvider.overrideWith((ref) => Stream.value(update))],
+    overrides: [
+      peersProvider.overrideWith((ref) => Stream.value(update)),
+      peerNamesProvider.overrideWith(
+        (ref) => Stream.value(const <String, String>{}),
+      ),
+    ],
     child: MaterialApp(
       theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
       home: Scaffold(
@@ -303,7 +308,12 @@ void main() {
     addTearDown(controller.close);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [peersProvider.overrideWith((ref) => controller.stream)],
+        overrides: [
+          peersProvider.overrideWith((ref) => controller.stream),
+          peerNamesProvider.overrideWith(
+            (ref) => Stream.value(const <String, String>{}),
+          ),
+        ],
         child: MaterialApp(
           theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
           home: const Scaffold(
