@@ -116,6 +116,7 @@ class _PeersTabState extends ConsumerState<PeersTab> {
   @override
   Widget build(BuildContext context) {
     final network = ref.watch(peersProvider);
+    final names = ref.watch(peerNamesProvider).valueOrNull ?? const {};
     final fresh = network.valueOrNull;
     // Identity, not equality: `valueOrNull` re-serves the last emitted value on
     // every rebuild, so stamping the arrival time whenever it is non-null would
@@ -187,6 +188,7 @@ class _PeersTabState extends ConsumerState<PeersTab> {
           child: _TableSection(
             connected: update.connected,
             routing: update.routing,
+            names: names,
             localProtocols: update.hasSelfStatus()
                 ? update.selfStatus.localProtocols
                 : const [],
@@ -738,6 +740,7 @@ class _TableSection extends StatefulWidget {
   const _TableSection({
     required this.connected,
     required this.routing,
+    required this.names,
     required this.localProtocols,
     required this.selectedPeerId,
     required this.onSelectPeer,
@@ -746,6 +749,9 @@ class _TableSection extends StatefulWidget {
 
   final List<pb.ConnectedPeer> connected;
   final List<pb.RoutingPeer> routing;
+
+  /// Announced names by peer id, from [peerNamesProvider].
+  final Map<String, String> names;
 
   /// What this node itself advertises. The protocol filter offers the union
   /// of this and everything the connected peers advertise — one discovered
@@ -801,7 +807,7 @@ class _TableSectionState extends State<_TableSection> {
               (_showDhtClients || !r.isDhtClient) &&
               (_showUnconnected || r.isConnected) &&
               (_protocolFilter.isEmpty || r.advertisesAny(_protocolFilter)) &&
-              r.matches(_search),
+              r.matches(_search, name: widget.names[r.peerId]),
         )
         .toList();
     // What the table is actually withholding — zero once everything is shown.
@@ -856,6 +862,7 @@ class _TableSectionState extends State<_TableSection> {
                 )
               : _PeerTable(
                   rows: rows,
+                  names: widget.names,
                   selectedPeerId: widget.selectedPeerId,
                   onSelectPeer: widget.onSelectPeer,
                   onConnect: widget.onConnect,
@@ -1003,17 +1010,18 @@ class PeerRow {
   /// has already lower-cased — normalising once per build rather than once per
   /// row per field.
   ///
-  /// Identity and reachability text only: peer id, agent version, and every
-  /// address or relay we hold, live or routing-table. The state columns are
+  /// Identity and reachability text only: peer id, announced [name] (passed
+  /// in, as names come from a separate feed), agent version, and every address
+  /// or relay we hold, live or routing-table. The state columns are
   /// deliberately not searched — CONN/DHT/PATH have their own toggles, and a
   /// substring match on them would quietly overlap those controls.
   ///
   /// The peer id is matched whole while the row shows it truncated, so a
   /// pasted id matches on the middle the row does not display.
-  bool matches(String needle) {
+  bool matches(String needle, {String? name}) {
     if (needle.isEmpty) return true;
     bool has(String s) => s.toLowerCase().contains(needle);
-    if (has(peerId)) return true;
+    if (has(peerId) || (name != null && has(name))) return true;
     for (final c in connections) {
       if (has(c.agentVersion) || has(c.addr) || has(c.via)) return true;
     }
@@ -1084,16 +1092,46 @@ List<PeerRow> mergePeerRows(
   return rows;
 }
 
+/// A peer's announced name, ellipsised past a fixed width with the whole name
+/// in a tooltip; '—' when none is known.
+class _NameCell extends StatelessWidget {
+  const _NameCell({required this.name, required this.style});
+
+  final String? name;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = this.name;
+    if (name == null) return Text('—', style: style);
+    return Tooltip(
+      message: name,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 160),
+        child: Text(
+          name,
+          style: style,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
+  }
+}
+
 /// The merged peer table. One row per peer; selecting a row expands it.
 class _PeerTable extends StatelessWidget {
   const _PeerTable({
     required this.rows,
+    required this.names,
     required this.selectedPeerId,
     required this.onSelectPeer,
     required this.onConnect,
   });
 
   final List<PeerRow> rows;
+  final Map<String, String> names;
   final String? selectedPeerId;
   final void Function(String peerId) onSelectPeer;
   final Future<bool> Function(String peerId) onConnect;
@@ -1137,6 +1175,12 @@ class _PeerTable extends StatelessWidget {
                 DataColumn(label: Text('RTT', style: headStyle), numeric: true),
                 DataColumn(label: Text('ROLE', style: headStyle)),
                 DataColumn(label: Text('VERSION', style: headStyle)),
+                DataColumn(
+                  label: Text('NAME', style: headStyle),
+                  tooltip:
+                      'Announced name, known only for peers serving this '
+                      'node\'s model or in the VPK registry',
+                ),
                 DataColumn(label: Text('PEER ID', style: headStyle)),
                 DataColumn(label: Text('ADDRESS', style: headStyle)),
               ],
@@ -1199,6 +1243,9 @@ class _PeerTable extends StatelessWidget {
                               : '—',
                           style: cellStyle,
                         ),
+                      ),
+                      DataCell(
+                        _NameCell(name: names[r.peerId], style: cellStyle),
                       ),
                       DataCell(
                         Row(

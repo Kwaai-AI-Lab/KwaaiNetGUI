@@ -276,8 +276,11 @@ class SessionClient {
   ///
   /// The default cadence matches the daemon's: a round dials every
   /// advertised node, so this is deliberately far slower than the
-  /// block-coverage feed.
-  StorageDiscoveryOperation storageDiscoverySubscribe({int intervalSecs = 30}) {
+  /// block-coverage feed. [skipProbes] drops the dials and the second update.
+  StorageDiscoveryOperation storageDiscoverySubscribe({
+    int intervalSecs = 30,
+    bool skipProbes = false,
+  }) {
     ensureOpen();
     if (_closed || _outbound == null) {
       return StorageDiscoveryOperation(
@@ -298,7 +301,8 @@ class SessionClient {
         ..id = Int64(id)
         ..storageDiscovery = (pb.StorageDiscoveryRequest()
           ..subscribe = true
-          ..intervalSecs = intervalSecs),
+          ..intervalSecs = intervalSecs
+          ..skipProbes = skipProbes),
     );
     // As with block coverage, no silence watchdog: a subscription is
     // legitimately quiet while the daemon's p2p layer comes up, and
