@@ -22,6 +22,28 @@ const int kDefaultGrpcPort = 8093;
 /// Environment variable naming the port to reach the daemon on.
 const String kGrpcPortEnvVar = 'KWAAINET_GRPC_PORT';
 
+/// Environment variable naming the daemon's token file, for a daemon whose
+/// `run/` dir is not this app's (a bed container, via its bind mount). A path
+/// rather than the value, so a daemon restart's new token is still picked up.
+const String kGrpcTokenFileEnvVar = 'KWAAINET_GRPC_TOKEN_FILE';
+
+/// The token to send: the file [envFile] names if set, else [defaultFile].
+/// Null when the file is missing or empty, which is also what a pre-auth
+/// daemon looks like, so the request goes out bare and still works there.
+String? resolveGrpcToken({
+  required String? envFile,
+  required String defaultFile,
+}) {
+  final named = envFile?.trim();
+  final path = (named != null && named.isNotEmpty) ? named : defaultFile;
+  try {
+    final token = File(path).readAsStringSync().trim();
+    return token.isEmpty ? null : token;
+  } on FileSystemException {
+    return null;
+  }
+}
+
 /// Longest usable Unix socket path. macOS caps `sun_path` at 104 bytes
 /// including the terminator; Linux is 108. Take the smaller.
 const int kMaxUnixSocketPathBytes = 103;
@@ -207,7 +229,10 @@ class KwaaiRpcClient {
       final session = await _sessionOrInit();
       await session.ping().timeout(const Duration(seconds: 2));
       _publish(RpcConnection.connected);
-    } catch (_) {
+    } catch (e) {
+      if (e is GrpcError && e.code == StatusCode.unauthenticated) {
+        _log('daemon rejected the gRPC token — check $kGrpcTokenFileEnvVar');
+      }
       _publish(RpcConnection.disconnected);
       // Drop the dead channel so the next probe tries a fresh
       // _openChannel — important when the daemon was restarted and
@@ -243,7 +268,18 @@ class KwaaiRpcClient {
     // produces a connecting/disconnected loop in the UI even when
     // pings are succeeding. The periodic ping probe is the only
     // source of truth.
-    final stub = pbgrpc.KwaaiNetClient(channel);
+    // Re-read on every new channel: the daemon draws a fresh token per
+    // start, and a failed probe resets the channel, so a restart heals here.
+    final token = resolveGrpcToken(
+      envFile: Platform.environment[kGrpcTokenFileEnvVar],
+      defaultFile: KwaainetPaths.grpcTokenFile,
+    );
+    final stub = pbgrpc.KwaaiNetClient(
+      channel,
+      options: token == null
+          ? null
+          : CallOptions(metadata: {'authorization': 'Bearer $token'}),
+    );
     _stub = stub;
     return stub;
   }
