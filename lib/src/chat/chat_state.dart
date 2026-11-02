@@ -40,6 +40,7 @@ enum ChatPath {
 class ChatTranscriptNotifier
     extends FamilyNotifier<List<ChatMessage>, ChatPath> {
   StreamSubscription<String>? _sub;
+  StreamSubscription<SessionSlowNotice>? _slowSub;
   Timer? _bumpTimer;
 
   /// Daemon-side id of the in-flight operation, used to tell the daemon
@@ -62,6 +63,7 @@ class ChatTranscriptNotifier
   List<ChatMessage> build(ChatPath arg) {
     ref.onDispose(() {
       _sub?.cancel();
+      _slowSub?.cancel();
       _bumpTimer?.cancel();
     });
     // Screenshot aid, not a user feature: seed a canned transcript so
@@ -96,6 +98,14 @@ What a vast and fascinating topic! Here are some bullet points about the univers
 * The universe is divided into:
 \t+ **Galaxies**: massive, gravitationally bound systems''';
 
+  /// Tear down the slow-run notice. Called on every path that ends a run,
+  /// so a "still working" bar can never outlive the work it describes.
+  void _clearSlow() {
+    _slowSub?.cancel();
+    _slowSub = null;
+    ref.read(chatSlowNoticeProvider(_path).notifier).state = null;
+  }
+
   /// Send [prompt] and stream the response into a new assistant message.
   /// Returns when the stream completes.
   Future<void> send(String prompt) async {
@@ -108,14 +118,28 @@ What a vast and fascinating topic! Here are some bullet points about the univers
     final client = ref.read(kwaaiRpcClientProvider);
     _operationId = null;
     void captureId(int? id) => _operationId = id;
+
+    // Slow-run notices. The subscription is kept so it can be torn down
+    // with the run — the notice stream is broadcast and closes itself, but
+    // a cancel drops us out before that.
+    ref.read(chatSlowNoticeProvider(_path).notifier).state = null;
+    void watchSlow(Stream<SessionSlowNotice> notices) {
+      _slowSub?.cancel();
+      _slowSub = notices.listen((n) {
+        ref.read(chatSlowNoticeProvider(_path).notifier).state = n;
+      });
+    }
+
     final stream = switch (_path) {
       ChatPath.shardRun => client.chatStreamCancellable(
         prompt,
         onOperationId: captureId,
+        onSlow: watchSlow,
       ),
       ChatPath.generateLocal => client.generateLocalCancellable(
         prompt,
         onOperationId: captureId,
+        onSlow: watchSlow,
       ),
     };
     final completer = Completer<void>();
@@ -148,6 +172,7 @@ What a vast and fascinating topic! Here are some bullet points about the univers
             : ChatError(code: 0, message: e.toString());
         assistant.streaming = false;
         _flushBump();
+        _clearSlow();
         _sub = null;
         _operationId = null;
         if (!completer.isCompleted) completer.complete();
@@ -156,6 +181,7 @@ What a vast and fascinating topic! Here are some bullet points about the univers
         _log('[${_path.name}] < ${assistant.text}');
         assistant.streaming = false;
         _flushBump();
+        _clearSlow();
         _sub = null;
         // Stream finished on its own: there is nothing left to cancel,
         // so drop the id to keep a later stop from targeting a
@@ -193,6 +219,7 @@ What a vast and fascinating topic! Here are some bullet points about the univers
     // Unconditional: a pending bump must be cleared even when the last
     // message wasn't mid-stream, so it can't fire after teardown.
     _flushBump();
+    _clearSlow();
   }
 
   /// Drop the transcript and abort any in-flight stream. Backs the
@@ -213,6 +240,7 @@ What a vast and fascinating topic! Here are some bullet points about the univers
     // against the emptied transcript a frame later.
     _bumpTimer?.cancel();
     _bumpTimer = null;
+    _clearSlow();
     state = [];
   }
 
@@ -259,3 +287,12 @@ final chatStreamingProvider = Provider.family<bool, ChatPath>((ref, path) {
   final msgs = ref.watch(chatTranscriptProvider(path));
   return msgs.isNotEmpty && msgs.last.streaming;
 });
+
+/// Set while the in-flight run is slow to produce its first token, null
+/// otherwise.
+///
+/// Deliberately separate from [ChatMessage.error]: this is not a failure and
+/// must not render as one. Distributed prefill takes as long as it takes,
+/// and the only decision to be made — keep waiting or stop — is the user's.
+final chatSlowNoticeProvider =
+    StateProvider.family<SessionSlowNotice?, ChatPath>((_, _) => null);

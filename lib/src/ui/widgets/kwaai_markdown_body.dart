@@ -93,7 +93,8 @@ class KwaaiMarkdownBody extends StatelessWidget {
       // Style rather than a widget builder: an InlineSpan stays on the text
       // baseline and is selectable, which the old highlightBuilder was not.
       inlineCodeStyle: InlineCodeStyle(
-        fontFamily: 'monospace',
+        fontFamily: kwaaiMonoFamily,
+        fontFamilyFallback: kwaaiMonoFallback,
         fontSizeFactor: 0.92,
         backgroundColor: scheme.onSurface.withValues(alpha: 0.08),
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
@@ -131,7 +132,8 @@ class _CodeBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final mono = Theme.of(context).textTheme.bodySmall?.copyWith(
-      fontFamily: 'monospace',
+      fontFamily: kwaaiMonoFamily,
+      fontFamilyFallback: kwaaiMonoFallback,
       color: scheme.onSurface,
       height: 1.4,
     );

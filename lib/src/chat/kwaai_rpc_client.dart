@@ -327,10 +327,12 @@ class KwaaiRpcClient {
   Stream<String> chatStreamCancellable(
     String prompt, {
     required void Function(int? operationId) onOperationId,
+    void Function(Stream<SessionSlowNotice>)? onSlow,
   }) async* {
     final session = await _sessionOrInit();
     final op = session.shardRunOp(prompt);
     onOperationId(op.id);
+    onSlow?.call(op.slow);
     try {
       yield* op.tokens;
     } catch (e) {
@@ -343,10 +345,12 @@ class KwaaiRpcClient {
   Stream<String> generateLocalCancellable(
     String prompt, {
     required void Function(int? operationId) onOperationId,
+    void Function(Stream<SessionSlowNotice>)? onSlow,
   }) async* {
     final session = await _sessionOrInit();
     final op = session.generateOp(prompt);
     onOperationId(op.id);
+    onSlow?.call(op.slow);
     try {
       yield* op.tokens;
     } catch (e) {
