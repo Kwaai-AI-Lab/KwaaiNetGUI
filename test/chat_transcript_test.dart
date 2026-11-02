@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kwaainet_gui/src/chat/chat_state.dart';
+import 'package:kwaainet_gui/src/chat/generated/kwaai.pb.dart' as pb;
+import 'package:kwaainet_gui/src/chat/inference_events_state.dart';
 import 'package:kwaainet_gui/src/chat/kwaai_rpc_client.dart';
 import 'package:kwaainet_gui/src/chat/session_client.dart';
 
@@ -47,6 +49,7 @@ abstract class _FakeClient extends KwaaiRpcClient {
   Stream<String> chatStreamCancellable(
     String prompt, {
     required void Function(int? operationId) onOperationId,
+    void Function(Stream<pb.InferenceEvent>)? onEvents,
     void Function(Stream<SessionSlowNotice>)? onSlow,
   }) {
     onOperationId(operationId);
@@ -139,6 +142,7 @@ class _SlowClient extends _FakeClient {
   Stream<String> chatStreamCancellable(
     String prompt, {
     required void Function(int? operationId) onOperationId,
+    void Function(Stream<pb.InferenceEvent>)? onEvents,
     void Function(Stream<SessionSlowNotice>)? onSlow,
   }) {
     onOperationId(operationId);
@@ -473,6 +477,24 @@ void main() {
     // resurrect the cleared transcript.
     await Future<void>.delayed(const Duration(milliseconds: 120));
     expect(container.read(chatTranscriptProvider(ChatPath.shardRun)), isEmpty);
+  });
+
+  test('a run sent with the panel closed still ends the panel\'s run', () async {
+    final container = ProviderContainer(
+      overrides: [
+        kwaaiRpcClientProvider.overrideWithValue(_StubClient(const ['ok'])),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(chatTranscriptProvider(ChatPath.shardRun).notifier)
+        .send('hi');
+
+    final log = container.read(inferenceEventsProvider);
+    expect(log.startedAt, isNotNull, reason: 'the previous run is not current');
+    expect(log.eventsRequested, isFalse);
+    expect(log.running, isFalse, reason: 'no event stream will end it');
   });
 
   test('a slow run raises a notice, not an error', () async {

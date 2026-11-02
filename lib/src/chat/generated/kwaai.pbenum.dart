@@ -151,6 +151,163 @@ class StorageReachability extends $pb.ProtobufEnum {
   const StorageReachability._(super.value, super.name);
 }
 
+/// What stage of a distributed run an InferenceEvent describes.
+///
+/// Open enum: a client that does not recognise a value must render the
+/// event's `message` generically rather than dropping it, so a newer
+/// daemon's added phases stay legible on an older client.
+class InferencePhase extends $pb.ProtobufEnum {
+  static const InferencePhase INFERENCE_PHASE_UNSPECIFIED =
+      InferencePhase._(0, _omitEnumNames ? '' : 'INFERENCE_PHASE_UNSPECIFIED');
+
+  /// Run accepted; model / dht_prefix / total_blocks resolved.
+  /// Sets: model, dht_prefix, total_blocks.
+  static const InferencePhase INFERENCE_PHASE_RESOLVED =
+      InferencePhase._(1, _omitEnumNames ? '' : 'INFERENCE_PHASE_RESOLVED');
+
+  /// A DHT discovery round is starting. Sets: attempt, dht_prefix.
+  static const InferencePhase INFERENCE_PHASE_DISCOVERY_START =
+      InferencePhase._(
+          2, _omitEnumNames ? '' : 'INFERENCE_PHASE_DISCOVERY_START');
+
+  /// A discovery round returned. Sets: attempt, peer_count,
+  /// covered_blocks, total_blocks. peer_count == 0 means the round
+  /// found nothing and another attempt follows, up to the 30s cap.
+  static const InferencePhase INFERENCE_PHASE_DISCOVERY_RESULT =
+      InferencePhase._(
+          3, _omitEnumNames ? '' : 'INFERENCE_PHASE_DISCOVERY_RESULT');
+
+  /// The chain came from a saved circuit rather than the DHT.
+  /// Sets: circuit_id, peer_count.
+  static const InferencePhase INFERENCE_PHASE_CIRCUIT_LOADED = InferencePhase._(
+      4, _omitEnumNames ? '' : 'INFERENCE_PHASE_CIRCUIT_LOADED');
+
+  /// The route for this run was pinned. Sets: hops (ordered, gapless,
+  /// covering [0, total_blocks)) and total_blocks. Re-emitted after a
+  /// rebuild with `attempt` incremented.
+  static const InferencePhase INFERENCE_PHASE_CHAIN_PINNED =
+      InferencePhase._(5, _omitEnumNames ? '' : 'INFERENCE_PHASE_CHAIN_PINNED');
+
+  /// A best-effort dial of a chain member is about to be attempted,
+  /// answered later by a PEER_DIAL for the same peer. Announced up
+  /// front because the dial can take tens of seconds to time out,
+  /// during which a result-only event would leave a client unable to
+  /// say who is being waited on. Sets: peer_id, peer_name, is_self.
+  static const InferencePhase INFERENCE_PHASE_PEER_DIAL_START =
+      InferencePhase._(
+          13, _omitEnumNames ? '' : 'INFERENCE_PHASE_PEER_DIAL_START');
+
+  /// The dial's result. Sets: peer_id, peer_name, ok, and (since
+  /// PEER_DIAL_START was added) duration_ms.
+  static const InferencePhase INFERENCE_PHASE_PEER_DIAL =
+      InferencePhase._(6, _omitEnumNames ? '' : 'INFERENCE_PHASE_PEER_DIAL');
+
+  /// A hop is being dispatched: the coordinator is sending this
+  /// token's activations to the peer serving [block_start, block_end).
+  /// Sets: peer_id, peer_name, block_start, block_end, is_self,
+  /// token_index, is_prefill, candidate_index.
+  static const InferencePhase INFERENCE_PHASE_HOP_START =
+      InferencePhase._(7, _omitEnumNames ? '' : 'INFERENCE_PHASE_HOP_START');
+
+  /// The hop returned its activations (or, from the last hop, logits).
+  /// Sets everything HOP_START does, plus duration_ms.
+  static const InferencePhase INFERENCE_PHASE_HOP_OK =
+      InferencePhase._(8, _omitEnumNames ? '' : 'INFERENCE_PHASE_HOP_OK');
+
+  /// A hop failed. Sets everything HOP_START does, plus duration_ms,
+  /// message (the error) and failure. Followed by a HOP_START for the
+  /// next candidate at the same block_start; when none is left, by
+  /// PATH_REBUILD, or by the operation's Error if this token's one
+  /// rebuild was already spent.
+  static const InferencePhase INFERENCE_PHASE_HOP_FAILED =
+      InferencePhase._(9, _omitEnumNames ? '' : 'INFERENCE_PHASE_HOP_FAILED');
+
+  /// No candidate could serve block_start, so the path is being rebuilt
+  /// and the token retried once. Usually follows HOP_FAILED, but comes
+  /// alone when no peer covered block_start at all. The KV cache is
+  /// lost, so output may degrade. Sets: block_start, message, attempt,
+  /// token_index, is_prefill, session_id, seq_pos.
+  static const InferencePhase INFERENCE_PHASE_PATH_REBUILD = InferencePhase._(
+      10, _omitEnumNames ? '' : 'INFERENCE_PHASE_PATH_REBUILD');
+
+  /// A token was sampled from the logits the last hop returned —
+  /// generation is autoregressive, so every token costs one full pass
+  /// through the chain, and this closes that pass. Sets: token_index,
+  /// is_prefill, duration_ms (wall time for the whole pass).
+  static const InferencePhase INFERENCE_PHASE_TOKEN_SAMPLED = InferencePhase._(
+      11, _omitEnumNames ? '' : 'INFERENCE_PHASE_TOKEN_SAMPLED');
+
+  /// Generation finished. Sets: token_index (total generated),
+  /// duration_ms (whole run), message (the stop reason) and
+  /// dropped_events. Never itself dropped.
+  static const InferencePhase INFERENCE_PHASE_COMPLETE =
+      InferencePhase._(12, _omitEnumNames ? '' : 'INFERENCE_PHASE_COMPLETE');
+
+  static const $core.List<InferencePhase> values = <InferencePhase>[
+    INFERENCE_PHASE_UNSPECIFIED,
+    INFERENCE_PHASE_RESOLVED,
+    INFERENCE_PHASE_DISCOVERY_START,
+    INFERENCE_PHASE_DISCOVERY_RESULT,
+    INFERENCE_PHASE_CIRCUIT_LOADED,
+    INFERENCE_PHASE_CHAIN_PINNED,
+    INFERENCE_PHASE_PEER_DIAL_START,
+    INFERENCE_PHASE_PEER_DIAL,
+    INFERENCE_PHASE_HOP_START,
+    INFERENCE_PHASE_HOP_OK,
+    INFERENCE_PHASE_HOP_FAILED,
+    INFERENCE_PHASE_PATH_REBUILD,
+    INFERENCE_PHASE_TOKEN_SAMPLED,
+    INFERENCE_PHASE_COMPLETE,
+  ];
+
+  static final $core.List<InferencePhase?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 13);
+  static InferencePhase? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const InferencePhase._(super.value, super.name);
+}
+
+/// Why a hop failed, which decides whether the peer stays eligible for
+/// the rest of the run.
+class HopFailure extends $pb.ProtobufEnum {
+  static const HopFailure HOP_FAILURE_UNSPECIFIED =
+      HopFailure._(0, _omitEnumNames ? '' : 'HOP_FAILURE_UNSPECIFIED');
+
+  /// The peer answered but has no inference handler registered
+  /// ("protocols not supported"). Blacklisted for this run.
+  static const HopFailure HOP_FAILURE_NO_HANDLER =
+      HopFailure._(1, _omitEnumNames ? '' : 'HOP_FAILURE_NO_HANDLER');
+
+  /// Stream reset, early eof, or connection closed. NOT blacklisted:
+  /// the peer may recover and is retried on the next token.
+  static const HopFailure HOP_FAILURE_TRANSIENT =
+      HopFailure._(2, _omitEnumNames ? '' : 'HOP_FAILURE_TRANSIENT');
+
+  /// Exceeded the per-hop deadline. Blacklisted for this run.
+  static const HopFailure HOP_FAILURE_TIMEOUT =
+      HopFailure._(3, _omitEnumNames ? '' : 'HOP_FAILURE_TIMEOUT');
+
+  /// Anything else. Blacklisted for this run.
+  static const HopFailure HOP_FAILURE_OTHER =
+      HopFailure._(4, _omitEnumNames ? '' : 'HOP_FAILURE_OTHER');
+
+  static const $core.List<HopFailure> values = <HopFailure>[
+    HOP_FAILURE_UNSPECIFIED,
+    HOP_FAILURE_NO_HANDLER,
+    HOP_FAILURE_TRANSIENT,
+    HOP_FAILURE_TIMEOUT,
+    HOP_FAILURE_OTHER,
+  ];
+
+  static final $core.List<HopFailure?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static HopFailure? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const HopFailure._(super.value, super.name);
+}
+
 class Error_Code extends $pb.ProtobufEnum {
   static const Error_Code UNKNOWN =
       Error_Code._(0, _omitEnumNames ? '' : 'UNKNOWN');

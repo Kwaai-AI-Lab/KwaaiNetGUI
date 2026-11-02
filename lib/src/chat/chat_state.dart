@@ -3,7 +3,9 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../settings.dart';
 import 'chat_message.dart';
+import 'inference_events_state.dart';
 import 'kwaai_rpc_client.dart';
 import 'session_client.dart';
 
@@ -106,6 +108,14 @@ What a vast and fascinating topic! Here are some bullet points about the univers
     ref.read(chatSlowNoticeProvider(_path).notifier).state = null;
   }
 
+  /// Stop the panel's spinner on every path that ends a run; a run sent
+  /// without events has no event stream to end it.
+  void _endEventsRun() {
+    if (_path == ChatPath.shardRun) {
+      ref.read(inferenceEventsProvider.notifier).endRun();
+    }
+  }
+
   /// Send [prompt] and stream the response into a new assistant message.
   /// Returns when the stream completes.
   Future<void> send(String prompt) async {
@@ -118,6 +128,18 @@ What a vast and fascinating topic! Here are some bullet points about the univers
     final client = ref.read(kwaaiRpcClientProvider);
     _operationId = null;
     void captureId(int? id) => _operationId = id;
+
+    // Only the distributed path has a route to narrate, and only ask the
+    // daemon for the detail when the panel is actually open — producing it
+    // is real work on its side.
+    final wantEvents =
+        _path == ChatPath.shardRun && ref.read(inferencePanelEnabledProvider);
+    final eventsNotifier = ref.read(inferenceEventsProvider.notifier);
+    // Every distributed run starts one, so a panel opened mid-run never
+    // passes off the previous run's log as this one's.
+    if (_path == ChatPath.shardRun) {
+      eventsNotifier.startRun(eventsRequested: wantEvents);
+    }
 
     // Slow-run notices. The subscription is kept so it can be torn down
     // with the run — the notice stream is broadcast and closes itself, but
@@ -134,6 +156,7 @@ What a vast and fascinating topic! Here are some bullet points about the univers
       ChatPath.shardRun => client.chatStreamCancellable(
         prompt,
         onOperationId: captureId,
+        onEvents: wantEvents ? eventsNotifier.ingest : null,
         onSlow: watchSlow,
       ),
       ChatPath.generateLocal => client.generateLocalCancellable(
@@ -173,6 +196,7 @@ What a vast and fascinating topic! Here are some bullet points about the univers
         assistant.streaming = false;
         _flushBump();
         _clearSlow();
+        _endEventsRun();
         _sub = null;
         _operationId = null;
         if (!completer.isCompleted) completer.complete();
@@ -182,6 +206,7 @@ What a vast and fascinating topic! Here are some bullet points about the univers
         assistant.streaming = false;
         _flushBump();
         _clearSlow();
+        _endEventsRun();
         _sub = null;
         // Stream finished on its own: there is nothing left to cancel,
         // so drop the id to keep a later stop from targeting a
@@ -220,6 +245,7 @@ What a vast and fascinating topic! Here are some bullet points about the univers
     // message wasn't mid-stream, so it can't fire after teardown.
     _flushBump();
     _clearSlow();
+    _endEventsRun();
   }
 
   /// Drop the transcript and abort any in-flight stream. Backs the
@@ -242,6 +268,11 @@ What a vast and fascinating topic! Here are some bullet points about the univers
     _bumpTimer = null;
     _clearSlow();
     state = [];
+    // The panel describes the transcript we just discarded, so clear it
+    // too rather than leaving a finished run's route on screen.
+    if (_path == ChatPath.shardRun) {
+      ref.read(inferenceEventsProvider.notifier).reset();
+    }
   }
 
   /// Trigger a rebuild without changing the list reference — copying
