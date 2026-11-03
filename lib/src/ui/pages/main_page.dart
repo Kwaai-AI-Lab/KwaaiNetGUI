@@ -21,6 +21,7 @@ import '../widgets/kwaai_chat_composer.dart';
 import '../widgets/kwaai_markdown_body.dart';
 import '../widgets/kwaai_status_bar.dart';
 import '../widgets/service_status_view.dart';
+import 'rag_tab.dart';
 import 'settings_page.dart';
 
 class MainPage extends ConsumerStatefulWidget {
@@ -40,18 +41,19 @@ class MainPage extends ConsumerStatefulWidget {
 }
 
 class _MainPageState extends ConsumerState<MainPage> {
-  /// Index into the currently-visible tab list (`_visibleTabs(...)`).
-  /// Reset to 0 when the visible tab list shrinks so we never point
-  /// past the end.
-  int _selectedTab = 0;
+  /// Label of the selected tab, or null for the first. By label rather than
+  /// index, so toggling a tab on or off doesn't move the selection.
+  String? _selectedLabel;
 
   /// Tabs that are visible based on current settings. The first entry
   /// is always the main chat (shard_run). Additional entries appear
   /// when developer/etc. toggles are on.
   List<_TabSpec> _visibleTabs(WidgetRef ref) {
     final localChatOn = ref.watch(localChatEnabledProvider);
+    final ragOn = ref.watch(ragEnabledProvider);
     return [
       const _TabSpec(label: 'Chat', path: ChatPath.shardRun),
+      if (ragOn) const _TabSpec(label: 'RAG'),
       if (localChatOn)
         const _TabSpec(label: 'Local chat', path: ChatPath.generateLocal),
     ];
@@ -77,7 +79,7 @@ class _MainPageState extends ConsumerState<MainPage> {
   void _onOpenAtChat() {
     if (!mounted) return;
     Navigator.of(context).popUntil((r) => r.isFirst);
-    setState(() => _selectedTab = 0);
+    setState(() => _selectedLabel = null);
   }
 
   @override
@@ -86,9 +88,13 @@ class _MainPageState extends ConsumerState<MainPage> {
     // a pushed Settings route, so the request still lands there.
     ref.listen<int>(openAtChatProvider, (_, _) => _onOpenAtChat());
     final tabs = _visibleTabs(ref);
-    // Clamp selection in case the user just turned off the tab they
+    // Fall back to the first tab if the user just turned off the one they
     // were on (e.g. disabled Local chat from Settings).
-    if (_selectedTab >= tabs.length) _selectedTab = 0;
+    var selectedTab = tabs.indexWhere((t) => t.label == _selectedLabel);
+    if (selectedTab < 0) {
+      selectedTab = 0;
+      _selectedLabel = null;
+    }
 
     return AppShell(
       child: ShellCard(
@@ -107,16 +113,31 @@ class _MainPageState extends ConsumerState<MainPage> {
             _MainTopBar(
               onOpenSettings: _openSettings,
               tabs: tabs.length > 1 ? tabs : const [],
-              selectedTab: _selectedTab,
-              onSelectTab: (i) => setState(() => _selectedTab = i),
+              selectedTab: selectedTab,
+              onSelectTab: (i) =>
+                  setState(() => _selectedLabel = tabs[i].label),
+              // The KB picker belongs to the RAG tab alone; on any other
+              // tab there is nothing for it to scope.
+              showKbPicker: tabs[selectedTab].path == null,
             ),
             const _UpdateBanner(),
             Expanded(
               child: IndexedStack(
-                index: _selectedTab,
+                index: selectedTab,
+                // Keyed so a tab keeps its state when another is toggled in
+                // or out ahead of it.
                 children: [
                   for (final t in tabs)
-                    _ChatTab(path: t.path, onOpenSettings: _openSettings),
+                    KeyedSubtree(
+                      key: ValueKey(t.label),
+                      child: switch (t.path) {
+                        final path? => _ChatTab(
+                          path: path,
+                          onOpenSettings: _openSettings,
+                        ),
+                        null => const RagTab(),
+                      },
+                    ),
                 ],
               ),
             ),
@@ -129,10 +150,15 @@ class _MainPageState extends ConsumerState<MainPage> {
 
 /// Per-tab metadata: display label + which gRPC operation drives the
 /// chat surface.
+///
+/// [path] is null for tabs that aren't a chat surface at all (RAG), which
+/// is what the body switch keys off. Kept as a nullable field rather than a
+/// separate enum because chat tabs remain the common case and every other
+/// tab is defined by what it *isn't* driving.
 class _TabSpec {
-  const _TabSpec({required this.label, required this.path});
+  const _TabSpec({required this.label, this.path});
   final String label;
-  final ChatPath path;
+  final ChatPath? path;
 }
 
 /// The contents of one tab — body + input — driven by a [ChatPath].
@@ -230,6 +256,7 @@ class _MainTopBar extends StatelessWidget {
     this.tabs = const [],
     this.selectedTab = 0,
     this.onSelectTab,
+    this.showKbPicker = false,
   });
 
   final VoidCallback onOpenSettings;
@@ -239,6 +266,10 @@ class _MainTopBar extends StatelessWidget {
   final List<_TabSpec> tabs;
   final int selectedTab;
   final ValueChanged<int>? onSelectTab;
+
+  /// Whether to offer the knowledge-base picker. True only on the RAG
+  /// tab; the picker itself also hides when no KB exists yet.
+  final bool showKbPicker;
 
   @override
   Widget build(BuildContext context) {
@@ -271,6 +302,15 @@ class _MainTopBar extends StatelessWidget {
               ),
             ),
           ],
+          // Two Spacers rather than one: they share the leftover width
+          // equally, which centres the picker between the tab strip and
+          // the settings icon regardless of how wide either grows.
+          const Spacer(),
+          if (showKbPicker)
+            const Padding(
+              padding: EdgeInsets.only(top: tabTop),
+              child: RagKbPicker(),
+            ),
           const Spacer(),
           // No tooltip here, deliberately. This is the one control that both
           // carries a tooltip and pushes an opaque route (Settings). Once that

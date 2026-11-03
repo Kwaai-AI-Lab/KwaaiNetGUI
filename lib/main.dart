@@ -117,6 +117,7 @@ Future<void> main() async {
       inferencePanelEnabledProvider.overrideWith(
         (_) => settings.inferencePanelEnabled,
       ),
+      ragEnabledProvider.overrideWith((_) => settings.ragEnabled),
       // Seed the skipped-version mirror so the update banner suppresses a
       // previously-skipped release on first paint.
       skippedVersionProvider.overrideWith((_) => settings.skippedVersion),
