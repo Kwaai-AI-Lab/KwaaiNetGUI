@@ -306,7 +306,12 @@ class KwaaiRpcClient {
       // letting the TCP fallback look like "the daemon isn't up yet".
       if (utf8.encode(sockPath).length > kMaxUnixSocketPathBytes) {
         _log('socket path too long for this platform, using TCP: $sockPath');
-      } else if (await File(sockPath).exists()) {
+      } else if (!await File(sockPath).exists()) {
+        _log('Unix socket not found, falling back to TCP');
+      } else if (!await _unixSocketListening(sockPath)) {
+        // A daemon killed before its shutdown ran leaves the file behind.
+        _log('Unix socket is stale (nothing listening), falling back to TCP');
+      } else {
         _connectionPath = 'unix://$sockPath';
         _log('opening Unix socket: $sockPath');
         return ClientChannel(
@@ -316,8 +321,6 @@ class KwaaiRpcClient {
             credentials: ChannelCredentials.insecure(),
           ),
         );
-      } else {
-        _log('Unix socket not found, falling back to TCP');
       }
     }
     final port = _tcpPort;
@@ -662,6 +665,22 @@ class KwaaiRpcClient {
     _log('gRPC TCP port $_tcpPort → $value, resetting channel');
     _tcpPort = value;
     unawaited(_resetChannel(silent: true));
+  }
+
+  /// Whether anything accepts on [path]. The file alone proves nothing: it
+  /// outlives a daemon that was SIGKILLed or crashed. A refusal is immediate.
+  static Future<bool> _unixSocketListening(String path) async {
+    try {
+      final probe = await Socket.connect(
+        InternetAddress(path, type: InternetAddressType.unix),
+        0,
+        timeout: const Duration(seconds: 1),
+      );
+      probe.destroy();
+      return true;
+    } on SocketException {
+      return false;
+    }
   }
 
   /// Best-effort Unix socket path matching the daemon's bind location

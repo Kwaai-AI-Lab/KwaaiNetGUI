@@ -1,6 +1,25 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kwaainet_gui/src/chat/kwaai_rpc_client.dart';
+import 'package:kwaainet_gui/src/daemon/paths.dart';
 import 'package:kwaainet_gui/src/daemon/status_watcher.dart';
+
+/// Point [KwaainetPaths.home] at an empty temp dir for the test, so a daemon
+/// or stale socket under the real `~/.kwaainet` cannot pick the transport.
+/// Returns its `run/` dir. systemTemp keeps the path inside sun_path.
+Directory _isolatedRunDir() {
+  final home = Directory.systemTemp.createTempSync('krpc');
+  KwaainetPaths.debugOverrideHome(home.path);
+  addTearDown(() {
+    KwaainetPaths.debugResetHomeCache();
+    home.deleteSync(recursive: true);
+  });
+  return Directory('${home.path}/run')..createSync();
+}
+
+InternetAddress _unix(String path) =>
+    InternetAddress(path, type: InternetAddressType.unix);
 
 /// `run/kwaainet.grpc` is how the GUI finds a live daemon it did not spawn
 /// (its own restart, an out-of-band `kwaainet restart`). The daemon writes it
@@ -49,12 +68,16 @@ void main() {
     });
 
     test('a daemon too old to write the file reads as null, not zero', () {
-      expect(NodeStatus(running: true, pid: 1).withGrpcPort(null).grpcPort,
-          isNull);
+      expect(
+        NodeStatus(running: true, pid: 1).withGrpcPort(null).grpcPort,
+        isNull,
+      );
     });
   });
 
   group('KwaaiRpcClient.tcpPort', () {
+    setUp(_isolatedRunDir);
+
     test('drops the channel so the probe re-dials the new port', () async {
       final client = KwaaiRpcClient();
       addTearDown(client.close);
@@ -90,5 +113,44 @@ void main() {
       client.tcpPort = kDefaultGrpcPort;
       expect(client.debugConnectionPath, path);
     });
+  });
+
+  // Only a channel's path is checked, so a listener that hangs up at once
+  // stands in for the daemon.
+  group('KwaaiRpcClient Unix socket', () {
+    final skip = Platform.isWindows || grpcPortOverridden;
+
+    test('a socket with nothing behind it falls back to TCP', () async {
+      final run = _isolatedRunDir();
+      // Dart unlinks a socket file on close; renaming it first leaves the
+      // file a SIGKILLed daemon would.
+      final server = await ServerSocket.bind(_unix('${run.path}/bind'), 0);
+      File('${run.path}/bind').renameSync(KwaaiRpcClient.unixSocketPath);
+      await server.close();
+      expect(File(KwaaiRpcClient.unixSocketPath).existsSync(), isTrue);
+
+      final client = KwaaiRpcClient();
+      addTearDown(client.close);
+      await client.daemonVersion();
+      expect(client.debugConnectionPath, 'tcp://127.0.0.1:$kDefaultGrpcPort');
+    }, skip: skip);
+
+    test('a listening socket is preferred over TCP', () async {
+      _isolatedRunDir();
+      final server = await ServerSocket.bind(
+        _unix(KwaaiRpcClient.unixSocketPath),
+        0,
+      );
+      addTearDown(server.close);
+      server.listen((s) => s.destroy());
+
+      final client = KwaaiRpcClient();
+      addTearDown(client.close);
+      await client.daemonVersion();
+      expect(
+        client.debugConnectionPath,
+        'unix://${KwaaiRpcClient.unixSocketPath}',
+      );
+    }, skip: skip);
   });
 }
