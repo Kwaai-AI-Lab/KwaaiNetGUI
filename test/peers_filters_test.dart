@@ -50,7 +50,12 @@ pb.NetworkUpdate _update({
   ]);
 
 Widget _host(pb.NetworkUpdate update, {double width = 1100}) => ProviderScope(
-  overrides: [peersProvider.overrideWith((ref) => Stream.value(update))],
+  overrides: [
+    peersProvider.overrideWith((ref) => Stream.value(update)),
+    peerNamesProvider.overrideWith(
+      (ref) => Stream.value(const <String, String>{}),
+    ),
+  ],
   child: MaterialApp(
     theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
     home: Scaffold(

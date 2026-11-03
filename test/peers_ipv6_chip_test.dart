@@ -19,7 +19,12 @@ Widget _host(String ipv6) {
       ..announceable = true
       ..ipv6 = ipv6);
   return ProviderScope(
-    overrides: [peersProvider.overrideWith((ref) => Stream.value(update))],
+    overrides: [
+      peersProvider.overrideWith((ref) => Stream.value(update)),
+      peerNamesProvider.overrideWith(
+        (ref) => Stream.value(const <String, String>{}),
+      ),
+    ],
     child: MaterialApp(
       theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
       home: const Scaffold(

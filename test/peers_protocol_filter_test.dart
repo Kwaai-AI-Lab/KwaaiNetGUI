@@ -59,7 +59,12 @@ Future<void> _pump(WidgetTester tester, Widget host) async {
 }
 
 Widget _host(pb.NetworkUpdate update) => ProviderScope(
-  overrides: [peersProvider.overrideWith((ref) => Stream.value(update))],
+  overrides: [
+    peersProvider.overrideWith((ref) => Stream.value(update)),
+    peerNamesProvider.overrideWith(
+      (ref) => Stream.value(const <String, String>{}),
+    ),
+  ],
   child: MaterialApp(
     theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
     home: const Scaffold(

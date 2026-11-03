@@ -40,15 +40,19 @@ pb.NetworkUpdate _update() => pb.NetworkUpdate()
     ),
   ]);
 
-Widget _host(pb.NetworkUpdate update) => ProviderScope(
-  overrides: [peersProvider.overrideWith((ref) => Stream.value(update))],
-  child: MaterialApp(
-    theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
-    home: const Scaffold(
-      body: SizedBox(width: 1300, height: 700, child: PeersTab()),
-    ),
-  ),
-);
+Widget _host(pb.NetworkUpdate update, {Map<String, String> names = const {}}) =>
+    ProviderScope(
+      overrides: [
+        peersProvider.overrideWith((ref) => Stream.value(update)),
+        peerNamesProvider.overrideWith((ref) => Stream.value(names)),
+      ],
+      child: MaterialApp(
+        theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
+        home: const Scaffold(
+          body: SizedBox(width: 1300, height: 700, child: PeersTab()),
+        ),
+      ),
+    );
 
 Finder _textWith(String fragment) => find.byWidgetPredicate(
   (w) => w is Text && (w.data ?? '').contains(fragment),
@@ -109,6 +113,12 @@ void main() {
       expect(row.matches('192.168'), isFalse);
     });
 
+    test('matches the announced name, case-insensitively', () {
+      expect(row.matches('alpha', name: 'Node-Alpha'), isTrue);
+      expect(row.matches('alpha'), isFalse);
+      expect(row.matches('beta', name: 'Node-Alpha'), isFalse);
+    });
+
     test('matches the part of the id the row abbreviates away', () {
       // The cell shows `12D3KooW…AAONE01`; this lands in the elided middle.
       expect(row.matches('peeronexxx'), isTrue);
@@ -141,6 +151,44 @@ void main() {
     });
   });
 
+  group('NAME column', () {
+    testWidgets('shows an announced name, and a dash without one', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        _host(_update(), names: {'12D3KooWPeerOnexxxxxxxxxxxxxxAAONE01': 'Al'}),
+      );
+      await tester.pumpAndSettle();
+
+      // NAME is the seventh column: CONN DHT PATH RTT ROLE VERSION NAME.
+      Finder nameCell(String peerId) => find.descendant(
+        of: find.byWidget(
+          tester
+              .widget<DataTable>(find.byType(DataTable))
+              .rows
+              .firstWhere((r) => r.key == ValueKey(peerId))
+              .cells[6]
+              .child,
+        ),
+        matching: find.byType(Text),
+        matchRoot: true,
+      );
+      expect(
+        tester
+            .widget<Text>(nameCell('12D3KooWPeerOnexxxxxxxxxxxxxxAAONE01'))
+            .data,
+        'Al',
+      );
+      expect(
+        tester
+            .widget<Text>(nameCell('12D3KooWPeerTwoxxxxxxxxxxxxxxBBTWO02'))
+            .data,
+        '—',
+      );
+    });
+  });
+
   group('search field', () {
     testWidgets('shows every peer until something is typed', (tester) async {
       await _pump(tester, _host(_update()));
@@ -164,6 +212,22 @@ void main() {
       expect(_textWith('AAONE01'), findsNothing);
       // Same accounting as the other filters — a hidden row is never silent.
       expect(_textWith('1 hidden'), findsOneWidget);
+    });
+
+    testWidgets('finds a peer by its announced name', (tester) async {
+      await _pump(
+        tester,
+        _host(
+          _update(),
+          names: {'12D3KooWPeerTwoxxxxxxxxxxxxxxBBTWO02': 'Bob'},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _search(tester, 'BOB');
+
+      expect(_textWith('BBTWO02'), findsOneWidget);
+      expect(_textWith('AAONE01'), findsNothing);
     });
 
     testWidgets('is case-insensitive and ignores surrounding space', (
@@ -201,7 +265,12 @@ void main() {
       addTearDown(updates.close);
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [peersProvider.overrideWith((ref) => updates.stream)],
+          overrides: [
+            peersProvider.overrideWith((ref) => updates.stream),
+            peerNamesProvider.overrideWith(
+              (ref) => Stream.value(const <String, String>{}),
+            ),
+          ],
           child: MaterialApp(
             theme: buildKwaaiTheme(ThemeVariantKey.kwaai, Brightness.dark),
             home: const Scaffold(
