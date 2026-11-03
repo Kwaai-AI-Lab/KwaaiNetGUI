@@ -18,7 +18,7 @@ GUI is read-only and only probes the node over gRPC.
 
 ## Bundled node version
 
-Downloaded builds ship with a `kwaainet` node (and its `p2pd` helper) pulled
+Downloaded builds ship with a `kwaainet` node pulled
 from a pinned [KwaaiNet release](https://github.com/Kwaai-AI-Lab/KwaaiNet/releases).
 The pinned tag lives in [`.kwaainet-version`](../.kwaainet-version); bump it
 (and regenerate the [gRPC bindings](development.md#grpc-bindings) if the RPC
