@@ -61,6 +61,11 @@ class KwaainetPaths {
 
   @visibleForTesting
   static void debugResetHomeCache() => _homeCache = null;
+
+  /// Pin [home] to [path], so a test never reads the developer's real
+  /// `~/.kwaainet`. Undo with [debugResetHomeCache].
+  @visibleForTesting
+  static void debugOverrideHome(String path) => _homeCache = path;
 }
 
 /// Resolve the daemon state directory: `KWAAINET_HOME`, else a project-local
