@@ -42,6 +42,11 @@ class KwaainetPaths {
   static String get grpcPortFile =>
       '$runDir${Platform.pathSeparator}kwaainet.grpc';
 
+  /// The bearer token the running daemon drew at start, owner-readable only.
+  /// Written before the port file and removed on shutdown.
+  static String get grpcTokenFile =>
+      '$runDir${Platform.pathSeparator}kwaainet.token';
+
   static String get configFile => '$home${Platform.pathSeparator}config.yaml';
   static String get logsDir => '$home${Platform.pathSeparator}logs';
 
