@@ -70,7 +70,7 @@ jobs:
             artifact_path: build/macos/Build/Products/Release/KwaaiNet.app
           - os: windows-latest
             target: windows
-            kwaainet_asset: kwaainet-x86_64-pc-windows-msvc.zip
+            kwaainet_asset: kwaainet-x86_64-pc-windows-msvc-cuda-full.zip
             bundle_dir: build/windows/x64/runner/Release
             artifact_path: build/windows/x64/runner/Release
     steps:
@@ -143,8 +143,12 @@ jobs:
           # The Windows zip is flat (kwaainet.exe at the top level).
           Expand-Archive -Path $asset -DestinationPath kw -Force
           Pop-Location
-          Copy-Item "$env:TEMP\kw\kw\kwaainet.exe" "$dest\kwaainet.exe" -Force
-          Write-Host "Bundled kwaainet.exe into ${{ matrix.bundle_dir }}"
+          # The -cuda-full zip carries the CUDA runtime DLLs beside kwaainet.exe;
+          # they must land beside it too, or the node falls back to CPU.
+          Get-ChildItem "$env:TEMP\kw\kw" -File -Include *.exe,*.dll -Recurse |
+            Copy-Item -Destination $dest -Force
+          if (-not (Test-Path "$dest\cublas64_12.dll")) { throw "cublas64_12.dll missing from $asset" }
+          Write-Host "Bundled kwaainet.exe + CUDA DLLs into ${{ matrix.bundle_dir }}"
 
       # ── Package into a single archive that preserves the bundle ────────────
       # We archive ourselves (rather than letting upload-artifact zip the
