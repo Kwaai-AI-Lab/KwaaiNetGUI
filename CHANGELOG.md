@@ -4,6 +4,43 @@ All notable changes to KwaaiNet GUI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-11-06
+
+Bundles kwaainet **v0.7.3**. The bundled node is still the CPU build on
+Windows and Linux; CUDA users can install the CUDA node with KwaaiNet's
+installer and point Settings at it as a custom node.
+
+### Added
+- **Chat: inference panel.** Shows live how a distributed answer is routed:
+  discovery, the pinned chain of peers and block ranges, each dial and hop with
+  its timing, failures and path rebuilds, and the tokens each hop produced.
+  Shows the session id and sequence position that match a hop to the serving
+  peer's log.
+- **RAG tab** (Settings → Experimental). Lets you search your own documents:
+  create knowledge bases, drop files in to ingest them, see results first and
+  delete documents. Documents are uploaded over the daemon session, so this
+  works against a remote daemon too, with a queued ingest you can cancel.
+- **DHT tab.** Lists this node's hivemind DHT records, looks up a key on a peer
+  you pick, and shows decoded values as JSON. It flags truncated listings and
+  withheld values. A peer's routing entry opens from its mark in Peers.
+- **Peers: name column.** Each peer's announced name, searchable.
+- **gRPC bearer token.** The GUI sends the per-start token the daemon now
+  requires on every call.
+
+### Changed
+- Slow chats are no longer failed. The watchdog now measures 10 minutes of
+  *silence* instead of 90 s to the first token, and a notice says the run is
+  slow. This applies to local chat too.
+- The restart-needed notice is its own bar, cleared by the next start.
+- p2pd is no longer bundled; the daemon is native.
+
+### Fixed
+- Code spans, badges and logs render in a font that really is fixed-width on
+  macOS.
+- A leftover Unix socket file with nothing listening no longer makes the GUI
+  connect to a dead daemon.
+- Toggling RAG no longer changes the selected tab.
+
 ## [0.4.0] - 2026-09-04
 
 ### Added
