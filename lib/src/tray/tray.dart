@@ -28,6 +28,24 @@ extension on TrayState {
   };
 }
 
+/// The bundled asset to show as the tray icon, and the file name to write it
+/// to. Windows needs an `.ico`: tray_manager loads it with
+/// `LoadImage(IMAGE_ICON, LR_LOADFROMFILE)`, which returns nothing for a PNG,
+/// so the icon silently never appears and the tray menu (with Quit) is
+/// unreachable.
+({String asset, String fileName}) trayIconAsset({required bool isWindows}) {
+  if (isWindows) {
+    return (
+      asset: 'assets/tray_kwaai_logo.ico',
+      fileName: 'tray_kwaai_logo.ico',
+    );
+  }
+  return (
+    asset: 'assets/tray_kwaai_logo@2x.png',
+    fileName: 'tray_kwaai_logo.png',
+  );
+}
+
 /// Drives the macOS menu-bar tray icon + menu. Reads daemon status and
 /// transition state from Riverpod providers, and dispatches start/stop
 /// actions through them so the main UI sees the same Starting…/Stopping…
@@ -68,10 +86,8 @@ class TrayController with TrayListener {
     // Monochrome logo. macOS menu-bar treats this as a template image and
     // auto-inverts for dark mode. State is communicated via the menu's
     // coloured emoji, not by swapping the tray icon.
-    _iconPath = await _materializeIcon(
-      'assets/tray_kwaai_logo@2x.png',
-      'tray_kwaai_logo.png',
-    );
+    final icon = trayIconAsset(isWindows: Platform.isWindows);
+    _iconPath = await _materializeIcon(icon.asset, icon.fileName);
     await trayManager.setIcon(_iconPath!, isTemplate: true);
     await trayManager.setToolTip('KwaaiNet — ${_statusText.toLowerCase()}');
     trayManager.addListener(this);
