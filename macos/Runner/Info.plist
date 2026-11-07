@@ -22,6 +22,12 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>KwaaiNet connects directly to other KwaaiNet nodes on your local network, instead of relaying that traffic through the internet.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_p2p._udp</string>
+	</array>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHumanReadableCopyright</key>
