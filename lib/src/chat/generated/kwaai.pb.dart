@@ -2639,6 +2639,7 @@ class NetworkUpdate extends $pb.GeneratedMessage {
     $core.Iterable<RoutingPeer>? routing,
     $core.int? bootstrapTotal,
     $core.int? bootstrapReachable,
+    HolePunchStats? holePunch,
   }) {
     final result = create();
     if (serverTime != null) result.serverTime = serverTime;
@@ -2649,6 +2650,7 @@ class NetworkUpdate extends $pb.GeneratedMessage {
     if (bootstrapTotal != null) result.bootstrapTotal = bootstrapTotal;
     if (bootstrapReachable != null)
       result.bootstrapReachable = bootstrapReachable;
+    if (holePunch != null) result.holePunch = holePunch;
     return result;
   }
 
@@ -2678,6 +2680,8 @@ class NetworkUpdate extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OU3)
     ..aI(7, _omitFieldNames ? '' : 'bootstrapReachable',
         fieldType: $pb.PbFieldType.OU3)
+    ..aOM<HolePunchStats>(8, _omitFieldNames ? '' : 'holePunch',
+        subBuilder: HolePunchStats.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2768,6 +2772,153 @@ class NetworkUpdate extends $pb.GeneratedMessage {
   $core.bool hasBootstrapReachable() => $_has(6);
   @$pb.TagNumber(7)
   void clearBootstrapReachable() => $_clearField(7);
+
+  /// Hole punching and relay use since the daemon started. Counters only,
+  /// so not part of the subscription's change identity: they ride along on
+  /// the next update or heartbeat.
+  @$pb.TagNumber(8)
+  HolePunchStats get holePunch => $_getN(7);
+  @$pb.TagNumber(8)
+  set holePunch(HolePunchStats value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasHolePunch() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearHolePunch() => $_clearField(8);
+  @$pb.TagNumber(8)
+  HolePunchStats ensureHolePunch() => $_ensure(7);
+}
+
+/// DCUtR outcomes and relayed connections. A punch is counted per dial, on
+/// both sides of it; one that failed before any dial counts once in each of
+/// `attempted` and `failed`.
+class HolePunchStats extends $pb.GeneratedMessage {
+  factory HolePunchStats({
+    $fixnum.Int64? attempted,
+    $fixnum.Int64? succeeded,
+    $fixnum.Int64? failed,
+    $core.int? relayedConnections,
+    $fixnum.Int64? relayedReleased,
+    $fixnum.Int64? relayedIdled,
+  }) {
+    final result = create();
+    if (attempted != null) result.attempted = attempted;
+    if (succeeded != null) result.succeeded = succeeded;
+    if (failed != null) result.failed = failed;
+    if (relayedConnections != null)
+      result.relayedConnections = relayedConnections;
+    if (relayedReleased != null) result.relayedReleased = relayedReleased;
+    if (relayedIdled != null) result.relayedIdled = relayedIdled;
+    return result;
+  }
+
+  HolePunchStats._();
+
+  factory HolePunchStats.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory HolePunchStats.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'HolePunchStats',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..a<$fixnum.Int64>(
+        1, _omitFieldNames ? '' : 'attempted', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..a<$fixnum.Int64>(
+        2, _omitFieldNames ? '' : 'succeeded', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..a<$fixnum.Int64>(3, _omitFieldNames ? '' : 'failed', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aI(4, _omitFieldNames ? '' : 'relayedConnections',
+        fieldType: $pb.PbFieldType.OU3)
+    ..a<$fixnum.Int64>(
+        5, _omitFieldNames ? '' : 'relayedReleased', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..a<$fixnum.Int64>(
+        6, _omitFieldNames ? '' : 'relayedIdled', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HolePunchStats clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HolePunchStats copyWith(void Function(HolePunchStats) updates) =>
+      super.copyWith((message) => updates(message as HolePunchStats))
+          as HolePunchStats;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static HolePunchStats create() => HolePunchStats._();
+  @$core.override
+  HolePunchStats createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static HolePunchStats getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<HolePunchStats>(create);
+  static HolePunchStats? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get attempted => $_getI64(0);
+  @$pb.TagNumber(1)
+  set attempted($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasAttempted() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAttempted() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get succeeded => $_getI64(1);
+  @$pb.TagNumber(2)
+  set succeeded($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSucceeded() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSucceeded() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get failed => $_getI64(2);
+  @$pb.TagNumber(3)
+  set failed($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFailed() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFailed() => $_clearField(3);
+
+  /// Live connections that run over a relay circuit.
+  @$pb.TagNumber(4)
+  $core.int get relayedConnections => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set relayedConnections($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRelayedConnections() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRelayedConnections() => $_clearField(4);
+
+  /// Relayed connections closed because a confirmed direct one replaced
+  /// them, freeing the relay's circuit slot.
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get relayedReleased => $_getI64(4);
+  @$pb.TagNumber(5)
+  set relayedReleased($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasRelayedReleased() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearRelayedReleased() => $_clearField(5);
+
+  /// Relayed connections closed after the node's short app-idle hold, so a
+  /// session that could not punch does not keep a relay slot.
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get relayedIdled => $_getI64(5);
+  @$pb.TagNumber(6)
+  set relayedIdled($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasRelayedIdled() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearRelayedIdled() => $_clearField(6);
 }
 
 /// `kwaainet vpk discover` — VPK storage nodes from the DHT.

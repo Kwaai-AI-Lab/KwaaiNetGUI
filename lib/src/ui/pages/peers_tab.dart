@@ -179,6 +179,7 @@ class _PeersTabState extends ConsumerState<PeersTab> {
             // Evidence, not capability: a live DCUtR-upgraded connection is
             // proof a peer got through the NAT to us.
             holePunched: update.connected.any((c) => c.dcutr),
+            holePunch: update.hasHolePunch() ? update.holePunch : null,
             stale: stale,
             staleFor: staleFor,
           ),
@@ -325,6 +326,7 @@ class _SelfStatusHeader extends StatelessWidget {
     required this.connectedCount,
     required this.routingCount,
     required this.holePunched,
+    this.holePunch,
     required this.stale,
     required this.staleFor,
   });
@@ -335,6 +337,9 @@ class _SelfStatusHeader extends StatelessWidget {
 
   /// Whether any live connection was upgraded by DCUtR.
   final bool holePunched;
+
+  /// Hole-punch and relay counters; absent from a daemon that predates them.
+  final pb.HolePunchStats? holePunch;
   final bool stale;
   final Duration? staleFor;
 
@@ -374,6 +379,7 @@ class _SelfStatusHeader extends StatelessWidget {
                   // would still take the Wrap's spacing and leave a gap.
                   if (s != null && ipv6Chip(s.ipv6) != null)
                     _Ipv6Chip(ipv6: s.ipv6),
+                  if (holePunch != null) _HolePunchChip(stats: holePunch!),
                 ],
               ),
             ),
@@ -464,6 +470,52 @@ class _SelfStatusHeader extends StatelessWidget {
   'unavailable' => (label: 'IPv6 unavailable', warn: true),
   _ => null,
 };
+
+/// The chip's text and whether it warns: punching failing while traffic still
+/// rides relays is what loads the bootstraps.
+({String label, bool warn}) holePunchChip(pb.HolePunchStats h) {
+  final ok = h.succeeded.toInt();
+  final tried = h.attempted.toInt();
+  final relayed = h.relayedConnections;
+  final label = tried == 0
+      ? 'No hole punches · $relayed relayed'
+      : 'Hole punch $ok/$tried · $relayed relayed';
+  return (label: label, warn: tried > 0 && ok == 0 && relayed > 0);
+}
+
+/// Hole-punch outcomes and live relay use, beside the reachability badge.
+class _HolePunchChip extends StatelessWidget {
+  const _HolePunchChip({required this.stats});
+
+  final pb.HolePunchStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final chip = holePunchChip(stats);
+    final kwaai = context.kwaai;
+    final color = chip.warn ? kwaai.semanticWarning : kwaai.statusRunning;
+
+    return Tooltip(
+      message:
+          'Hole punches succeeded / attempted since the daemon started, and '
+          'connections currently running over a relay.\n'
+          'Relays released after a punch: ${stats.relayedReleased} · '
+          'closed after going quiet: ${stats.relayedIdled}',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          chip.label,
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: color, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+}
 
 /// IPv6 state, beside the reachability badge. Silent unless the node actually
 /// has an IPv6 listener, or asked for one and did not get it.
