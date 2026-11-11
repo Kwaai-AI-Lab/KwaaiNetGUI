@@ -6,6 +6,11 @@ All notable changes to KwaaiNet GUI are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- **Quit leaves the node running when "Start service on startup" is off.**
+  Quit stops the node only when the GUI would have started one at launch.
+  Stop still stops it, and external mode is unchanged.
+
 ### Fixed
 - **Windows: one GUI at a time.** Launching KwaaiNet while it is already
   running brings the existing window forward, including one hidden to the

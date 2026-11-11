@@ -2,8 +2,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kwaainet_gui/src/daemon/daemon_state.dart';
+import 'package:kwaainet_gui/src/settings.dart';
 import 'package:kwaainet_gui/src/window/shutdown.dart';
 import 'package:kwaainet_gui/src/window/window_restore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Stops nothing: these tests are about the window calls around the stop.
 class _NoopTransition extends DaemonTransitionNotifier {
@@ -18,9 +20,13 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const channel = MethodChannel('window_manager');
   late List<String> calls;
+  late Settings settings;
 
-  setUp(() {
+  setUp(() async {
     calls = [];
+    // Defaults: built-in mode, start on startup, so quit stops the node.
+    SharedPreferences.setMockInitialValues({});
+    settings = await Settings.load();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           calls.add(call.method);
@@ -36,7 +42,10 @@ void main() {
 
   ProviderContainer container() {
     final c = ProviderContainer(
-      overrides: [daemonTransitionProvider.overrideWith(_NoopTransition.new)],
+      overrides: [
+        daemonTransitionProvider.overrideWith(_NoopTransition.new),
+        settingsProvider.overrideWithValue(settings),
+      ],
     );
     addTearDown(c.dispose);
     return c;
