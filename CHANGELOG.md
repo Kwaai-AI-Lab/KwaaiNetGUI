@@ -4,6 +4,13 @@ All notable changes to KwaaiNet GUI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **Windows: one GUI at a time.** Launching KwaaiNet while it is already
+  running brings the existing window forward, including one hidden to the
+  tray, instead of starting a second copy with its own tray icon.
+
 ## [0.5.0] - 2026-11-06
 
 Bundles kwaainet **v0.7.3**. The bundled node is still the CPU build on
