@@ -27,13 +27,24 @@ final openAtChatProvider = NotifierProvider<OpenAtChatNotifier, int>(
 ///
 /// The request is made before the window is shown so the tab switch happens
 /// off-screen rather than as a visible flick after it appears.
-Future<void> openMainWindowAtChat(ProviderContainer container) async {
+///
+/// [isWindows] defaults to the host platform; tests pass it explicitly.
+Future<void> openMainWindowAtChat(
+  ProviderContainer container, {
+  bool? isWindows,
+}) async {
   try {
     container.read(openAtChatProvider.notifier).request();
     // The window may be hidden to tray and the Dock icon hidden with it
     // (activation policy = .accessory). Restore both.
     await DockIcon.setVisible(true);
-    await windowManager.setSkipTaskbar(false);
+    // Not on Windows: window_manager 0.5.2's SetSkipTaskbar dereferences a
+    // taskbar list that only waitUntilReadyToShow() creates, which this app
+    // never calls, so it crashes the process. Hiding never removes the
+    // window from the Windows taskbar list, so there is nothing to undo.
+    if (!(isWindows ?? Platform.isWindows)) {
+      await windowManager.setSkipTaskbar(false);
+    }
     await windowManager.show();
     await windowManager.focus();
     _log('window restored at chat');

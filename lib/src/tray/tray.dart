@@ -83,12 +83,14 @@ class TrayController with TrayListener {
 
   Future<void> init() async {
     if (_enabled) return;
-    // Monochrome logo. macOS menu-bar treats this as a template image and
-    // auto-inverts for dark mode. State is communicated via the menu's
-    // coloured emoji, not by swapping the tray icon.
+    // macOS and Linux: a monochrome PNG, which the macOS menu bar treats as a
+    // template image and auto-inverts for dark mode. Windows: the colour
+    // .ico (see [trayIconAsset]); template images do not exist there. State
+    // is communicated via the menu's coloured emoji, not by swapping the
+    // tray icon.
     final icon = trayIconAsset(isWindows: Platform.isWindows);
     _iconPath = await _materializeIcon(icon.asset, icon.fileName);
-    await trayManager.setIcon(_iconPath!, isTemplate: true);
+    await trayManager.setIcon(_iconPath!, isTemplate: !Platform.isWindows);
     await trayManager.setToolTip('KwaaiNet — ${_statusText.toLowerCase()}');
     trayManager.addListener(this);
     // Flip _enabled before _rebuildMenu() — it guards on !_enabled and
@@ -283,11 +285,11 @@ class TrayController with TrayListener {
         _log('quit → performQuit');
         // Shared shutdown: shows "Stopping service…" and runs `kwaainet stop`
         // (reaping the node + its detached children). We deliberately keep the
-        // tray icon in place until performQuit returns — the menu already
+        // tray icon in place until the daemon is down — the menu already
         // reflects DaemonTransition.stopping, so reopening it shows "Stopping"
-        // rather than vanishing. dispose() then runs on the way out.
-        await performQuit(_container);
-        await dispose();
+        // rather than vanishing. dispose() then runs before the window
+        // closes, while the plugin can still answer.
+        await performQuit(_container, beforeClose: dispose);
     }
   }
 

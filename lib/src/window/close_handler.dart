@@ -38,6 +38,12 @@ class WindowCloseHandler with WindowListener {
 
   @override
   void onWindowClose() async {
+    // performQuit closes the window itself on Windows; that close must go
+    // through, not hide to tray or start a second quit.
+    if (_container.read(shuttingDownProvider)) {
+      _log('close during quit → letting it through');
+      return;
+    }
     // Hide to tray only if the tray icon is actually showing — otherwise the
     // app would vanish entirely while the daemon keeps running.
     if (_settings.keepInTrayOnClose && _tray.enabled) {

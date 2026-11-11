@@ -40,7 +40,8 @@ final appContainerProvider = Provider<ProviderContainer>((ref) {
 ///    `kwaainet stop`, so the CLI reaps the node and its detached children
 ///    (shard serve, storage API). We await it so the window doesn't vanish
 ///    before the daemon is actually gone.
-/// 3. Destroy the window / exit.
+/// 3. Run [beforeClose] (the tray removes its icon here), then close the
+///    window to exit.
 ///
 /// When [osTerminating] is true, macOS is already terminating the app (this
 /// was called from applicationShouldTerminate, which replied .terminateLater).
@@ -51,9 +52,13 @@ final appContainerProvider = Provider<ProviderContainer>((ref) {
 /// Idempotent: a second call while already shutting down is a no-op (returns
 /// immediately) so reopening the tray menu and hitting Quit again can't start
 /// a second teardown.
+///
+/// [isWindows] defaults to the host platform; tests pass it explicitly.
 Future<void> performQuit(
   ProviderContainer container, {
   bool osTerminating = false,
+  Future<void> Function()? beforeClose,
+  bool? isWindows,
 }) async {
   if (container.read(shuttingDownProvider)) {
     _log('already shutting down — ignoring repeat quit');
@@ -76,9 +81,27 @@ Future<void> performQuit(
     return;
   }
 
+  if (beforeClose != null) {
+    try {
+      await beforeClose();
+    } catch (e) {
+      _log('beforeClose error (proceeding to quit): $e');
+    }
+  }
+
   try {
     await windowManager.setPreventClose(false);
-    await windowManager.destroy();
+    if (isWindows ?? Platform.isWindows) {
+      // Not destroy(): on Windows that is a bare PostQuitMessage(0), which
+      // ends the message loop with the window and engine still alive, and
+      // the process then crashes in flutter_windows.dll on the way out.
+      // close() takes the runner's own path: WM_CLOSE → DestroyWindow →
+      // WM_DESTROY → FlutterWindow::OnDestroy → PostQuitMessage. It also
+      // raises onWindowClose, which WindowCloseHandler ignores mid-quit.
+      await windowManager.close();
+    } else {
+      await windowManager.destroy();
+    }
   } catch (e) {
     _log('window destroy error (forcing exit): $e');
     exit(0);

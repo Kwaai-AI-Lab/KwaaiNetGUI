@@ -13,6 +13,12 @@ void main() {
     final bytes = File(icon.asset).readAsBytesSync();
     // ICONDIR header: reserved 0, type 1 (icon).
     expect(bytes.sublist(0, 4), [0, 0, 1, 0]);
+    // The tray asks LoadImage for SM_CXSMICON (16 px at 100% scaling), so a
+    // 16 px entry must exist rather than be scaled down from a large one.
+    // ICONDIRENTRY widths start at byte 6, 16 bytes apart; 0 means 256.
+    final count = bytes[4] | (bytes[5] << 8);
+    final widths = [for (var i = 0; i < count; i++) bytes[6 + 16 * i]];
+    expect(widths, containsAll([16, 32, 0]));
   });
 
   test('macOS and Linux keep the template PNG', () {
