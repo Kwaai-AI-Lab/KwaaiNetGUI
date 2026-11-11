@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 import '../settings.dart';
 import 'daemon_env.dart';
 import 'paths.dart';
@@ -166,8 +168,35 @@ class DaemonController {
   /// True while the running node is one this GUI spawned. A node that was
   /// already up when the GUI attached (CLI, a service, an earlier GUI) is the
   /// user's, and quitting the GUI must leave it running.
-  bool get startedNode => _startedNode;
-  bool _startedNode = false;
+  ///
+  /// Keyed to the pid, not a flag: if our node is stopped from the CLI and
+  /// another started, the pid file names the new one and this turns false.
+  bool get startedNode {
+    if (_spawnPending) return true;
+    final owned = _ownedPid;
+    return owned != null && readPid() == owned;
+  }
+
+  /// Between spawning and [claimSpawnedNode]: ours, pid not yet known.
+  bool _spawnPending = false;
+  int? _ownedPid;
+
+  /// Record the node [start] spawned as ours. Call once it is up: `start
+  /// --daemon` re-execs `run-node`, and it is that child's pid the pid file
+  /// holds, not the one [Process.start] returned.
+  /// With no pid file yet, the node stays pending (ours) rather than
+  /// becoming nobody's.
+  void claimSpawnedNode() {
+    if (!_spawnPending) return;
+    final pid = readPid();
+    if (pid == null) return;
+    _ownedPid = pid;
+    _spawnPending = false;
+  }
+
+  /// What [start] records after a spawn, without spawning.
+  @visibleForTesting
+  void debugMarkSpawned() => _spawnPending = true;
 
   int? readPid() {
     final f = File(KwaainetPaths.pidFile);
@@ -213,6 +242,7 @@ class DaemonController {
       );
     }
     Directory(KwaainetPaths.runDir).createSync(recursive: true);
+    _clearStaleRunFiles();
 
     // A port of our own, so a second GUI's daemon is a separate daemon
     // rather than one this app silently shares. The daemon aborts if it
@@ -239,7 +269,7 @@ class DaemonController {
         '--daemon',
       ], environment: env);
       _log('spawned pid ${p.pid} (piped — stdout/stderr will appear below)');
-      _startedNode = true;
+      _spawnPending = true;
 
       p.stdout
           .transform(utf8.decoder)
@@ -257,6 +287,22 @@ class DaemonController {
     } catch (e, st) {
       _log('spawn failed: $e\n$st');
       return DaemonStartResult.error('Failed to spawn daemon: $e');
+    }
+  }
+
+  /// Remove the port and pid files of a node that is no longer running.
+  /// Only call once [isAlive] is false. A node that is killed rather than
+  /// shut down (on Windows, every `kwaainet stop`: it uses taskkill) leaves
+  /// `kwaainet.grpc` behind. The bind wait after a spawn would see it at once,
+  /// and the pid read then would not be the new node's.
+  void _clearStaleRunFiles() {
+    for (final path in [KwaainetPaths.grpcPortFile, KwaainetPaths.pidFile]) {
+      try {
+        final f = File(path);
+        if (f.existsSync()) f.deleteSync();
+      } catch (e) {
+        _log('could not remove stale $path: $e');
+      }
     }
   }
 
@@ -287,7 +333,8 @@ class DaemonController {
         _log('kwaainet stop exit ${r.exitCode}: ${r.stderr}');
         return false;
       }
-      _startedNode = false;
+      _spawnPending = false;
+      _ownedPid = null;
       return true;
     } catch (e, st) {
       _log('kwaainet stop failed: $e\n$st');

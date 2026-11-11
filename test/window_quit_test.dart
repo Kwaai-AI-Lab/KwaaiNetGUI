@@ -6,15 +6,18 @@ import 'package:kwaainet_gui/src/window/shutdown.dart';
 import 'package:kwaainet_gui/src/window/window_restore.dart';
 
 /// Stops nothing: these tests are about the window calls around the stop.
+/// Records which stop was asked for.
 class _NoopTransition extends DaemonTransitionNotifier {
+  final stops = <String>[];
+
   @override
   DaemonTransition build() => DaemonTransition.none;
 
   @override
-  Future<void> stop() async {}
+  Future<void> stop() async => stops.add('stop');
 
   @override
-  Future<void> stopOnQuit() async {}
+  Future<void> stopOnQuit() async => stops.add('stopOnQuit');
 }
 
 void main() {
@@ -86,6 +89,23 @@ void main() {
       );
       expect(order, ['beforeClose:0']);
       expect(calls, ['setPreventClose', 'close']);
+    });
+
+    // KwaaiNetGUI#17: Quit must leave a node the app only attached to.
+    test('stops only a node the app started', () async {
+      final c = container();
+      await performQuit(c, isWindows: true);
+      final t = c.read(daemonTransitionProvider.notifier) as _NoopTransition;
+      expect(t.stops, ['stopOnQuit']);
+    });
+
+    // The update swap renames the install dir, which a running bundled
+    // kwaainet.exe blocks on Windows.
+    test('stopAttached stops the node whoever started it', () async {
+      final c = container();
+      await performQuit(c, isWindows: true, stopAttached: true);
+      final t = c.read(daemonTransitionProvider.notifier) as _NoopTransition;
+      expect(t.stops, ['stop']);
     });
 
     test('a second quit does nothing', () async {

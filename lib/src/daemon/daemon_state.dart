@@ -166,14 +166,15 @@ class DaemonTransitionNotifier extends Notifier<DaemonTransition> {
     ref.read(restartNeededProvider.notifier).clear();
     state = DaemonTransition.starting;
 
-    var r = await ref.read(daemonControllerProvider).start();
+    final daemon = ref.read(daemonControllerProvider);
+    var r = await daemon.start();
 
     // Only a daemon we just spawned has a port we chose. An external no-op or
     // an attach to a daemon already running has nothing to wait for.
     if (r.kind == DaemonStartKind.spawned && !await _awaitGrpcBind()) {
       _log('daemon did not report a gRPC port — retrying on a fresh one');
-      await ref.read(daemonControllerProvider).stop();
-      r = await ref.read(daemonControllerProvider).start();
+      await daemon.stop();
+      r = await daemon.start();
       if (r.kind == DaemonStartKind.spawned && !await _awaitGrpcBind()) {
         _lastError =
             'Daemon started but never bound its gRPC port. Check the log: '
@@ -183,6 +184,8 @@ class DaemonTransitionNotifier extends Notifier<DaemonTransition> {
         return;
       }
     }
+    // Bound, so the node has written its pid: remember it as ours.
+    if (r.kind == DaemonStartKind.spawned) daemon.claimSpawnedNode();
 
     if (!r.ok) {
       _log('start failed: ${r.error}');

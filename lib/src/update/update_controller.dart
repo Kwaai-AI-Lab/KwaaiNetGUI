@@ -98,7 +98,10 @@ class UpdateInstallOps {
     );
   }
 
-  Future<void> quit(ProviderContainer container) => performQuit(container);
+  /// Stops the node even if the GUI only attached to it: the swap cannot
+  /// rename an install directory whose `kwaainet.exe` is running.
+  Future<void> quit(ProviderContainer container) =>
+      performQuit(container, stopAttached: true);
 }
 
 final updateInstallOpsProvider = Provider<UpdateInstallOps>(
@@ -308,8 +311,9 @@ class UpdateInstallNotifier extends Notifier<UpdateStage> {
 
   /// Launches the detached swap helper, then quits cleanly. The helper is
   /// already polling our pid when we start dying, so this ordering is safe —
-  /// and [performQuit] stops the daemon first, which Windows requires before
-  /// the install directory can be renamed.
+  /// and [performQuit] stops the daemon first (even one the GUI did not
+  /// start), which Windows requires before the install directory can be
+  /// renamed.
   Future<void> installAndRestart() async {
     final ready = state;
     if (ready is! UpdateReady) return;

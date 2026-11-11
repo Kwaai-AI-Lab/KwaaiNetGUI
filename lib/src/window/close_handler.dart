@@ -16,10 +16,12 @@ void _log(String msg) {
 /// [Settings.keepInTrayOnClose] live, so the choice can be toggled in
 /// preferences without restarting the app.
 ///
-/// Invariant: we must never end up with the daemon running while neither the
-/// window nor the tray icon is visible. So we only hide-to-tray when the tray
-/// icon is actually installed; otherwise closing the window is a true quit,
-/// which runs the shared [performQuit] routine (stops the daemon first).
+/// Invariant: we must never end up with a daemon this app started running
+/// while neither the window nor the tray icon is visible. So we only
+/// hide-to-tray when the tray icon is actually installed; otherwise closing
+/// the window is a true quit, which runs the shared [performQuit] routine
+/// (stops a daemon this app started first; one it attached to is the user's
+/// and keeps running).
 class WindowCloseHandler with WindowListener {
   WindowCloseHandler(this._settings, this._tray, this._container);
 

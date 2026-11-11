@@ -40,7 +40,8 @@ final appContainerProvider = Provider<ProviderContainer>((ref) {
 ///    path — which runs `kwaainet stop`, so the CLI reaps the node and its
 ///    detached children (shard serve, storage API). We await it so the window
 ///    doesn't vanish before the daemon is actually gone. A node the app only
-///    attached to is left running ([DaemonTransitionNotifier.stopOnQuit]).
+///    attached to is left running ([DaemonTransitionNotifier.stopOnQuit]),
+///    unless [stopAttached] is set.
 /// 3. Run [beforeClose] (the tray removes its icon here), then close the
 ///    window to exit.
 ///
@@ -54,10 +55,15 @@ final appContainerProvider = Provider<ProviderContainer>((ref) {
 /// immediately) so reopening the tray menu and hitting Quit again can't start
 /// a second teardown.
 ///
+/// [stopAttached] stops the node whoever started it. The updater needs this:
+/// on Windows the bundled `kwaainet.exe` running from the install directory
+/// blocks the swap that renames it.
+///
 /// [isWindows] defaults to the host platform; tests pass it explicitly.
 Future<void> performQuit(
   ProviderContainer container, {
   bool osTerminating = false,
+  bool stopAttached = false,
   Future<void> Function()? beforeClose,
   bool? isWindows,
 }) async {
@@ -66,13 +72,18 @@ Future<void> performQuit(
     return;
   }
   container.read(shuttingDownProvider.notifier).engage();
-  _log('clean quit → stopping the daemon if this app started it');
+  _log(
+    stopAttached
+        ? 'clean quit → stopping the daemon'
+        : 'clean quit → stopping the daemon if this app started it',
+  );
 
   // Goes through the transition notifier so the UI shows "Stopping service…"
   // (DaemonTransition.stopping). Leaves a node the app only attached to
   // running; stop() is a no-op in external mode.
   try {
-    await container.read(daemonTransitionProvider.notifier).stopOnQuit();
+    final transition = container.read(daemonTransitionProvider.notifier);
+    await (stopAttached ? transition.stop() : transition.stopOnQuit());
   } catch (e) {
     _log('daemon stop error (proceeding to quit): $e');
   }

@@ -290,8 +290,9 @@ class TrayController with TrayListener {
         break;
       case 'quit':
         _log('quit → performQuit');
-        // Shared shutdown: shows "Stopping service…" and runs `kwaainet stop`
-        // (reaping the node + its detached children). We deliberately keep the
+        // Shared shutdown: shows "Stopping service…" and, for a node this app
+        // started, runs `kwaainet stop` (reaping the node + its detached
+        // children). We deliberately keep the
         // tray icon in place until the daemon is down — the menu already
         // reflects DaemonTransition.stopping, so reopening it shows "Stopping"
         // rather than vanishing. dispose() then runs before the window
