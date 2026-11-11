@@ -239,7 +239,12 @@ class TrayController with TrayListener {
   @override
   void onTrayIconRightMouseDown() {
     _log('icon rightMouseDown → popping menu');
-    trayManager.popUpContextMenu();
+    // Windows: a tray menu only closes on click-away when its owner window is
+    // in the foreground, and tray_manager 0.5.3 calls SetForegroundWindow
+    // before TrackPopupMenu only with bringAppToFront. Without it the menu
+    // stays open and its modal loop swallows the next tray clicks.
+    // ignore: deprecated_member_use
+    trayManager.popUpContextMenu(bringAppToFront: Platform.isWindows);
   }
 
   @override
@@ -283,8 +288,8 @@ class TrayController with TrayListener {
         break;
       case 'quit':
         _log('quit → performQuit');
-        // Shared shutdown: shows "Stopping service…" and runs `kwaainet stop`
-        // (reaping the node + its detached children). We deliberately keep the
+        // Shared shutdown: shows "Stopping service…" and, when quitStopsDaemon,
+        // runs `kwaainet stop` (reaping the node + its children). We keep the
         // tray icon in place until the daemon is down — the menu already
         // reflects DaemonTransition.stopping, so reopening it shows "Stopping"
         // rather than vanishing. dispose() then runs before the window

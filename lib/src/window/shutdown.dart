@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../daemon/daemon_state.dart';
+import '../settings.dart';
 
 void _log(String msg) {
   stderr.writeln('[shutdown] $msg');
@@ -32,14 +33,19 @@ final appContainerProvider = Provider<ProviderContainer>((ref) {
   );
 });
 
+/// Whether quitting stops the node: only when this GUI starts one at launch,
+/// so a node it merely found running is treated as its own then. Read live.
+bool quitStopsDaemon(Settings s) =>
+    s.mode != DaemonMode.external && s.startServiceOnStartup;
+
 /// The single, shared "clean quit" routine used by both the window-close
 /// handler and the tray Quit item.
 ///
 /// 1. Engage the shutdown lock (UI blocks interaction + shows the overlay).
-/// 2. Drive the daemon down via the normal transition path — which runs
-///    `kwaainet stop`, so the CLI reaps the node and its detached children
-///    (shard serve, storage API). We await it so the window doesn't vanish
-///    before the daemon is actually gone.
+/// 2. If [quitStopsDaemon], drive the daemon down via the normal transition
+///    path — which runs `kwaainet stop`, so the CLI reaps the node and its
+///    detached children (shard serve, storage API). We await it so the window
+///    doesn't vanish before the daemon is actually gone.
 /// 3. Run [beforeClose] (the tray removes its icon here), then close the
 ///    window to exit.
 ///
@@ -53,10 +59,14 @@ final appContainerProvider = Provider<ProviderContainer>((ref) {
 /// immediately) so reopening the tray menu and hitting Quit again can't start
 /// a second teardown.
 ///
+/// [forceStop] stops a managed node regardless of [quitStopsDaemon]; the
+/// updater needs it gone to replace the bundle.
+///
 /// [isWindows] defaults to the host platform; tests pass it explicitly.
 Future<void> performQuit(
   ProviderContainer container, {
   bool osTerminating = false,
+  bool forceStop = false,
   Future<void> Function()? beforeClose,
   bool? isWindows,
 }) async {
@@ -65,14 +75,18 @@ Future<void> performQuit(
     return;
   }
   container.read(shuttingDownProvider.notifier).engage();
-  _log('clean quit → stopping daemon via kwaainet stop');
+  _log('clean quit');
 
   // Goes through the transition notifier so the UI shows "Stopping service…"
   // (DaemonTransition.stopping). stop() is a no-op in external mode.
-  try {
-    await container.read(daemonTransitionProvider.notifier).stop();
-  } catch (e) {
-    _log('daemon stop error (proceeding to quit): $e');
+  if (forceStop || quitStopsDaemon(container.read(settingsProvider))) {
+    try {
+      await container.read(daemonTransitionProvider.notifier).stop();
+    } catch (e) {
+      _log('daemon stop error (proceeding to quit): $e');
+    }
+  } else {
+    _log('start-on-startup off or external mode — leaving the node running');
   }
 
   if (osTerminating) {

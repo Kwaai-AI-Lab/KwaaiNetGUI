@@ -24,6 +24,28 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
+  // One GUI per user session: a second launch brings the existing window
+  // forward (FindWindowW also finds one hidden to the tray) and exits. Debug
+  // builds take their own name so `flutter run` works beside an installed GUI.
+#ifdef _DEBUG
+  constexpr wchar_t kInstanceMutex[] =
+      L"Local\\KwaaiNetGUI-single-instance-debug";
+#else
+  constexpr wchar_t kInstanceMutex[] = L"Local\\KwaaiNetGUI-single-instance";
+#endif
+  HANDLE instance_mutex = ::CreateMutexW(nullptr, TRUE, kInstanceMutex);
+  if (::GetLastError() == ERROR_ALREADY_EXISTS) {
+    if (HWND existing =
+            ::FindWindowW(L"FLUTTER_RUNNER_WIN32_WINDOW", L"KwaaiNet")) {
+      ::ShowWindow(existing, SW_SHOW);
+      ::ShowWindow(existing, SW_RESTORE);
+      ::SetForegroundWindow(existing);
+    }
+    if (instance_mutex) ::CloseHandle(instance_mutex);
+    ::CoUninitialize();
+    return EXIT_SUCCESS;
+  }
+
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
@@ -39,5 +61,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
 
   ::CoUninitialize();
+  if (instance_mutex) ::CloseHandle(instance_mutex);
   return EXIT_SUCCESS;
 }
