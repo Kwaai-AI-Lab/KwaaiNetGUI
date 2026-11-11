@@ -194,6 +194,10 @@ class DaemonController {
     _spawnPending = false;
   }
 
+  /// Forget a spawn that never came up. Whatever node runs later is not
+  /// known to be ours, and when unsure Quit must leave a node alone.
+  void disownSpawn() => _spawnPending = false;
+
   /// What [start] records after a spawn, without spawning.
   @visibleForTesting
   void debugMarkSpawned() => _spawnPending = true;
@@ -230,6 +234,9 @@ class DaemonController {
     if (await isAlive()) {
       final pid = readPid()!;
       _log('daemon already running (pid $pid) — attaching');
+      // A node found running is the user's, even after a spawn of ours
+      // that never came up (see [disownSpawn]).
+      disownSpawn();
       return DaemonStartResult.alreadyRunning(pid);
     }
     final res = resolveBinary();
@@ -242,7 +249,6 @@ class DaemonController {
       );
     }
     Directory(KwaainetPaths.runDir).createSync(recursive: true);
-    _clearStaleRunFiles();
 
     // A port of our own, so a second GUI's daemon is a separate daemon
     // rather than one this app silently shares. The daemon aborts if it
@@ -283,26 +289,10 @@ class DaemonController {
         _log('daemon process exited with code $code');
       });
 
-      return DaemonStartResult.spawned(p.pid);
+      return DaemonStartResult.spawned(p.pid, grpcPort: grpcPort);
     } catch (e, st) {
       _log('spawn failed: $e\n$st');
       return DaemonStartResult.error('Failed to spawn daemon: $e');
-    }
-  }
-
-  /// Remove the port and pid files of a node that is no longer running.
-  /// Only call once [isAlive] is false. A node that is killed rather than
-  /// shut down (on Windows, every `kwaainet stop`: it uses taskkill) leaves
-  /// `kwaainet.grpc` behind. The bind wait after a spawn would see it at once,
-  /// and the pid read then would not be the new node's.
-  void _clearStaleRunFiles() {
-    for (final path in [KwaainetPaths.grpcPortFile, KwaainetPaths.pidFile]) {
-      try {
-        final f = File(path);
-        if (f.existsSync()) f.deleteSync();
-      } catch (e) {
-        _log('could not remove stale $path: $e');
-      }
     }
   }
 
@@ -359,13 +349,20 @@ enum DaemonStartKind {
 }
 
 class DaemonStartResult {
-  DaemonStartResult._(this.kind, {this.pid, this.error});
+  DaemonStartResult._(this.kind, {this.pid, this.error, this.grpcPort});
   final DaemonStartKind kind;
   final int? pid;
   final String? error;
 
-  factory DaemonStartResult.spawned(int pid) =>
-      DaemonStartResult._(DaemonStartKind.spawned, pid: pid);
+  /// The gRPC port handed to a spawned daemon; null for any other kind.
+  final int? grpcPort;
+
+  factory DaemonStartResult.spawned(int pid, {int? grpcPort}) =>
+      DaemonStartResult._(
+        DaemonStartKind.spawned,
+        pid: pid,
+        grpcPort: grpcPort,
+      );
   factory DaemonStartResult.alreadyRunning(int pid) =>
       DaemonStartResult._(DaemonStartKind.alreadyRunning, pid: pid);
   factory DaemonStartResult.error(String message) =>

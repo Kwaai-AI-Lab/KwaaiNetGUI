@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../daemon/daemon_state.dart';
 import '../daemon/paths.dart';
 import '../settings.dart';
 import '../window/shutdown.dart';
@@ -98,10 +100,37 @@ class UpdateInstallOps {
     );
   }
 
-  /// Stops the node even if the GUI only attached to it: the swap cannot
-  /// rename an install directory whose `kwaainet.exe` is running.
-  Future<void> quit(ProviderContainer container) =>
-      performQuit(container, stopAttached: true);
+  /// Quits for the swap. See [updateMustStopNode] for when that also stops a
+  /// node the GUI only attached to.
+  Future<void> quit(ProviderContainer container, InstallRoot root) =>
+      performQuit(
+        container,
+        stopAttached: updateMustStopNode(
+          isWindows: Platform.isWindows,
+          daemonPath: container
+              .read(daemonControllerProvider)
+              .resolveBinary()
+              .path,
+          installRoot: root.path,
+        ),
+      );
+}
+
+/// Whether the update swap must stop the node even if the GUI only attached
+/// to it: on Windows, when the daemon binary lives inside the install
+/// directory, because a running `kwaainet.exe` there blocks the rename. A
+/// node run from anywhere else (`~/.cargo/bin`, a service) does not block it
+/// and is the user's, so it keeps running, as with a plain Quit.
+@visibleForTesting
+bool updateMustStopNode({
+  required bool isWindows,
+  required String daemonPath,
+  required String installRoot,
+}) {
+  if (!isWindows || daemonPath.isEmpty) return false;
+  final root = installRoot.toLowerCase().replaceAll('/', r'\');
+  final daemon = daemonPath.toLowerCase().replaceAll('/', r'\');
+  return daemon.startsWith(root.endsWith(r'\') ? root : '$root\\');
 }
 
 final updateInstallOpsProvider = Provider<UpdateInstallOps>(
@@ -311,9 +340,10 @@ class UpdateInstallNotifier extends Notifier<UpdateStage> {
 
   /// Launches the detached swap helper, then quits cleanly. The helper is
   /// already polling our pid when we start dying, so this ordering is safe —
-  /// and [performQuit] stops the daemon first (even one the GUI did not
-  /// start), which Windows requires before the install directory can be
-  /// renamed.
+  /// and [performQuit] stops the daemon first (on Windows even one the GUI
+  /// did not start, if it runs from the install directory: see
+  /// [updateMustStopNode]), which Windows requires before the install
+  /// directory can be renamed.
   Future<void> installAndRestart() async {
     final ready = state;
     if (ready is! UpdateReady) return;
@@ -367,7 +397,7 @@ class UpdateInstallNotifier extends Notifier<UpdateStage> {
       return;
     }
 
-    await ops.quit(ref.read(appContainerProvider));
+    await ops.quit(ref.read(appContainerProvider), root);
   }
 
   Future<void> _cleanupFor(InstallRoot root, String version) async {

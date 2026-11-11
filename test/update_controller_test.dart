@@ -94,7 +94,7 @@ class _FakeOps implements UpdateInstallOps {
   }
 
   @override
-  Future<void> quit(ProviderContainer container) async {
+  Future<void> quit(ProviderContainer container, InstallRoot root) async {
     quitCalls++;
   }
 }
@@ -295,6 +295,53 @@ void main() {
     test('true when resolvable and writable', () async {
       final c = _containerWith(_FakeDownloader(), _FakeOps());
       expect(await c.read(updateInstallSupportedProvider.future), isTrue);
+    });
+  });
+
+  // The swap renames the install dir, which a running kwaainet.exe inside it
+  // blocks on Windows; any other node is the user's and keeps running.
+  group('updateMustStopNode', () {
+    const root = r'C:\Users\u\AppData\Local\KwaaiNet';
+
+    test('stops the bundled daemon on Windows', () {
+      expect(
+        updateMustStopNode(
+          isWindows: true,
+          daemonPath: r'c:\users\u\appdata\local\kwaainet\kwaainet.exe',
+          installRoot: root,
+        ),
+        isTrue,
+      );
+    });
+
+    test('leaves a daemon run from elsewhere', () {
+      expect(
+        updateMustStopNode(
+          isWindows: true,
+          daemonPath: r'C:\Users\u\.cargo\bin\kwaainet.exe',
+          installRoot: root,
+        ),
+        isFalse,
+      );
+      expect(
+        updateMustStopNode(
+          isWindows: true,
+          daemonPath: r'C:\Users\u\AppData\Local\KwaaiNet2\kwaainet.exe',
+          installRoot: root,
+        ),
+        isFalse,
+      );
+    });
+
+    test('never off Windows', () {
+      expect(
+        updateMustStopNode(
+          isWindows: false,
+          daemonPath: '/Applications/KwaaiNet.app/Contents/Resources/kwaainet',
+          installRoot: '/Applications/KwaaiNet.app',
+        ),
+        isFalse,
+      );
     });
   });
 }

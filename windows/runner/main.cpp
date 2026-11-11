@@ -73,11 +73,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // same node. Keyed to the exe path, not the app: a build run from a
   // KwaaiNetGUI checkout has its own sandboxed node and may run beside the
   // installed app.
+  // With no path to key on, skip the check rather than share one name with
+  // every other instance that also failed.
   const std::wstring exe = ExePath(::GetCurrentProcess());
-  const std::wstring mutex_name =
-      L"Local\\KwaaiNetGUI-" + std::to_wstring(Fnv1a(exe));
-  HANDLE instance_mutex = ::CreateMutexW(nullptr, TRUE, mutex_name.c_str());
-  if (::GetLastError() == ERROR_ALREADY_EXISTS) {
+  HANDLE instance_mutex = nullptr;
+  DWORD instance_error = ERROR_SUCCESS;
+  if (!exe.empty()) {
+    const std::wstring mutex_name =
+        L"Local\\KwaaiNetGUI-" + std::to_wstring(Fnv1a(exe));
+    instance_mutex = ::CreateMutexW(nullptr, TRUE, mutex_name.c_str());
+    instance_error = ::GetLastError();
+  }
+  // ACCESS_DENIED: the mutex exists but belongs to an elevated instance.
+  if (instance_error == ERROR_ALREADY_EXISTS ||
+      instance_error == ERROR_ACCESS_DENIED) {
     FindArgs args{&exe, nullptr};
     ::EnumWindows(FindSameExeWindow, reinterpret_cast<LPARAM>(&args));
     if (HWND existing = args.found) {

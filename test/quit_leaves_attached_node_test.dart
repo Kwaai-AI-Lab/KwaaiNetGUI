@@ -102,6 +102,24 @@ void main() {
       expect(daemon.startedNode, isFalse);
     });
 
+    // A spawn that never bound is given up; a node running later (say, one
+    // the user then starts from the CLI) must not be taken for it.
+    test('disownSpawn forgets a spawn that never came up', () {
+      daemon.debugMarkSpawned();
+      daemon.disownSpawn();
+      pidFile.writeAsStringSync('100');
+      daemon.claimSpawnedNode();
+      expect(daemon.startedNode, isFalse);
+    });
+
+    test('attaching to a running node disowns a pending spawn', () async {
+      daemon.debugMarkSpawned();
+      pidFile.writeAsStringSync('$pid'); // this test process: alive
+      final r = await daemon.start();
+      expect(r.kind, DaemonStartKind.alreadyRunning);
+      expect(daemon.startedNode, isFalse);
+    });
+
     // Our node stopped from the CLI and another started: that one is the
     // user's, so Quit must leave it alone.
     test('false once the pid file names another node', () {
@@ -112,6 +130,17 @@ void main() {
       expect(daemon.startedNode, isFalse);
       pidFile.deleteSync();
       expect(daemon.startedNode, isFalse);
+    });
+
+    // Regression (metro-win): `kwaainet stop` on Windows uses taskkill, so
+    // the dead node's port file stayed and the bind wait passed at once.
+    test('the bind wait needs the port it handed out', () {
+      final portFile = File(KwaainetPaths.grpcPortFile);
+      expect(grpcPortFileNames(5000), isFalse);
+      portFile.writeAsStringSync('4000\n'); // a dead node's
+      expect(grpcPortFileNames(5000), isFalse);
+      portFile.writeAsStringSync('5000\n');
+      expect(grpcPortFileNames(5000), isTrue);
     });
   });
 }
