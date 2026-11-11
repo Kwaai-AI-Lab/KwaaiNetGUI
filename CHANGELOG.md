@@ -12,6 +12,8 @@ All notable changes to KwaaiNet GUI are documented here. The format follows
   Stop still stops it, and external mode is unchanged.
 
 ### Fixed
+- **Windows: the tray menu closes when you click elsewhere.** It used to stay
+  open, and the next clicks on the tray icon could be lost.
 - **Windows: one GUI at a time.** Launching KwaaiNet while it is already
   running brings the existing window forward, including one hidden to the
   tray, instead of starting a second copy with its own tray icon.

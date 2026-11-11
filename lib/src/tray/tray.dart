@@ -239,7 +239,12 @@ class TrayController with TrayListener {
   @override
   void onTrayIconRightMouseDown() {
     _log('icon rightMouseDown → popping menu');
-    trayManager.popUpContextMenu();
+    // Windows: a tray menu only closes on click-away when its owner window is
+    // in the foreground, and tray_manager 0.5.3 calls SetForegroundWindow
+    // before TrackPopupMenu only with bringAppToFront. Without it the menu
+    // stays open and its modal loop swallows the next tray clicks.
+    // ignore: deprecated_member_use
+    trayManager.popUpContextMenu(bringAppToFront: Platform.isWindows);
   }
 
   @override
