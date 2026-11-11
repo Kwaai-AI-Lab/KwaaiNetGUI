@@ -24,7 +24,8 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           calls.add(call.method);
-          return null;
+          // show() asks isMinimized first and casts the answer to bool.
+          return call.method.startsWith('is') ? false : null;
         });
   });
 
