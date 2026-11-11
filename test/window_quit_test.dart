@@ -12,6 +12,9 @@ class _NoopTransition extends DaemonTransitionNotifier {
 
   @override
   Future<void> stop() async {}
+
+  @override
+  Future<void> stopOnQuit() async {}
 }
 
 void main() {

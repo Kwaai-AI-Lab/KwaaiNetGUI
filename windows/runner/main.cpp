@@ -13,6 +13,22 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     CreateAndAttachConsole();
   }
 
+  // One GUI per user session. A second launch (Start menu, taskbar jump list,
+  // double-click) brings the existing window forward, including one hidden
+  // to the tray, and exits, so two GUIs never drive the same node.
+  HANDLE instance_mutex =
+      ::CreateMutexW(nullptr, TRUE, L"Local\\KwaaiNetGUI-single-instance");
+  if (::GetLastError() == ERROR_ALREADY_EXISTS) {
+    if (HWND existing =
+            ::FindWindowW(L"FLUTTER_RUNNER_WIN32_WINDOW", L"KwaaiNet")) {
+      ::ShowWindow(existing, SW_SHOW);
+      ::ShowWindow(existing, SW_RESTORE);
+      ::SetForegroundWindow(existing);
+    }
+    if (instance_mutex) ::CloseHandle(instance_mutex);
+    return EXIT_SUCCESS;
+  }
+
   // Initialize COM, so that it is available for use in the library and/or
   // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -39,5 +55,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
 
   ::CoUninitialize();
+  if (instance_mutex) ::CloseHandle(instance_mutex);
   return EXIT_SUCCESS;
 }

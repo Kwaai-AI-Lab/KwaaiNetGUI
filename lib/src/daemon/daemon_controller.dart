@@ -163,6 +163,12 @@ class DaemonController {
     return null;
   }
 
+  /// True while the running node is one this GUI spawned. A node that was
+  /// already up when the GUI attached (CLI, a service, an earlier GUI) is the
+  /// user's, and quitting the GUI must leave it running.
+  bool get startedNode => _startedNode;
+  bool _startedNode = false;
+
   int? readPid() {
     final f = File(KwaainetPaths.pidFile);
     if (!f.existsSync()) return null;
@@ -233,6 +239,7 @@ class DaemonController {
         '--daemon',
       ], environment: env);
       _log('spawned pid ${p.pid} (piped — stdout/stderr will appear below)');
+      _startedNode = true;
 
       p.stdout
           .transform(utf8.decoder)
@@ -278,8 +285,10 @@ class DaemonController {
       final r = await Process.run(res.path, ['stop'], environment: _childEnv());
       if (r.exitCode != 0) {
         _log('kwaainet stop exit ${r.exitCode}: ${r.stderr}');
+        return false;
       }
-      return r.exitCode == 0;
+      _startedNode = false;
+      return true;
     } catch (e, st) {
       _log('kwaainet stop failed: $e\n$st');
       return false;

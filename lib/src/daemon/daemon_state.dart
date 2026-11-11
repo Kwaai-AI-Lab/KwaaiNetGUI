@@ -217,6 +217,19 @@ class DaemonTransitionNotifier extends Notifier<DaemonTransition> {
       state = DaemonTransition.none;
     }
   }
+
+  /// Quit's stop: only a node this GUI spawned. One it attached to was
+  /// started outside the app and outlives it — quitting a window must not
+  /// take down a node the user runs from the CLI or as a service, and
+  /// `kwaainet stop` would also drop that node's recorded start flags.
+  /// "Stop service" in the tray and settings still uses [stop].
+  Future<void> stopOnQuit() async {
+    if (!ref.read(daemonControllerProvider).startedNode) {
+      _log('quit: node was not started by this app — leaving it running');
+      return;
+    }
+    await stop();
+  }
 }
 
 final daemonTransitionProvider =

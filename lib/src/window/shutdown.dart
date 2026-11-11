@@ -36,10 +36,11 @@ final appContainerProvider = Provider<ProviderContainer>((ref) {
 /// handler and the tray Quit item.
 ///
 /// 1. Engage the shutdown lock (UI blocks interaction + shows the overlay).
-/// 2. Drive the daemon down via the normal transition path — which runs
-///    `kwaainet stop`, so the CLI reaps the node and its detached children
-///    (shard serve, storage API). We await it so the window doesn't vanish
-///    before the daemon is actually gone.
+/// 2. If this app spawned the node, drive it down via the normal transition
+///    path — which runs `kwaainet stop`, so the CLI reaps the node and its
+///    detached children (shard serve, storage API). We await it so the window
+///    doesn't vanish before the daemon is actually gone. A node the app only
+///    attached to is left running ([DaemonTransitionNotifier.stopOnQuit]).
 /// 3. Run [beforeClose] (the tray removes its icon here), then close the
 ///    window to exit.
 ///
@@ -65,12 +66,13 @@ Future<void> performQuit(
     return;
   }
   container.read(shuttingDownProvider.notifier).engage();
-  _log('clean quit → stopping daemon via kwaainet stop');
+  _log('clean quit → stopping the daemon if this app started it');
 
   // Goes through the transition notifier so the UI shows "Stopping service…"
-  // (DaemonTransition.stopping). stop() is a no-op in external mode.
+  // (DaemonTransition.stopping). Leaves a node the app only attached to
+  // running; stop() is a no-op in external mode.
   try {
-    await container.read(daemonTransitionProvider.notifier).stop();
+    await container.read(daemonTransitionProvider.notifier).stopOnQuit();
   } catch (e) {
     _log('daemon stop error (proceeding to quit): $e');
   }
