@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../chat/kwaai_rpc_client.dart';
@@ -166,15 +167,17 @@ class DaemonTransitionNotifier extends Notifier<DaemonTransition> {
     ref.read(restartNeededProvider.notifier).clear();
     state = DaemonTransition.starting;
 
-    var r = await ref.read(daemonControllerProvider).start();
+    final daemon = ref.read(daemonControllerProvider);
+    var r = await daemon.start();
 
     // Only a daemon we just spawned has a port we chose. An external no-op or
     // an attach to a daemon already running has nothing to wait for.
-    if (r.kind == DaemonStartKind.spawned && !await _awaitGrpcBind()) {
+    if (r.kind == DaemonStartKind.spawned && !await _awaitGrpcBind(r)) {
       _log('daemon did not report a gRPC port — retrying on a fresh one');
-      await ref.read(daemonControllerProvider).stop();
-      r = await ref.read(daemonControllerProvider).start();
-      if (r.kind == DaemonStartKind.spawned && !await _awaitGrpcBind()) {
+      await daemon.stop();
+      r = await daemon.start();
+      if (r.kind == DaemonStartKind.spawned && !await _awaitGrpcBind(r)) {
+        daemon.disownSpawn();
         _lastError =
             'Daemon started but never bound its gRPC port. Check the log: '
             '${KwaainetPaths.logsDir}.';
@@ -183,6 +186,8 @@ class DaemonTransitionNotifier extends Notifier<DaemonTransition> {
         return;
       }
     }
+    // Bound, so the node has written its pid: remember it as ours.
+    if (r.kind == DaemonStartKind.spawned) daemon.claimSpawnedNode();
 
     if (!r.ok) {
       _log('start failed: ${r.error}');
@@ -192,13 +197,19 @@ class DaemonTransitionNotifier extends Notifier<DaemonTransition> {
     }
   }
 
-  /// Wait for the daemon to write `run/kwaainet.grpc`. Its presence means the
-  /// listener is up — the daemon writes it only after a successful bind, and
-  /// exits rather than carry on without a port it was given.
-  Future<bool> _awaitGrpcBind() async {
+  /// Wait for the daemon to write `run/kwaainet.grpc` naming the port it was
+  /// handed. That means the listener is up — the daemon writes it only after
+  /// a successful bind, and exits rather than carry on without a port it was
+  /// given.
+  ///
+  /// The port, not just the file: a node that was killed rather than shut
+  /// down (on Windows, every `kwaainet stop`: it uses taskkill) leaves its
+  /// file behind, and that would pass at once, before the new node has even
+  /// written its pid.
+  Future<bool> _awaitGrpcBind(DaemonStartResult r) async {
     final deadline = DateTime.now().add(_grpcBindDeadline);
     while (DateTime.now().isBefore(deadline)) {
-      if (File(KwaainetPaths.grpcPortFile).existsSync()) return true;
+      if (grpcPortFileNames(r.grpcPort)) return true;
       await Future<void>.delayed(const Duration(milliseconds: 200));
     }
     return false;
@@ -216,6 +227,34 @@ class DaemonTransitionNotifier extends Notifier<DaemonTransition> {
       ref.read(daemonErrorProvider.notifier).set(_lastError);
       state = DaemonTransition.none;
     }
+  }
+
+  /// Quit's stop: only a node this GUI spawned. One it attached to was
+  /// started outside the app and outlives it — quitting a window must not
+  /// take down a node the user runs from the CLI or as a service, and
+  /// `kwaainet stop` would also drop that node's recorded start flags.
+  /// "Stop service" in the tray and settings still uses [stop].
+  Future<void> stopOnQuit() async {
+    if (!ref.read(daemonControllerProvider).startedNode) {
+      _log('quit: node was not started by this app — leaving it running');
+      return;
+    }
+    await stop();
+  }
+}
+
+/// True when `run/kwaainet.grpc` holds [port]. A null [port] (a spawn whose
+/// port is unknown) accepts any valid port file.
+@visibleForTesting
+bool grpcPortFileNames(int? port) {
+  final f = File(KwaainetPaths.grpcPortFile);
+  try {
+    if (!f.existsSync()) return false;
+    final written = parseGrpcPortFile(f.readAsStringSync());
+    return written != null && (port == null || written == port);
+  } catch (_) {
+    // Read mid-write, or removed between the check and the read.
+    return false;
   }
 }
 

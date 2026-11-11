@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 import '../settings.dart';
 import 'daemon_env.dart';
 import 'paths.dart';
@@ -163,6 +165,43 @@ class DaemonController {
     return null;
   }
 
+  /// True while the running node is one this GUI spawned. A node that was
+  /// already up when the GUI attached (CLI, a service, an earlier GUI) is the
+  /// user's, and quitting the GUI must leave it running.
+  ///
+  /// Keyed to the pid, not a flag: if our node is stopped from the CLI and
+  /// another started, the pid file names the new one and this turns false.
+  bool get startedNode {
+    if (_spawnPending) return true;
+    final owned = _ownedPid;
+    return owned != null && readPid() == owned;
+  }
+
+  /// Between spawning and [claimSpawnedNode]: ours, pid not yet known.
+  bool _spawnPending = false;
+  int? _ownedPid;
+
+  /// Record the node [start] spawned as ours. Call once it is up: `start
+  /// --daemon` re-execs `run-node`, and it is that child's pid the pid file
+  /// holds, not the one [Process.start] returned.
+  /// With no pid file yet, the node stays pending (ours) rather than
+  /// becoming nobody's.
+  void claimSpawnedNode() {
+    if (!_spawnPending) return;
+    final pid = readPid();
+    if (pid == null) return;
+    _ownedPid = pid;
+    _spawnPending = false;
+  }
+
+  /// Forget a spawn that never came up. Whatever node runs later is not
+  /// known to be ours, and when unsure Quit must leave a node alone.
+  void disownSpawn() => _spawnPending = false;
+
+  /// What [start] records after a spawn, without spawning.
+  @visibleForTesting
+  void debugMarkSpawned() => _spawnPending = true;
+
   int? readPid() {
     final f = File(KwaainetPaths.pidFile);
     if (!f.existsSync()) return null;
@@ -195,6 +234,9 @@ class DaemonController {
     if (await isAlive()) {
       final pid = readPid()!;
       _log('daemon already running (pid $pid) — attaching');
+      // A node found running is the user's, even after a spawn of ours
+      // that never came up (see [disownSpawn]).
+      disownSpawn();
       return DaemonStartResult.alreadyRunning(pid);
     }
     final res = resolveBinary();
@@ -233,6 +275,7 @@ class DaemonController {
         '--daemon',
       ], environment: env);
       _log('spawned pid ${p.pid} (piped — stdout/stderr will appear below)');
+      _spawnPending = true;
 
       p.stdout
           .transform(utf8.decoder)
@@ -246,7 +289,7 @@ class DaemonController {
         _log('daemon process exited with code $code');
       });
 
-      return DaemonStartResult.spawned(p.pid);
+      return DaemonStartResult.spawned(p.pid, grpcPort: grpcPort);
     } catch (e, st) {
       _log('spawn failed: $e\n$st');
       return DaemonStartResult.error('Failed to spawn daemon: $e');
@@ -278,8 +321,11 @@ class DaemonController {
       final r = await Process.run(res.path, ['stop'], environment: _childEnv());
       if (r.exitCode != 0) {
         _log('kwaainet stop exit ${r.exitCode}: ${r.stderr}');
+        return false;
       }
-      return r.exitCode == 0;
+      _spawnPending = false;
+      _ownedPid = null;
+      return true;
     } catch (e, st) {
       _log('kwaainet stop failed: $e\n$st');
       return false;
@@ -303,13 +349,20 @@ enum DaemonStartKind {
 }
 
 class DaemonStartResult {
-  DaemonStartResult._(this.kind, {this.pid, this.error});
+  DaemonStartResult._(this.kind, {this.pid, this.error, this.grpcPort});
   final DaemonStartKind kind;
   final int? pid;
   final String? error;
 
-  factory DaemonStartResult.spawned(int pid) =>
-      DaemonStartResult._(DaemonStartKind.spawned, pid: pid);
+  /// The gRPC port handed to a spawned daemon; null for any other kind.
+  final int? grpcPort;
+
+  factory DaemonStartResult.spawned(int pid, {int? grpcPort}) =>
+      DaemonStartResult._(
+        DaemonStartKind.spawned,
+        pid: pid,
+        grpcPort: grpcPort,
+      );
   factory DaemonStartResult.alreadyRunning(int pid) =>
       DaemonStartResult._(DaemonStartKind.alreadyRunning, pid: pid);
   factory DaemonStartResult.error(String message) =>
