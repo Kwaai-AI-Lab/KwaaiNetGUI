@@ -4,6 +4,26 @@ All notable changes to KwaaiNet GUI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] - 2026-11-11
+
+Bundles kwaainet **v0.7.3**, as 0.5.0 did.
+
+### Fixed
+- **Windows: tray icon.** The tray now shows the KwaaiNet logo, so its menu
+  and **Quit KwaaiNet** can be reached and a window closed to the tray can be
+  reopened. The exe and the taskbar button show the KwaaiNet logo too.
+- **Windows: reopening from the tray no longer crashes.** Both **Open
+  KwaaiNet…** and a left click on the tray icon bring the window back.
+- **Windows: quitting no longer crashes on the way out.** This covers the
+  tray's Quit and closing the window with "Keep running in tray" off. The
+  tray icon is removed before the window closes.
+
+### Build
+- The Linux build runs on Ubuntu 24.04 again. Ubuntu 26.04 deprecates an
+  appindicator call the tray plugin makes, which failed the `-Werror` build.
+- CI and release builds pin their toolchain: Flutter 3.47.9, runner images,
+  and each GitHub Action by commit. `pub get` enforces `pubspec.lock`.
+
 ## [0.5.0] - 2026-11-06
 
 Bundles kwaainet **v0.7.3**. The bundled node is still the CPU build on

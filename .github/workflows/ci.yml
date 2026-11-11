@@ -19,18 +19,19 @@ jobs:
   # ── Analyze + test (once, on Linux) ───────────────────────────────────────
   analyze:
     name: Analyze & test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Install Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
 
       - name: Pub get
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Analyze
         run: flutter analyze
@@ -65,20 +66,20 @@ jobs:
             bundle_dir: build/linux/x64/release/bundle
             # what to upload as the artifact (whole distributable dir/app)
             artifact_path: build/linux/x64/release/bundle
-          - os: macos-latest
+          - os: macos-26
             target: macos
             kwaainet_asset: kwaainet-aarch64-apple-darwin.tar.xz
             # Resources, not MacOS: the app executable there is `KwaaiNet`, and on
             # case-insensitive APFS installing `kwaainet` beside it overwrites the app.
             bundle_dir: build/macos/Build/Products/Release/KwaaiNet.app/Contents/Resources
             artifact_path: build/macos/Build/Products/Release/KwaaiNet.app
-          - os: windows-latest
+          - os: windows-2025-vs2026
             target: windows
             kwaainet_asset: kwaainet-x86_64-pc-windows-msvc.zip
             bundle_dir: build/windows/x64/runner/Release
             artifact_path: build/windows/x64/runner/Release
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Install Linux build dependencies
         if: matrix.target == 'linux'
@@ -89,13 +90,14 @@ jobs:
             libayatana-appindicator3-dev
 
       - name: Install Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
 
       - name: Pub get
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Build ${{ matrix.target }}
         run: flutter build ${{ matrix.target }} --release
@@ -193,7 +195,7 @@ jobs:
             -DestinationPath "$env:GITHUB_WORKSPACE\kwaainet-gui-windows.zip" -Force
 
       - name: Upload ${{ matrix.target }} build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: kwaainet-gui-${{ matrix.target }}
           path: kwaainet-gui-${{ matrix.target }}.${{ matrix.target == 'linux' && 'tar.gz' || 'zip' }}

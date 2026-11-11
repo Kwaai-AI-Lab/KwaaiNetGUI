@@ -39,20 +39,20 @@ jobs:
             kwaainet_asset: kwaainet-x86_64-unknown-linux-gnu.tar.xz
             bundle_dir: build/linux/x64/release/bundle
             artifact_path: build/linux/x64/release/bundle
-          - os: macos-latest
+          - os: macos-26
             target: macos
             kwaainet_asset: kwaainet-aarch64-apple-darwin.tar.xz
             # Resources, not MacOS: the app executable there is `KwaaiNet`, and on
             # case-insensitive APFS installing `kwaainet` beside it overwrites the app.
             bundle_dir: build/macos/Build/Products/Release/KwaaiNet.app/Contents/Resources
             artifact_path: build/macos/Build/Products/Release/KwaaiNet.app
-          - os: windows-latest
+          - os: windows-2025-vs2026
             target: windows
             kwaainet_asset: kwaainet-x86_64-pc-windows-msvc.zip
             bundle_dir: build/windows/x64/runner/Release
             artifact_path: build/windows/x64/runner/Release
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
@@ -64,13 +64,14 @@ jobs:
             libayatana-appindicator3-dev
 
       - name: Install Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.9
           cache: true
 
       - name: Pub get
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Build ${{ matrix.target }}
         run: flutter build ${{ matrix.target }} --release
@@ -150,7 +151,7 @@ jobs:
             -DestinationPath "$env:GITHUB_WORKSPACE\kwaainet-gui-windows.zip" -Force
 
       - name: Stage archive for release
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-${{ matrix.target }}
           path: kwaainet-gui-${{ matrix.target }}.${{ matrix.target == 'linux' && 'tar.gz' || 'zip' }}
@@ -159,18 +160,18 @@ jobs:
   publish:
     name: Publish GitHub Release
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - name: Download all platform archives
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: dist
           merge-multiple: true
 
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           name: KwaaiNet ${{ github.event.inputs.tag || github.ref_name }}
