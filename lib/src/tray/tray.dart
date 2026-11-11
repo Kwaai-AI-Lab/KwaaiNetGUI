@@ -28,6 +28,24 @@ extension on TrayState {
   };
 }
 
+/// The bundled asset to show as the tray icon, and the file name to write it
+/// to. Windows needs an `.ico`: tray_manager loads it with
+/// `LoadImage(IMAGE_ICON, LR_LOADFROMFILE)`, which returns nothing for a PNG,
+/// so the icon silently never appears and the tray menu (with Quit) is
+/// unreachable.
+({String asset, String fileName}) trayIconAsset({required bool isWindows}) {
+  if (isWindows) {
+    return (
+      asset: 'assets/tray_kwaai_logo.ico',
+      fileName: 'tray_kwaai_logo.ico',
+    );
+  }
+  return (
+    asset: 'assets/tray_kwaai_logo@2x.png',
+    fileName: 'tray_kwaai_logo.png',
+  );
+}
+
 /// Drives the macOS menu-bar tray icon + menu. Reads daemon status and
 /// transition state from Riverpod providers, and dispatches start/stop
 /// actions through them so the main UI sees the same Starting…/Stopping…
@@ -65,14 +83,14 @@ class TrayController with TrayListener {
 
   Future<void> init() async {
     if (_enabled) return;
-    // Monochrome logo. macOS menu-bar treats this as a template image and
-    // auto-inverts for dark mode. State is communicated via the menu's
-    // coloured emoji, not by swapping the tray icon.
-    _iconPath = await _materializeIcon(
-      'assets/tray_kwaai_logo@2x.png',
-      'tray_kwaai_logo.png',
-    );
-    await trayManager.setIcon(_iconPath!, isTemplate: true);
+    // macOS and Linux: a monochrome PNG, which the macOS menu bar treats as a
+    // template image and auto-inverts for dark mode. Windows: the colour
+    // .ico (see [trayIconAsset]); template images do not exist there. State
+    // is communicated via the menu's coloured emoji, not by swapping the
+    // tray icon.
+    final icon = trayIconAsset(isWindows: Platform.isWindows);
+    _iconPath = await _materializeIcon(icon.asset, icon.fileName);
+    await trayManager.setIcon(_iconPath!, isTemplate: !Platform.isWindows);
     await trayManager.setToolTip('KwaaiNet — ${_statusText.toLowerCase()}');
     trayManager.addListener(this);
     // Flip _enabled before _rebuildMenu() — it guards on !_enabled and
@@ -267,11 +285,11 @@ class TrayController with TrayListener {
         _log('quit → performQuit');
         // Shared shutdown: shows "Stopping service…" and runs `kwaainet stop`
         // (reaping the node + its detached children). We deliberately keep the
-        // tray icon in place until performQuit returns — the menu already
+        // tray icon in place until the daemon is down — the menu already
         // reflects DaemonTransition.stopping, so reopening it shows "Stopping"
-        // rather than vanishing. dispose() then runs on the way out.
-        await performQuit(_container);
-        await dispose();
+        // rather than vanishing. dispose() then runs before the window
+        // closes, while the plugin can still answer.
+        await performQuit(_container, beforeClose: dispose);
     }
   }
 
