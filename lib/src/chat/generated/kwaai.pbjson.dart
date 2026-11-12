@@ -972,6 +972,14 @@ const NetworkUpdate$json = {
       '5': 13,
       '10': 'bootstrapReachable'
     },
+    {
+      '1': 'hole_punch',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.kwaai.v1.HolePunchStats',
+      '10': 'holePunch'
+    },
   ],
 };
 
@@ -983,7 +991,35 @@ final $typed_data.Uint8List networkUpdateDescriptor = $convert.base64Decode(
     'ADKAsyFy5rd2FhaS52MS5Db25uZWN0ZWRQZWVyUgljb25uZWN0ZWQSLwoHcm91dGluZxgFIAMo'
     'CzIVLmt3YWFpLnYxLlJvdXRpbmdQZWVyUgdyb3V0aW5nEicKD2Jvb3RzdHJhcF90b3RhbBgGIA'
     'EoDVIOYm9vdHN0cmFwVG90YWwSLwoTYm9vdHN0cmFwX3JlYWNoYWJsZRgHIAEoDVISYm9vdHN0'
-    'cmFwUmVhY2hhYmxl');
+    'cmFwUmVhY2hhYmxlEjcKCmhvbGVfcHVuY2gYCCABKAsyGC5rd2FhaS52MS5Ib2xlUHVuY2hTdG'
+    'F0c1IJaG9sZVB1bmNo');
+
+@$core.Deprecated('Use holePunchStatsDescriptor instead')
+const HolePunchStats$json = {
+  '1': 'HolePunchStats',
+  '2': [
+    {'1': 'attempted', '3': 1, '4': 1, '5': 4, '10': 'attempted'},
+    {'1': 'succeeded', '3': 2, '4': 1, '5': 4, '10': 'succeeded'},
+    {'1': 'failed', '3': 3, '4': 1, '5': 4, '10': 'failed'},
+    {
+      '1': 'relayed_connections',
+      '3': 4,
+      '4': 1,
+      '5': 13,
+      '10': 'relayedConnections'
+    },
+    {'1': 'relayed_released', '3': 5, '4': 1, '5': 4, '10': 'relayedReleased'},
+    {'1': 'relayed_idled', '3': 6, '4': 1, '5': 4, '10': 'relayedIdled'},
+  ],
+};
+
+/// Descriptor for `HolePunchStats`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List holePunchStatsDescriptor = $convert.base64Decode(
+    'Cg5Ib2xlUHVuY2hTdGF0cxIcCglhdHRlbXB0ZWQYASABKARSCWF0dGVtcHRlZBIcCglzdWNjZW'
+    'VkZWQYAiABKARSCXN1Y2NlZWRlZBIWCgZmYWlsZWQYAyABKARSBmZhaWxlZBIvChNyZWxheWVk'
+    'X2Nvbm5lY3Rpb25zGAQgASgNUhJyZWxheWVkQ29ubmVjdGlvbnMSKQoQcmVsYXllZF9yZWxlYX'
+    'NlZBgFIAEoBFIPcmVsYXllZFJlbGVhc2VkEiMKDXJlbGF5ZWRfaWRsZWQYBiABKARSDHJlbGF5'
+    'ZWRJZGxlZA==');
 
 @$core.Deprecated('Use storageDiscoveryRequestDescriptor instead')
 const StorageDiscoveryRequest$json = {
