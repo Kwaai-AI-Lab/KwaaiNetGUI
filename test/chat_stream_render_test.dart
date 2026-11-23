@@ -34,6 +34,7 @@ class _ControlledClient extends KwaaiRpcClient {
     required void Function(int? operationId) onOperationId,
     void Function(Stream<pb.InferenceEvent>)? onEvents,
     void Function(Stream<SessionSlowNotice>)? onSlow,
+    List<pb.ChatTurn> messages = const [],
   }) {
     onOperationId(1);
     return source;

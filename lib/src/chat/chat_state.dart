@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../settings.dart';
 import 'chat_message.dart';
+import 'generated/kwaai.pb.dart' as pb;
 import 'inference_events_state.dart';
 import 'kwaai_rpc_client.dart';
 import 'session_client.dart';
@@ -22,6 +23,29 @@ String _elide(String s, {int maxLen = 240, int headTail = 110}) {
   final head = flat.substring(0, headTail);
   final tail = flat.substring(flat.length - headTail);
   return '$head … [${flat.length} chars] … $tail';
+}
+
+/// Most earlier messages sent as context, the same cap `kwaainet rag chat`
+/// uses; the oldest exchanges drop first.
+const maxContextMessages = 20;
+
+/// The conversation to send for [prompt]: each earlier exchange that got an
+/// answer, newest [maxContextMessages] messages, then [prompt]. A failed or
+/// empty answer drops its question too, so turns always alternate.
+List<pb.ChatTurn> conversationTurns(List<ChatMessage> prior, String prompt) {
+  final turns = <pb.ChatTurn>[];
+  for (var i = 0; i + 1 < prior.length; i += 2) {
+    final (q, a) = (prior[i], prior[i + 1]);
+    if (q.role != 'user' || a.role != 'assistant') continue;
+    if (a.error != null || a.streaming || a.text.isEmpty) continue;
+    turns
+      ..add(pb.ChatTurn(role: 'user', content: q.text))
+      ..add(pb.ChatTurn(role: 'assistant', content: a.text));
+  }
+  final kept = turns.length > maxContextMessages
+      ? turns.sublist(turns.length - maxContextMessages)
+      : turns;
+  return [...kept, pb.ChatTurn(role: 'user', content: prompt)];
 }
 
 /// Which gRPC method drives a given transcript. Each path keeps its
@@ -122,6 +146,7 @@ What a vast and fascinating topic! Here are some bullet points about the univers
     if (prompt.trim().isEmpty) return;
     if (_sub != null) return; // ignore overlapping sends
     _log('[${_path.name}] > $prompt');
+    final messages = conversationTurns(state, prompt);
     final user = ChatMessage(role: 'user', text: prompt);
     final assistant = ChatMessage(role: 'assistant', text: '', streaming: true);
     state = [...state, user, assistant];
@@ -158,6 +183,7 @@ What a vast and fascinating topic! Here are some bullet points about the univers
         onOperationId: captureId,
         onEvents: wantEvents ? eventsNotifier.ingest : null,
         onSlow: watchSlow,
+        messages: messages,
       ),
       ChatPath.generateLocal => client.generateLocalCancellable(
         prompt,
@@ -250,8 +276,8 @@ What a vast and fascinating topic! Here are some bullet points about the univers
 
   /// Drop the transcript and abort any in-flight stream. Backs the
   /// composer's "new chat" affordance — the next [send] starts a
-  /// fresh conversation from the daemon's perspective too, since we
-  /// don't replay history.
+  /// fresh conversation from the daemon's perspective too, since the
+  /// daemon keeps none: context is only what [send] replays.
   void newChat() {
     // Same reasoning as [cancel]: abandoning the transcript must also
     // stop the daemon, or a discarded response keeps generating.

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:kwaainet_gui/src/chat/chat_message.dart';
 import 'package:kwaainet_gui/src/chat/chat_state.dart';
 import 'package:kwaainet_gui/src/chat/generated/kwaai.pb.dart' as pb;
 import 'package:kwaainet_gui/src/chat/inference_events_state.dart';
@@ -37,6 +38,9 @@ abstract class _FakeClient extends KwaaiRpcClient {
   /// has something to target.
   int get operationId => 42;
 
+  /// The `messages` of each distributed send, in call order.
+  final List<List<pb.ChatTurn>> sentConversations = [];
+
   Stream<String> tokenStream(String prompt);
 
   @override
@@ -51,7 +55,9 @@ abstract class _FakeClient extends KwaaiRpcClient {
     required void Function(int? operationId) onOperationId,
     void Function(Stream<pb.InferenceEvent>)? onEvents,
     void Function(Stream<SessionSlowNotice>)? onSlow,
+    List<pb.ChatTurn> messages = const [],
   }) {
+    sentConversations.add(messages);
     onOperationId(operationId);
     return tokenStream(prompt);
   }
@@ -144,6 +150,7 @@ class _SlowClient extends _FakeClient {
     required void Function(int? operationId) onOperationId,
     void Function(Stream<pb.InferenceEvent>)? onEvents,
     void Function(Stream<SessionSlowNotice>)? onSlow,
+    List<pb.ChatTurn> messages = const [],
   }) {
     onOperationId(operationId);
     onSlow?.call(slow.stream);
@@ -572,6 +579,74 @@ void main() {
     notifier.cancel();
     expect(container.read(chatSlowNoticeProvider(ChatPath.shardRun)), isNull);
     client.finish();
+  });
+
+  group('conversation context', () {
+    List<String> render(List<pb.ChatTurn> turns) =>
+        [for (final t in turns) '${t.role}:${t.content}'];
+
+    test('a second send carries the first exchange', () async {
+      final client = _StubClient(const ['answer']);
+      final container = ProviderContainer(
+        overrides: [kwaaiRpcClientProvider.overrideWithValue(client)],
+      );
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(chatTranscriptProvider(ChatPath.shardRun).notifier);
+
+      await notifier.send('first');
+      await notifier.send('second');
+
+      expect(render(client.sentConversations[0]), ['user:first']);
+      expect(render(client.sentConversations[1]),
+          ['user:first', 'assistant:answer', 'user:second']);
+    });
+
+    test('newChat starts the next send without context', () async {
+      final client = _StubClient(const ['answer']);
+      final container = ProviderContainer(
+        overrides: [kwaaiRpcClientProvider.overrideWithValue(client)],
+      );
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(chatTranscriptProvider(ChatPath.shardRun).notifier);
+
+      await notifier.send('first');
+      notifier.newChat();
+      await notifier.send('second');
+
+      expect(render(client.sentConversations[1]), ['user:second']);
+    });
+
+    test('a failed or empty answer drops its question', () {
+      final prior = [
+        ChatMessage(role: 'user', text: 'kept'),
+        ChatMessage(role: 'assistant', text: 'yes'),
+        ChatMessage(role: 'user', text: 'failed'),
+        ChatMessage(
+          role: 'assistant',
+          text: 'part',
+          error: ChatError(code: 3, message: 'down'),
+        ),
+        ChatMessage(role: 'user', text: 'empty'),
+        ChatMessage(role: 'assistant', text: ''),
+      ];
+      expect(render(conversationTurns(prior, 'next')),
+          ['user:kept', 'assistant:yes', 'user:next']);
+    });
+
+    test('only the newest exchanges are sent', () {
+      final prior = [
+        for (var i = 0; i < 15; i++) ...[
+          ChatMessage(role: 'user', text: 'q$i'),
+          ChatMessage(role: 'assistant', text: 'a$i'),
+        ],
+      ];
+      final turns = conversationTurns(prior, 'next');
+      expect(turns, hasLength(maxContextMessages + 1));
+      expect(render(turns).first, 'user:q5');
+      expect(render(turns).last, 'user:next');
+    });
   });
 }
 

@@ -363,16 +363,23 @@ class KwaaiRpcClient {
   /// the session has to be opened asynchronously first — a caller
   /// awaiting an id before subscribing would deadlock, since the
   /// request isn't sent until the stream is listened to.
+  ///
+  /// [messages] is the conversation so far, ending on [prompt].
   Stream<String> chatStreamCancellable(
     String prompt, {
     required void Function(int? operationId) onOperationId,
     void Function(Stream<pb.InferenceEvent>)? onEvents,
     void Function(Stream<SessionSlowNotice>)? onSlow,
+    List<pb.ChatTurn> messages = const [],
   }) async* {
     final session = await _sessionOrInit();
     // A non-null [onEvents] is also what asks the daemon to produce events
     // in the first place — no listener, no work.
-    final op = session.shardRunOp(prompt, events: onEvents != null);
+    final op = session.shardRunOp(
+      prompt,
+      events: onEvents != null,
+      messages: messages,
+    );
     onOperationId(op.id);
     onEvents?.call(op.events);
     onSlow?.call(op.slow);

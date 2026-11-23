@@ -1227,6 +1227,7 @@ class ShardRunRequest extends $pb.GeneratedMessage {
     $core.String? model,
     $core.String? conversationId,
     $core.bool? events,
+    $core.Iterable<ChatTurn>? messages,
   }) {
     final result = create();
     if (role != null) result.role = role;
@@ -1234,6 +1235,7 @@ class ShardRunRequest extends $pb.GeneratedMessage {
     if (model != null) result.model = model;
     if (conversationId != null) result.conversationId = conversationId;
     if (events != null) result.events = events;
+    if (messages != null) result.messages.addAll(messages);
     return result;
   }
 
@@ -1255,6 +1257,8 @@ class ShardRunRequest extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'model')
     ..aOS(4, _omitFieldNames ? '' : 'conversationId')
     ..aOB(5, _omitFieldNames ? '' : 'events')
+    ..pPM<ChatTurn>(6, _omitFieldNames ? '' : 'messages',
+        subBuilder: ChatTurn.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1334,6 +1338,79 @@ class ShardRunRequest extends $pb.GeneratedMessage {
   $core.bool hasEvents() => $_has(4);
   @$pb.TagNumber(5)
   void clearEvents() => $_clearField(5);
+
+  /// The whole conversation, oldest first, ending on the user turn to answer;
+  /// when set, role/content are ignored. The client owns the transcript.
+  /// Also set role/content to that last turn: an older daemon answers it alone.
+  @$pb.TagNumber(6)
+  $pb.PbList<ChatTurn> get messages => $_getList(5);
+}
+
+/// One turn of a ShardRunRequest conversation.
+class ChatTurn extends $pb.GeneratedMessage {
+  factory ChatTurn({
+    $core.String? role,
+    $core.String? content,
+  }) {
+    final result = create();
+    if (role != null) result.role = role;
+    if (content != null) result.content = content;
+    return result;
+  }
+
+  ChatTurn._();
+
+  factory ChatTurn.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ChatTurn.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ChatTurn',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'kwaai.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'role')
+    ..aOS(2, _omitFieldNames ? '' : 'content')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ChatTurn clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ChatTurn copyWith(void Function(ChatTurn) updates) =>
+      super.copyWith((message) => updates(message as ChatTurn)) as ChatTurn;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ChatTurn create() => ChatTurn._();
+  @$core.override
+  ChatTurn createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ChatTurn getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ChatTurn>(create);
+  static ChatTurn? _defaultInstance;
+
+  /// "system" (first turn only), "user" or "assistant".
+  @$pb.TagNumber(1)
+  $core.String get role => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set role($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRole() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRole() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get content => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set content($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasContent() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearContent() => $_clearField(2);
 }
 
 /// `kwaainet status` — daemon-side state snapshot.

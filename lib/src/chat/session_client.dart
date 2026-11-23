@@ -202,17 +202,22 @@ class SessionClient {
   /// account of which peers served which blocks. It is off by default
   /// because the daemon does real work to produce it, so it is only worth
   /// asking for when something is going to display it.
+  ///
+  /// [messages] is the whole conversation ending on [prompt]; a daemon that
+  /// predates it answers [prompt] alone.
   SessionOperation shardRunOp(
     String prompt, {
     String role = 'user',
     bool events = false,
+    Iterable<pb.ChatTurn> messages = const [],
   }) => _openOp(
     (id) => pb.ClientFrame()
       ..id = Int64(id)
       ..shardRun = (pb.ShardRunRequest()
         ..role = role
         ..content = prompt
-        ..events = events),
+        ..events = events
+        ..messages.addAll(messages)),
     withEvents: events,
   );
 
