@@ -184,6 +184,7 @@ What a vast and fascinating topic! Here are some bullet points about the univers
         onEvents: wantEvents ? eventsNotifier.ingest : null,
         onSlow: watchSlow,
         messages: messages,
+        maxTokens: ref.read(maxTokensProvider),
       ),
       ChatPath.generateLocal => client.generateLocalCancellable(
         prompt,

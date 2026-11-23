@@ -656,10 +656,20 @@ const ShardRunRequest$json = {
       '6': '.kwaai.v1.ChatTurn',
       '10': 'messages'
     },
+    {
+      '1': 'max_tokens',
+      '3': 7,
+      '4': 1,
+      '5': 13,
+      '9': 2,
+      '10': 'maxTokens',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_model'},
     {'1': '_conversation_id'},
+    {'1': '_max_tokens'},
   ],
 };
 
@@ -668,8 +678,9 @@ final $typed_data.Uint8List shardRunRequestDescriptor = $convert.base64Decode(
     'Cg9TaGFyZFJ1blJlcXVlc3QSEgoEcm9sZRgBIAEoCVIEcm9sZRIYCgdjb250ZW50GAIgASgJUg'
     'djb250ZW50EhkKBW1vZGVsGAMgASgJSABSBW1vZGVsiAEBEiwKD2NvbnZlcnNhdGlvbl9pZBgE'
     'IAEoCUgBUg5jb252ZXJzYXRpb25JZIgBARIWCgZldmVudHMYBSABKAhSBmV2ZW50cxIuCghtZX'
-    'NzYWdlcxgGIAMoCzISLmt3YWFpLnYxLkNoYXRUdXJuUghtZXNzYWdlc0IICgZfbW9kZWxCEgoQ'
-    'X2NvbnZlcnNhdGlvbl9pZA==');
+    'NzYWdlcxgGIAMoCzISLmt3YWFpLnYxLkNoYXRUdXJuUghtZXNzYWdlcxIiCgptYXhfdG9rZW5z'
+    'GAcgASgNSAJSCW1heFRva2Vuc4gBAUIICgZfbW9kZWxCEgoQX2NvbnZlcnNhdGlvbl9pZEINCg'
+    'tfbWF4X3Rva2Vucw==');
 
 @$core.Deprecated('Use chatTurnDescriptor instead')
 const ChatTurn$json = {

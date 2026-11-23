@@ -9,6 +9,7 @@ import 'package:kwaainet_gui/src/chat/generated/kwaai.pb.dart' as pb;
 import 'package:kwaainet_gui/src/chat/inference_events_state.dart';
 import 'package:kwaainet_gui/src/chat/kwaai_rpc_client.dart';
 import 'package:kwaainet_gui/src/chat/session_client.dart';
+import 'package:kwaainet_gui/src/settings.dart';
 
 /// Base for test clients.
 ///
@@ -41,6 +42,9 @@ abstract class _FakeClient extends KwaaiRpcClient {
   /// The `messages` of each distributed send, in call order.
   final List<List<pb.ChatTurn>> sentConversations = [];
 
+  /// The `maxTokens` of each distributed send, in call order.
+  final List<int?> sentMaxTokens = [];
+
   Stream<String> tokenStream(String prompt);
 
   @override
@@ -56,8 +60,10 @@ abstract class _FakeClient extends KwaaiRpcClient {
     void Function(Stream<pb.InferenceEvent>)? onEvents,
     void Function(Stream<SessionSlowNotice>)? onSlow,
     List<pb.ChatTurn> messages = const [],
+    int? maxTokens,
   }) {
     sentConversations.add(messages);
+    sentMaxTokens.add(maxTokens);
     onOperationId(operationId);
     return tokenStream(prompt);
   }
@@ -151,6 +157,7 @@ class _SlowClient extends _FakeClient {
     void Function(Stream<pb.InferenceEvent>)? onEvents,
     void Function(Stream<SessionSlowNotice>)? onSlow,
     List<pb.ChatTurn> messages = const [],
+    int? maxTokens,
   }) {
     onOperationId(operationId);
     onSlow?.call(slow.stream);
@@ -646,6 +653,33 @@ void main() {
       expect(turns, hasLength(maxContextMessages + 1));
       expect(render(turns).first, 'user:q5');
       expect(render(turns).last, 'user:next');
+    });
+  });
+
+  group('max tokens', () {
+    test('a send carries the setting, and none when it is unset', () async {
+      final client = _StubClient(const ['answer']);
+      final container = ProviderContainer(
+        overrides: [kwaaiRpcClientProvider.overrideWithValue(client)],
+      );
+      addTearDown(container.dispose);
+      final notifier =
+          container.read(chatTranscriptProvider(ChatPath.shardRun).notifier);
+
+      await notifier.send('first');
+      container.read(maxTokensProvider.notifier).state = 512;
+      await notifier.send('second');
+
+      expect(client.sentMaxTokens, [null, 512]);
+    });
+
+    test('the field takes 1 to the ceiling, and empty means the default', () {
+      expect(parseMaxTokens(''), (value: null, error: null));
+      expect(parseMaxTokens(' 512 '), (value: 512, error: null));
+      expect(parseMaxTokens('$maxTokensCeiling').value, maxTokensCeiling);
+      for (final bad in ['0', '-1', '${maxTokensCeiling + 1}', '1.5', 'x']) {
+        expect(parseMaxTokens(bad).error, isNotNull, reason: bad);
+      }
     });
   });
 }

@@ -204,22 +204,25 @@ class SessionClient {
   /// asking for when something is going to display it.
   ///
   /// [messages] is the whole conversation ending on [prompt]; a daemon that
-  /// predates it answers [prompt] alone.
+  /// predates it answers [prompt] alone. [maxTokens] caps the answer; null
+  /// leaves the daemon's default.
   SessionOperation shardRunOp(
     String prompt, {
     String role = 'user',
     bool events = false,
     Iterable<pb.ChatTurn> messages = const [],
-  }) => _openOp(
-    (id) => pb.ClientFrame()
+    int? maxTokens,
+  }) => _openOp((id) {
+    final req = pb.ShardRunRequest()
+      ..role = role
+      ..content = prompt
+      ..events = events
+      ..messages.addAll(messages);
+    if (maxTokens != null) req.maxTokens = maxTokens;
+    return pb.ClientFrame()
       ..id = Int64(id)
-      ..shardRun = (pb.ShardRunRequest()
-        ..role = role
-        ..content = prompt
-        ..events = events
-        ..messages.addAll(messages)),
-    withEvents: events,
-  );
+      ..shardRun = req;
+  }, withEvents: events);
 
   /// `kwaainet generate <PROMPT>` — single-node local inference. Used
   /// by the Developer tab to drive the local InferenceEngine directly.

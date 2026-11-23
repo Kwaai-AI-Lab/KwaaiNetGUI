@@ -364,13 +364,15 @@ class KwaaiRpcClient {
   /// awaiting an id before subscribing would deadlock, since the
   /// request isn't sent until the stream is listened to.
   ///
-  /// [messages] is the conversation so far, ending on [prompt].
+  /// [messages] is the conversation so far, ending on [prompt]. [maxTokens]
+  /// caps the answer; null leaves the daemon's default.
   Stream<String> chatStreamCancellable(
     String prompt, {
     required void Function(int? operationId) onOperationId,
     void Function(Stream<pb.InferenceEvent>)? onEvents,
     void Function(Stream<SessionSlowNotice>)? onSlow,
     List<pb.ChatTurn> messages = const [],
+    int? maxTokens,
   }) async* {
     final session = await _sessionOrInit();
     // A non-null [onEvents] is also what asks the daemon to produce events
@@ -379,6 +381,7 @@ class KwaaiRpcClient {
       prompt,
       events: onEvents != null,
       messages: messages,
+      maxTokens: maxTokens,
     );
     onOperationId(op.id);
     onEvents?.call(op.events);

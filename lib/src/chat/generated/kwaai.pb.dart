@@ -1228,6 +1228,7 @@ class ShardRunRequest extends $pb.GeneratedMessage {
     $core.String? conversationId,
     $core.bool? events,
     $core.Iterable<ChatTurn>? messages,
+    $core.int? maxTokens,
   }) {
     final result = create();
     if (role != null) result.role = role;
@@ -1236,6 +1237,7 @@ class ShardRunRequest extends $pb.GeneratedMessage {
     if (conversationId != null) result.conversationId = conversationId;
     if (events != null) result.events = events;
     if (messages != null) result.messages.addAll(messages);
+    if (maxTokens != null) result.maxTokens = maxTokens;
     return result;
   }
 
@@ -1259,6 +1261,7 @@ class ShardRunRequest extends $pb.GeneratedMessage {
     ..aOB(5, _omitFieldNames ? '' : 'events')
     ..pPM<ChatTurn>(6, _omitFieldNames ? '' : 'messages',
         subBuilder: ChatTurn.create)
+    ..aI(7, _omitFieldNames ? '' : 'maxTokens', fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1344,6 +1347,16 @@ class ShardRunRequest extends $pb.GeneratedMessage {
   /// Also set role/content to that last turn: an older daemon answers it alone.
   @$pb.TagNumber(6)
   $pb.PbList<ChatTurn> get messages => $_getList(5);
+
+  /// Most tokens to generate; unset is the daemon's default (200). 0 is refused.
+  @$pb.TagNumber(7)
+  $core.int get maxTokens => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set maxTokens($core.int value) => $_setUnsignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasMaxTokens() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearMaxTokens() => $_clearField(7);
 }
 
 /// One turn of a ShardRunRequest conversation.

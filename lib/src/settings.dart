@@ -48,6 +48,7 @@ class Settings {
   static const _ragKey = 'experimental.ragEnabled';
   static const _skippedVersionKey = 'app.skippedVersion';
   static const _autoDownloadKey = 'app.autoDownloadUpdates';
+  static const _maxTokensKey = 'chat.maxTokens';
 
   final SharedPreferences _prefs;
 
@@ -117,6 +118,10 @@ class Settings {
   /// fetched until they click Update. Defaults to true.
   bool get autoDownloadUpdates => _prefs.getBool(_autoDownloadKey) ?? true;
 
+  /// Most tokens a distributed chat answer may run to. Null leaves it to the
+  /// daemon, whose default is [defaultMaxTokens].
+  int? get maxTokens => _prefs.getInt(_maxTokensKey);
+
   Future<void> setMode(DaemonMode m) async {
     await _prefs.setString(_modeKey, _serialize(m));
   }
@@ -151,6 +156,14 @@ class Settings {
 
   Future<void> setAutoDownloadUpdates(bool v) async {
     await _prefs.setBool(_autoDownloadKey, v);
+  }
+
+  Future<void> setMaxTokens(int? v) async {
+    if (v == null) {
+      await _prefs.remove(_maxTokensKey);
+    } else {
+      await _prefs.setInt(_maxTokensKey, v);
+    }
   }
 
   Future<void> setSkippedVersion(String? v) async {
@@ -207,3 +220,29 @@ final skippedVersionProvider = StateProvider<String?>((_) => null);
 /// start downloading on its own. Seeded by main.dart at startup; the Settings
 /// UI writes through to both.
 final autoDownloadUpdatesProvider = StateProvider<bool>((_) => true);
+
+/// The daemon's answer length when the request names none.
+const defaultMaxTokens = 200;
+
+/// Largest answer length the setting accepts, to catch a stray extra digit.
+const maxTokensCeiling = 4096;
+
+/// Parse the max-tokens field: empty means the daemon's default (null).
+/// Returns the value, or an error to show beside the field.
+({int? value, String? error}) parseMaxTokens(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return (value: null, error: null);
+  final n = int.tryParse(trimmed);
+  if (n == null || n < 1 || n > maxTokensCeiling) {
+    return (
+      value: null,
+      error: 'Must be a whole number from 1 to $maxTokensCeiling.',
+    );
+  }
+  return (value: n, error: null);
+}
+
+/// Riverpod-visible mirror of [Settings.maxTokens], read by each
+/// distributed chat send. Seeded by main.dart; the Settings UI writes
+/// through to both.
+final maxTokensProvider = StateProvider<int?>((_) => null);

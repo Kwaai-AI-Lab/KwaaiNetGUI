@@ -2431,6 +2431,8 @@ class _DeveloperTab extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _FeatureCard(child: _MaxTokensSection(settings: settings)),
+          const SizedBox(height: 12),
           _FeatureCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2492,6 +2494,88 @@ class _DeveloperTab extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// How long a distributed chat answer may run. Saved on every valid edit;
+/// empty hands the choice back to the daemon.
+class _MaxTokensSection extends ConsumerStatefulWidget {
+  const _MaxTokensSection({required this.settings});
+
+  final Settings settings;
+
+  @override
+  ConsumerState<_MaxTokensSection> createState() => _MaxTokensSectionState();
+}
+
+class _MaxTokensSectionState extends ConsumerState<_MaxTokensSection> {
+  late final TextEditingController _controller = TextEditingController(
+    text: ref.read(maxTokensProvider)?.toString() ?? '',
+  );
+
+  /// Set while the box holds something we refuse to save.
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _commit(String raw) async {
+    final parsed = parseMaxTokens(raw);
+    setState(() => _error = parsed.error);
+    if (parsed.error != null) return;
+    await widget.settings.setMaxTokens(parsed.value);
+    ref.read(maxTokensProvider.notifier).state = parsed.value;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const KwaaiHeading('Chat'),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            const Expanded(child: Text('Max response tokens')),
+            SizedBox(
+              width: 110,
+              child: KwaaiTextField(
+                controller: _controller,
+                hintText: '$defaultMaxTokens',
+                onChanged: _commit,
+                onSubmitted: _commit,
+                onEditingComplete: () => _commit(_controller.text),
+              ),
+            ),
+          ],
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              _error!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Text(
+          'The longest a Chat answer may run, in tokens. Leave it empty for '
+          'the node\'s default ($defaultMaxTokens). Applies from the next '
+          'message; a node older than this setting ignores it.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }
