@@ -648,6 +648,14 @@ const ShardRunRequest$json = {
       '17': true
     },
     {'1': 'events', '3': 5, '4': 1, '5': 8, '10': 'events'},
+    {
+      '1': 'messages',
+      '3': 6,
+      '4': 3,
+      '5': 11,
+      '6': '.kwaai.v1.ChatTurn',
+      '10': 'messages'
+    },
   ],
   '8': [
     {'1': '_model'},
@@ -659,8 +667,23 @@ const ShardRunRequest$json = {
 final $typed_data.Uint8List shardRunRequestDescriptor = $convert.base64Decode(
     'Cg9TaGFyZFJ1blJlcXVlc3QSEgoEcm9sZRgBIAEoCVIEcm9sZRIYCgdjb250ZW50GAIgASgJUg'
     'djb250ZW50EhkKBW1vZGVsGAMgASgJSABSBW1vZGVsiAEBEiwKD2NvbnZlcnNhdGlvbl9pZBgE'
-    'IAEoCUgBUg5jb252ZXJzYXRpb25JZIgBARIWCgZldmVudHMYBSABKAhSBmV2ZW50c0IICgZfbW'
-    '9kZWxCEgoQX2NvbnZlcnNhdGlvbl9pZA==');
+    'IAEoCUgBUg5jb252ZXJzYXRpb25JZIgBARIWCgZldmVudHMYBSABKAhSBmV2ZW50cxIuCghtZX'
+    'NzYWdlcxgGIAMoCzISLmt3YWFpLnYxLkNoYXRUdXJuUghtZXNzYWdlc0IICgZfbW9kZWxCEgoQ'
+    'X2NvbnZlcnNhdGlvbl9pZA==');
+
+@$core.Deprecated('Use chatTurnDescriptor instead')
+const ChatTurn$json = {
+  '1': 'ChatTurn',
+  '2': [
+    {'1': 'role', '3': 1, '4': 1, '5': 9, '10': 'role'},
+    {'1': 'content', '3': 2, '4': 1, '5': 9, '10': 'content'},
+  ],
+};
+
+/// Descriptor for `ChatTurn`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List chatTurnDescriptor = $convert.base64Decode(
+    'CghDaGF0VHVybhISCgRyb2xlGAEgASgJUgRyb2xlEhgKB2NvbnRlbnQYAiABKAlSB2NvbnRlbn'
+    'Q=');
 
 @$core.Deprecated('Use statusRequestDescriptor instead')
 const StatusRequest$json = {

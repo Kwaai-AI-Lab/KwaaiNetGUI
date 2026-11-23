@@ -85,6 +85,24 @@ void main() {
       expect(stub.sent.single.shardRun.events, isTrue);
     });
 
+    test('sends the conversation alongside the last prompt', () async {
+      client.shardRunOp(
+        'bye',
+        messages: [
+          pb.ChatTurn(role: 'user', content: 'hi'),
+          pb.ChatTurn(role: 'assistant', content: 'hello'),
+          pb.ChatTurn(role: 'user', content: 'bye'),
+        ],
+      );
+      await Future<void>.delayed(Duration.zero);
+      final req = stub.sent.single.shardRun;
+      expect(req.content, 'bye');
+      expect(
+        [for (final t in req.messages) t.role],
+        ['user', 'assistant', 'user'],
+      );
+    });
+
     test('events stream is empty when not requested', () async {
       final op = client.shardRunOp('hi');
       expect(await op.events.toList(), isEmpty);
