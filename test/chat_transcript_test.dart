@@ -9,6 +9,7 @@ import 'package:kwaainet_gui/src/chat/generated/kwaai.pb.dart' as pb;
 import 'package:kwaainet_gui/src/chat/inference_events_state.dart';
 import 'package:kwaainet_gui/src/chat/kwaai_rpc_client.dart';
 import 'package:kwaainet_gui/src/chat/session_client.dart';
+import 'package:kwaainet_gui/src/settings.dart';
 
 /// Base for test clients.
 ///
@@ -643,9 +644,44 @@ void main() {
         ],
       ];
       final turns = conversationTurns(prior, 'next');
-      expect(turns, hasLength(maxContextMessages + 1));
+      expect(turns, hasLength(2 * defaultContextExchanges + 1));
       expect(render(turns).first, 'user:q5');
       expect(render(turns).last, 'user:next');
+
+      expect(render(conversationTurns(prior, 'next', exchanges: 1)),
+          ['user:q14', 'assistant:a14', 'user:next']);
+      expect(render(conversationTurns(prior, 'next', exchanges: 0)),
+          ['user:next']);
+    });
+
+    test('a system prompt leads, and a blank one is left out', () {
+      final prior = [
+        ChatMessage(role: 'user', text: 'q'),
+        ChatMessage(role: 'assistant', text: 'a'),
+      ];
+      expect(
+          render(conversationTurns(prior, 'next', systemPrompt: 'Be brief.')),
+          ['system:Be brief.', 'user:q', 'assistant:a', 'user:next']);
+      expect(render(conversationTurns(prior, 'next', systemPrompt: '  ')),
+          ['user:q', 'assistant:a', 'user:next']);
+    });
+
+    test('a send uses the system prompt and context settings', () async {
+      final client = _StubClient(const ['answer']);
+      final container = ProviderContainer(
+        overrides: [kwaaiRpcClientProvider.overrideWithValue(client)],
+      );
+      addTearDown(container.dispose);
+      container.read(systemPromptProvider.notifier).state = 'Be brief.';
+      container.read(contextExchangesProvider.notifier).state = 0;
+      final notifier =
+          container.read(chatTranscriptProvider(ChatPath.shardRun).notifier);
+
+      await notifier.send('first');
+      await notifier.send('second');
+
+      expect(render(client.sentConversations[1]),
+          ['system:Be brief.', 'user:second']);
     });
   });
 }

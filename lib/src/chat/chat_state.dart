@@ -25,27 +25,32 @@ String _elide(String s, {int maxLen = 240, int headTail = 110}) {
   return '$head … [${flat.length} chars] … $tail';
 }
 
-/// Most earlier messages sent as context, the same cap `kwaainet rag chat`
-/// uses; the oldest exchanges drop first.
-const maxContextMessages = 20;
-
-/// The conversation to send for [prompt]: each earlier exchange that got an
-/// answer, newest [maxContextMessages] messages, then [prompt]. A failed or
-/// empty answer drops its question too, so turns always alternate.
-List<pb.ChatTurn> conversationTurns(List<ChatMessage> prior, String prompt) {
-  final turns = <pb.ChatTurn>[];
+/// The conversation to send for [prompt]: [systemPrompt] if any, the newest
+/// [exchanges] earlier exchanges that got an answer, then [prompt]. A failed
+/// or empty answer drops its question too, so turns always alternate.
+List<pb.ChatTurn> conversationTurns(
+  List<ChatMessage> prior,
+  String prompt, {
+  String systemPrompt = '',
+  int exchanges = defaultContextExchanges,
+}) {
+  final pairs = <List<pb.ChatTurn>>[];
   for (var i = 0; i + 1 < prior.length; i += 2) {
     final (q, a) = (prior[i], prior[i + 1]);
     if (q.role != 'user' || a.role != 'assistant') continue;
     if (a.error != null || a.streaming || a.text.isEmpty) continue;
-    turns
-      ..add(pb.ChatTurn(role: 'user', content: q.text))
-      ..add(pb.ChatTurn(role: 'assistant', content: a.text));
+    pairs.add([
+      pb.ChatTurn(role: 'user', content: q.text),
+      pb.ChatTurn(role: 'assistant', content: a.text),
+    ]);
   }
-  final kept = turns.length > maxContextMessages
-      ? turns.sublist(turns.length - maxContextMessages)
-      : turns;
-  return [...kept, pb.ChatTurn(role: 'user', content: prompt)];
+  final kept = pairs.skip(pairs.length - exchanges.clamp(0, pairs.length));
+  return [
+    if (systemPrompt.trim().isNotEmpty)
+      pb.ChatTurn(role: 'system', content: systemPrompt),
+    for (final pair in kept) ...pair,
+    pb.ChatTurn(role: 'user', content: prompt),
+  ];
 }
 
 /// Which gRPC method drives a given transcript. Each path keeps its
@@ -146,7 +151,12 @@ What a vast and fascinating topic! Here are some bullet points about the univers
     if (prompt.trim().isEmpty) return;
     if (_sub != null) return; // ignore overlapping sends
     _log('[${_path.name}] > $prompt');
-    final messages = conversationTurns(state, prompt);
+    final messages = conversationTurns(
+      state,
+      prompt,
+      systemPrompt: ref.read(systemPromptProvider),
+      exchanges: ref.read(contextExchangesProvider),
+    );
     final user = ChatMessage(role: 'user', text: prompt);
     final assistant = ChatMessage(role: 'assistant', text: '', streaming: true);
     state = [...state, user, assistant];

@@ -45,144 +45,82 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
       s.maxConnections;
       s.healthEnabled;
       s.healthEndpoint;
+      s.blocks;
+      s.startBlock;
+      s.startBlockAuto;
+      s.useGpu;
+      s.shardBackend;
+      s.autoRebalance;
+      s.rebalanceIntervalSecs;
+      s.rebalanceMinRedundancy;
+      s.forwardChainServe;
+      s.publicName;
+      s.vpkEnabled;
+      s.vpkMode;
+      s.storageDataDir;
       return true;
     } catch (_) {
       return false;
     }
   }
 
-  void setModel(String v) {
+  // Every setter takes null to clear its key, so the daemon's default applies.
+  void _update(ConfigSnapshot Function(ConfigSnapshot) change) {
     final s = state;
-    if (s == null) return;
-    state = s.copyWith(model: v);
+    if (s != null) state = change(s);
   }
 
-  void setShardingEnabled(bool v) {
-    final s = state;
-    if (s == null) return;
-    state = s.copyWith(shardingEnabled: v);
-  }
+  void setModel(String? v) => _update((s) => s.copyWith(model: v));
+  void setShardingEnabled(bool? v) =>
+      _update((s) => s.copyWith(shardingEnabled: v));
+  void setStorageEnabled(bool? v) =>
+      _update((s) => s.copyWith(storageEnabled: v));
+  void setStorageCapacityGb(double? v) =>
+      _update((s) => s.copyWith(storageCapacityGb: v));
+  void setPort(int? v) => _update((s) => s.copyWith(port: v));
+  void setPublicIp(String? v) => _update((s) => s.copyWith(publicIp: v));
+  void setInitialPeers(List<String>? v) =>
+      _update((s) => s.copyWith(initialPeers: v));
+  void setForcePrivate(bool? v) => _update((s) => s.copyWith(forcePrivate: v));
+  void setEnableUpnp(bool? v) => _update((s) => s.copyWith(enableUpnp: v));
+  void setEnableQuic(bool? v) => _update((s) => s.copyWith(enableQuic: v));
+  void setIpv6(Ipv6Mode? v) => _update((s) => s.copyWith(ipv6: v));
 
-  void setStorageEnabled(bool v) {
-    final s = state;
-    if (s == null) return;
-    state = s.copyWith(storageEnabled: v);
-  }
+  void setMaxConnections(int? v) =>
+      _update((s) => s.copyWith(maxConnections: v));
+  void setHealthEnabled(bool? v) =>
+      _update((s) => s.copyWith(healthEnabled: v));
+  void setHealthEndpoint(String? v) =>
+      _update((s) => s.copyWith(healthEndpoint: v));
+  void setBlocks(int? v) => _update((s) => s.copyWith(blocks: v));
 
-  void setStorageCapacityGb(double? v) {
-    final s = state;
-    if (s == null) return;
-    // copyWith treats null as "leave unchanged", so we have to rebuild
-    // the snapshot to clear a previously-set capacity.
-    state = ConfigSnapshot(
-      model: s.model,
-      shardingEnabled: s.shardingEnabled,
-      storageEnabled: s.storageEnabled,
-      storageCapacityGb: v,
-      port: s.port,
-      publicIp: s.publicIp,
-      initialPeers: s.initialPeers,
-      forcePrivate: s.forcePrivate,
-      enableUpnp: s.enableUpnp,
-      enableQuic: s.enableQuic,
-      ipv6: s.ipv6,
-      maxConnections: s.maxConnections,
-      healthEnabled: s.healthEnabled,
-      healthEndpoint: s.healthEndpoint,
-    );
-  }
-
-  void setPort(int? v) {
-    final s = state;
-    if (s == null) return;
-    state = ConfigSnapshot(
-      model: s.model,
-      shardingEnabled: s.shardingEnabled,
-      storageEnabled: s.storageEnabled,
-      storageCapacityGb: s.storageCapacityGb,
-      port: v,
-      publicIp: s.publicIp,
-      initialPeers: s.initialPeers,
-      forcePrivate: s.forcePrivate,
-      enableUpnp: s.enableUpnp,
-      enableQuic: s.enableQuic,
-      ipv6: s.ipv6,
-      maxConnections: s.maxConnections,
-      healthEnabled: s.healthEnabled,
-      healthEndpoint: s.healthEndpoint,
-    );
-  }
-
-  void setPublicIp(String v) {
-    final s = state;
-    if (s == null) return;
-    state = s.copyWith(publicIp: v);
-  }
-
-  void setInitialPeers(List<String> v) {
-    final s = state;
-    if (s == null) return;
-    state = s.copyWith(initialPeers: v);
-  }
-
-  void setForcePrivate(bool v) {
-    final s = state;
-    if (s == null) return;
-    state = s.copyWith(forcePrivate: v);
-  }
-
-  void setEnableUpnp(bool v) {
-    final s = state;
-    if (s == null) return;
-    state = s.copyWith(enableUpnp: v);
-  }
-
-  void setEnableQuic(bool v) {
-    final s = state;
-    if (s == null) return;
-    state = s.copyWith(enableQuic: v);
-  }
-
-  void setIpv6(Ipv6Mode v) {
-    final s = state;
-    if (s == null) return;
-    state = s.copyWith(ipv6: v);
-  }
-
-  /// Null clears the key so the daemon's own default applies; copyWith
-  /// treats null as "unchanged", so this rebuilds the snapshot.
-  void setMaxConnections(int? v) {
-    final s = state;
-    if (s == null) return;
-    state = ConfigSnapshot(
-      model: s.model,
-      shardingEnabled: s.shardingEnabled,
-      storageEnabled: s.storageEnabled,
-      storageCapacityGb: s.storageCapacityGb,
-      port: s.port,
-      publicIp: s.publicIp,
-      initialPeers: s.initialPeers,
-      forcePrivate: s.forcePrivate,
-      enableUpnp: s.enableUpnp,
-      enableQuic: s.enableQuic,
-      ipv6: s.ipv6,
-      maxConnections: v,
-      healthEnabled: s.healthEnabled,
-      healthEndpoint: s.healthEndpoint,
-    );
-  }
-
-  void setHealthEnabled(bool v) {
-    final s = state;
-    if (s == null) return;
-    state = s.copyWith(healthEnabled: v);
-  }
-
-  void setHealthEndpoint(String v) {
-    final s = state;
-    if (s == null) return;
-    state = s.copyWith(healthEndpoint: v);
-  }
+  /// A start block typed here is the operator's pin; null hands placement
+  /// back to `shard serve`.
+  void setStartBlock(int? v) =>
+      _update((s) => s.copyWith(startBlock: v, startBlockAuto: false));
+  /// An emptied start-block field: back to the file's placement if that was
+  /// automatic (so the recorded range survives), else unplaced.
+  void clearStartBlock(ConfigSnapshot onDisk) => _update(
+    (s) => onDisk.startBlockAuto
+        ? s.copyWith(startBlock: onDisk.startBlock, startBlockAuto: true)
+        : s.copyWith(startBlock: null, startBlockAuto: false),
+  );
+  void setUseGpu(bool? v) => _update((s) => s.copyWith(useGpu: v));
+  void setShardBackend(ShardBackend? v) =>
+      _update((s) => s.copyWith(shardBackend: v));
+  void setAutoRebalance(bool? v) =>
+      _update((s) => s.copyWith(autoRebalance: v));
+  void setRebalanceIntervalSecs(int? v) =>
+      _update((s) => s.copyWith(rebalanceIntervalSecs: v));
+  void setRebalanceMinRedundancy(int? v) =>
+      _update((s) => s.copyWith(rebalanceMinRedundancy: v));
+  void setForwardChainServe(bool? v) =>
+      _update((s) => s.copyWith(forwardChainServe: v));
+  void setPublicName(String? v) => _update((s) => s.copyWith(publicName: v));
+  void setVpkEnabled(bool? v) => _update((s) => s.copyWith(vpkEnabled: v));
+  void setVpkMode(VpkMode? v) => _update((s) => s.copyWith(vpkMode: v));
+  void setStorageDataDir(String? v) =>
+      _update((s) => s.copyWith(storageDataDir: v));
 
   /// True when the draft differs from the on-disk snapshot.
   bool isDirty(ConfigSnapshot onDisk) {
@@ -201,10 +139,24 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
         s.ipv6 != onDisk.ipv6 ||
         s.maxConnections != onDisk.maxConnections ||
         s.healthEnabled != onDisk.healthEnabled ||
-        s.healthEndpoint != onDisk.healthEndpoint;
+        s.healthEndpoint != onDisk.healthEndpoint ||
+        s.blocks != onDisk.blocks ||
+        s.startBlock != onDisk.startBlock ||
+        s.startBlockAuto != onDisk.startBlockAuto ||
+        s.useGpu != onDisk.useGpu ||
+        s.shardBackend != onDisk.shardBackend ||
+        s.autoRebalance != onDisk.autoRebalance ||
+        s.rebalanceIntervalSecs != onDisk.rebalanceIntervalSecs ||
+        s.rebalanceMinRedundancy != onDisk.rebalanceMinRedundancy ||
+        s.forwardChainServe != onDisk.forwardChainServe ||
+        s.publicName != onDisk.publicName ||
+        s.vpkEnabled != onDisk.vpkEnabled ||
+        s.vpkMode != onDisk.vpkMode ||
+        s.storageDataDir != onDisk.storageDataDir;
   }
 
-  static bool _listsEqual(List<String> a, List<String> b) {
+  static bool _listsEqual(List<String>? a, List<String>? b) {
+    if (a == null || b == null) return a == b;
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
       if (a[i] != b[i]) return false;
@@ -241,3 +193,9 @@ class RestartNeededNotifier extends Notifier<bool> {
 final restartNeededProvider = NotifierProvider<RestartNeededNotifier, bool>(
   RestartNeededNotifier.new,
 );
+
+/// The Chat tab's config keys, as on disk. Saved straight away (see
+/// [ConfigFile.saveChat]); invalidate after writing.
+final chatConfigProvider = FutureProvider<ChatConfig>((ref) async {
+  return ConfigFile.loadChat();
+});
