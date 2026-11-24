@@ -16,6 +16,7 @@ class KwaaiTextField extends StatefulWidget {
     this.onEditingComplete,
     this.trailing,
     this.enabled = true,
+    this.maxLines = 1,
   });
 
   final TextEditingController controller;
@@ -37,6 +38,9 @@ class KwaaiTextField extends StatefulWidget {
   final Widget? trailing;
 
   final bool enabled;
+
+  /// Lines shown before the field scrolls; more than 1 makes it multi-line.
+  final int maxLines;
 
   @override
   State<KwaaiTextField> createState() => _KwaaiTextFieldState();
@@ -98,6 +102,8 @@ class _KwaaiTextFieldState extends State<KwaaiTextField> {
         controller: widget.controller,
         focusNode: _focusNode,
         enabled: widget.enabled,
+        maxLines: widget.maxLines,
+        minLines: widget.maxLines > 1 ? 2 : 1,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.0),
         onChanged: widget.onChanged,
         onSubmitted: widget.onSubmitted,

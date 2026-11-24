@@ -118,6 +118,12 @@ Future<void> main() async {
         (_) => settings.inferencePanelEnabled,
       ),
       ragEnabledProvider.overrideWith((_) => settings.ragEnabled),
+      systemPromptProvider.overrideWith((_) => settings.systemPrompt),
+      contextExchangesProvider.overrideWith(
+        (_) => settings.contextExchanges,
+      ),
+      ragTopKProvider.overrideWith((_) => settings.ragTopK),
+      ragMinScoreProvider.overrideWith((_) => settings.ragMinScore),
       // Seed the skipped-version mirror so the update banner suppresses a
       // previously-skipped release on first paint.
       skippedVersionProvider.overrideWith((_) => settings.skippedVersion),

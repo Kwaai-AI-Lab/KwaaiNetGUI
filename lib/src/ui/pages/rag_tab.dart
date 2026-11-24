@@ -7,6 +7,7 @@ import '../../chat/generated/kwaai.pb.dart' as pb;
 import '../../chat/kwaai_rpc_client.dart';
 import '../../daemon/daemon_state.dart';
 import '../../daemon/rag_state.dart';
+import '../../settings.dart';
 import '../theme/kwaai_theme.dart';
 import '../widgets/kwaai_button.dart';
 import '../widgets/kwaai_dropdown.dart';
@@ -365,12 +366,14 @@ class _NewKbDialogState extends State<_NewKbDialog> {
   // Owned here, not by the caller: showDialog's future resolves at pop,
   // while the field is still on screen for the route's exit transition.
   final _controller = TextEditingController();
+  final _embedModel = TextEditingController();
   String? _error;
   bool _busy = false;
 
   @override
   void dispose() {
     _controller.dispose();
+    _embedModel.dispose();
     super.dispose();
   }
 
@@ -388,7 +391,7 @@ class _NewKbDialogState extends State<_NewKbDialog> {
     try {
       final reply = await widget.ref
           .read(kwaaiRpcClientProvider)
-          .ragInit(kb: name);
+          .ragInit(kb: name, embedModel: _embedModel.text.trim());
       widget.ref.read(selectedKbProvider.notifier).state = reply.kb.name;
       widget.ref.invalidate(ragStatusProvider);
       if (mounted) Navigator.of(context).pop();
@@ -416,6 +419,20 @@ class _NewKbDialogState extends State<_NewKbDialog> {
             KwaaiTextField(
               controller: _controller,
               hintText: 'e.g. handbook',
+              enabled: !_busy,
+              onSubmitted: (_) => _busy ? null : _create(),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Embedding model',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 4),
+            KwaaiTextField(
+              controller: _embedModel,
+              // Empty lets the daemon choose; it fixes the model once the KB
+              // holds documents.
+              hintText: 'Default (nomic-embed-text)',
               enabled: !_busy,
               onSubmitted: (_) => _busy ? null : _create(),
             ),
@@ -971,7 +988,12 @@ class _QuerySectionState extends ConsumerState<_QuerySection> {
     try {
       final reply = await ref
           .read(kwaaiRpcClientProvider)
-          .ragQuery(text: text, kb: widget.kb.name);
+          .ragQuery(
+            text: text,
+            kb: widget.kb.name,
+            topK: ref.read(ragTopKProvider) ?? 0,
+            minScore: ref.read(ragMinScoreProvider),
+          );
       if (!mounted) return;
       setState(() => _results = reply.chunks);
     } catch (e) {
@@ -1026,7 +1048,16 @@ class _QuerySectionState extends ConsumerState<_QuerySection> {
                   onSubmitted: (_) => _run(),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
+              IconButton(
+                tooltip: 'Retrieval settings',
+                icon: const Icon(Icons.tune),
+                onPressed: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => const _RetrievalDialog(),
+                ),
+              ),
+              const SizedBox(width: 4),
               KwaaiButton(
                 label: 'Query',
                 onPressed: widget.enabled && !_busy ? _run : null,
@@ -1173,6 +1204,128 @@ class _ChunkCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// How many chunks a query returns and the lowest score kept. Saved as they
+/// are edited and used from the next query.
+class _RetrievalDialog extends ConsumerStatefulWidget {
+  const _RetrievalDialog();
+
+  @override
+  ConsumerState<_RetrievalDialog> createState() => _RetrievalDialogState();
+}
+
+class _RetrievalDialogState extends ConsumerState<_RetrievalDialog> {
+  late final _topK = TextEditingController(
+    text: ref.read(ragTopKProvider)?.toString() ?? '',
+  );
+  late final _minScore = TextEditingController(
+    text: _formatScore(ref.read(ragMinScoreProvider)),
+  );
+  String? _topKError;
+  String? _minScoreError;
+
+  static String _formatScore(double v) => v == 0 ? '' : '$v';
+
+  @override
+  void dispose() {
+    _topK.dispose();
+    _minScore.dispose();
+    super.dispose();
+  }
+
+  Future<void> _commitTopK(String raw) async {
+    final parsed = parseBoundedInt(raw, min: 1, max: maxRagTopK);
+    setState(() => _topKError = parsed.error);
+    if (parsed.error != null) return;
+    await ref.read(settingsProvider).setRagTopK(parsed.value);
+    ref.read(ragTopKProvider.notifier).state = parsed.value;
+  }
+
+  Future<void> _commitMinScore(String raw) async {
+    final parsed = parseMinScore(raw);
+    setState(() => _minScoreError = parsed.error);
+    if (parsed.error != null) return;
+    await ref.read(settingsProvider).setRagMinScore(parsed.value);
+    ref.read(ragMinScoreProvider.notifier).state = parsed.value;
+  }
+
+  Widget _field({
+    required String label,
+    required TextEditingController controller,
+    required String hint,
+    required ValueChanged<String> onChanged,
+    required String? error,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(label, style: theme.textTheme.bodySmall),
+        const SizedBox(height: 4),
+        KwaaiTextField(
+          controller: controller,
+          hintText: hint,
+          onChanged: onChanged,
+        ),
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              error,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Retrieval'),
+      content: SizedBox(
+        width: 360,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _field(
+              label: 'Chunks returned',
+              controller: _topK,
+              hint: 'Default (20)',
+              onChanged: _commitTopK,
+              error: _topKError,
+            ),
+            const SizedBox(height: 12),
+            _field(
+              label: 'Minimum score',
+              controller: _minScore,
+              hint: '0 keeps everything',
+              onChanged: _commitMinScore,
+              error: _minScoreError,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Scores depend on how the chunks were matched, so check the '
+              'scores in a query\'s results before raising the minimum.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Done'),
+        ),
+      ],
     );
   }
 }

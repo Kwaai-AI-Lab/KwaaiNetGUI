@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -261,6 +263,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       const DhtTab()
                     else
                       const SizedBox.shrink(),
+                    _ChatTab(settings: widget.settings),
                     const _ContributeTab(),
                     const _NetworkTab(),
                     const _AppearanceTab(),
@@ -380,6 +383,7 @@ const _settingsNavEntries = <_SettingsNavEntry>[
   // The hivemind DHT's contents, as opposed to the Kademlia routing table the
   // Peers tab shows — different layer, different store.
   _SettingsNavEntry(Icons.key_outlined, Icons.key, 'DHT'),
+  _SettingsNavEntry(Icons.chat_bubble_outline, Icons.chat_bubble, 'Chat'),
   _SettingsNavEntry(
     Icons.volunteer_activism_outlined,
     Icons.volunteer_activism,
@@ -1365,7 +1369,9 @@ class _ContributeTab extends ConsumerWidget {
         final draft = ref.watch(featuresDraftProvider) ?? snapshot;
         return _DraftTabLayout(
           sections: [
-            _FeatureCard(child: _ShardingSection(draft: draft)),
+            _FeatureCard(
+              child: _ShardingSection(draft: draft, onDisk: snapshot),
+            ),
             const SizedBox(height: 12),
             _FeatureCard(child: _StorageSection(draft: draft)),
           ],
@@ -1431,6 +1437,8 @@ class _NetworkTab extends ConsumerWidget {
         final draft = ref.watch(featuresDraftProvider) ?? snapshot;
         return _DraftTabLayout(
           sections: [
+            _FeatureCard(child: _IdentitySection(draft: draft)),
+            const SizedBox(height: 12),
             _FeatureCard(child: _NetworkBindSection(draft: draft)),
             const SizedBox(height: 12),
             _FeatureCard(child: _InitialPeersSection(draft: draft)),
@@ -1965,13 +1973,19 @@ class _FeatureCard extends StatelessWidget {
 
 /// "Sharding" section: enable toggle + model dropdown.
 class _ShardingSection extends ConsumerWidget {
-  const _ShardingSection({required this.draft});
+  const _ShardingSection({required this.draft, required this.onDisk});
 
   final ConfigSnapshot draft;
+
+  /// What the file holds, to restore an auto-assigned start block.
+  final ConfigSnapshot onDisk;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(featuresDraftProvider.notifier);
+    final on = draft.shardingEnabled;
+    final pinned = draft.startBlock != null && !draft.startBlockAuto;
+    final autoAt = draft.startBlockAuto ? draft.startBlock : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1996,9 +2010,112 @@ class _ShardingSection extends ConsumerWidget {
           alignment: Alignment.centerLeft,
           child: _ModelPicker(
             current: draft.model,
-            enabled: draft.shardingEnabled,
+            enabled: on,
             onChanged: notifier.setModel,
           ),
+        ),
+        const SizedBox(height: 12),
+        _SettingRow(
+          label: 'Blocks served',
+          enabled: on,
+          child: KwaaiDropdown<int>(
+            // 0 stands for "the daemon's default", which the file spells
+            // as an absent key.
+            value: draft.blocks ?? 0,
+            enabled: on,
+            items: [
+              const KwaaiDropdownItem(
+                value: 0,
+                label: 'Default ($defaultBlocks)',
+              ),
+              for (final n in {...validBlockCounts, ?draft.blocks})
+                KwaaiDropdownItem(value: n, label: '$n'),
+            ],
+            onChanged: (v) => notifier.setBlocks(v == 0 ? null : v),
+          ),
+        ),
+        const SizedBox(height: 8),
+        _NumberSetting(
+          label: 'First block',
+          initial: pinned ? draft.startBlock : null,
+          hint: autoAt != null ? 'Auto ($autoAt)' : 'Automatic',
+          min: 0,
+          max: 1023,
+          enabled: on,
+          onChanged: (v) => v == null
+              ? notifier.clearStartBlock(onDisk)
+              : notifier.setStartBlock(v),
+        ),
+        _Help(
+          'Empty lets the node pick a gap in the model to fill. A number '
+          'pins the range it serves, and the rebalancer never moves a pinned '
+          'range.',
+        ),
+        const SizedBox(height: 8),
+        _SettingRow(
+          label: 'Engine',
+          enabled: on,
+          child: KwaaiDropdown<ShardBackend>(
+            value: draft.shardBackend,
+            enabled: on,
+            items: const [
+              KwaaiDropdownItem(value: ShardBackend.auto, label: 'Automatic'),
+              KwaaiDropdownItem(value: ShardBackend.candle, label: 'Candle'),
+              KwaaiDropdownItem(value: ShardBackend.mlx, label: 'MLX'),
+            ],
+            onChanged: (v) => notifier.setShardBackend(v ?? ShardBackend.auto),
+          ),
+        ),
+        _Help(
+          'Automatic serves blocks with Candle, except on macOS, where the '
+          'node serves whole models through Ollama instead. MLX serves blocks '
+          'on Apple Silicon and needs an MLX build of kwaainet.',
+        ),
+        _SwitchRow(
+          label: 'Use the GPU when one is available',
+          value: draft.useGpu,
+          enabled: on,
+          onChanged: notifier.setUseGpu,
+        ),
+        _SwitchRow(
+          label: 'Move my blocks to fill gaps in coverage',
+          value: draft.autoRebalance,
+          enabled: on && !pinned,
+          onChanged: notifier.setAutoRebalance,
+        ),
+        if (pinned)
+          _Help('Not for a pinned first block: the rebalancer leaves it.'),
+        if (draft.autoRebalance && !pinned) ...[
+          _NumberSetting(
+            label: 'Check coverage every (seconds)',
+            initial: draft.rebalanceIntervalSecs,
+            hint: '$defaultRebalanceIntervalSecs',
+            min: 30,
+            max: 86400,
+            enabled: on,
+            onChanged: notifier.setRebalanceIntervalSecs,
+          ),
+          const SizedBox(height: 8),
+          _NumberSetting(
+            label: 'Other nodes that must cover my blocks before I move',
+            initial: draft.rebalanceMinRedundancy,
+            hint: '$defaultRebalanceMinRedundancy',
+            min: 1,
+            max: 32,
+            enabled: on,
+            onChanged: notifier.setRebalanceMinRedundancy,
+          ),
+          const SizedBox(height: 4),
+        ],
+        _SwitchRow(
+          label: 'Pass other nodes\' forward-chain steps onward',
+          value: draft.forwardChainServe,
+          enabled: on,
+          onChanged: notifier.setForwardChainServe,
+        ),
+        _Help(
+          'Off, a run that reaches this node as part of a chain falls back to '
+          'returning each step to its originator.',
         ),
       ],
     );
@@ -2044,6 +2161,38 @@ class _StorageSection extends ConsumerWidget {
               onChanged: notifier.setStorageCapacityGb,
             ),
           ),
+        ),
+        if (draft.storageDataDir != null) ...[
+          const SizedBox(height: 12),
+          _DataDirField(
+            initial: draft.storageDataDir!,
+            enabled: draft.storageEnabled,
+            onChanged: notifier.setStorageDataDir,
+          ),
+        ],
+        const SizedBox(height: 12),
+        _SwitchRow(
+          label: 'Advertise my VPK service on the network',
+          value: draft.vpkEnabled,
+          onChanged: notifier.setVpkEnabled,
+        ),
+        _SettingRow(
+          label: 'VPK role',
+          child: KwaaiDropdown<String>(
+            // '' stands for "no role chosen", an absent vpk_mode.
+            value: draft.vpkMode?.name ?? '',
+            items: const [
+              KwaaiDropdownItem(value: '', label: 'Not set'),
+              KwaaiDropdownItem(value: 'eve', label: 'Eve'),
+              KwaaiDropdownItem(value: 'bob', label: 'Bob'),
+              KwaaiDropdownItem(value: 'both', label: 'Both'),
+            ],
+            onChanged: (v) => notifier.setVpkMode(VpkMode.fromYaml(v)),
+          ),
+        ),
+        _Help(
+          'An Eve stores vectors for other nodes; a Bob only queries them. '
+          'The node advertises its role only while its VPK service answers.',
         ),
       ],
     );
@@ -2754,6 +2903,406 @@ class _AboutTab extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A label with its control on the right, muted when [enabled] is false.
+class _SettingRow extends StatelessWidget {
+  const _SettingRow({
+    required this.label,
+    required this.child,
+    this.enabled = true,
+  });
+
+  final String label;
+  final Widget child;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: enabled
+                    ? cs.onSurface
+                    : cs.onSurface.withValues(alpha: 0.38),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+/// Small explanatory text under a setting.
+class _Help extends StatelessWidget {
+  const _Help(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 8),
+      child: Text(
+        text,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+/// A labelled whole-number field. Empty means the default shown as [hint];
+/// anything out of range shows an error and is not passed on.
+class _NumberSetting extends StatefulWidget {
+  const _NumberSetting({
+    required this.label,
+    required this.initial,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+    this.hint,
+    this.enabled = true,
+  });
+
+  final String label;
+  final int? initial;
+  final int min;
+  final int max;
+  final ValueChanged<int?> onChanged;
+  final String? hint;
+  final bool enabled;
+
+  @override
+  State<_NumberSetting> createState() => _NumberSettingState();
+}
+
+class _NumberSettingState extends State<_NumberSetting> {
+  late final _controller = TextEditingController(
+    text: widget.initial?.toString() ?? '',
+  );
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _commit(String raw) {
+    final parsed = parseBoundedInt(raw, min: widget.min, max: widget.max);
+    setState(() => _error = parsed.error);
+    if (parsed.error == null) widget.onChanged(parsed.value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SettingRow(
+          label: widget.label,
+          enabled: widget.enabled,
+          child: SizedBox(
+            width: 110,
+            child: KwaaiTextField(
+              controller: _controller,
+              hintText: widget.hint,
+              enabled: widget.enabled,
+              onChanged: _commit,
+              onSubmitted: _commit,
+            ),
+          ),
+        ),
+        if (_error != null)
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              _error!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// `storage.data_dir`, shown only once storage has been initialised.
+class _DataDirField extends StatefulWidget {
+  const _DataDirField({
+    required this.initial,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String initial;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_DataDirField> createState() => _DataDirFieldState();
+}
+
+class _DataDirFieldState extends State<_DataDirField> {
+  late final _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Data directory',
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 4),
+        KwaaiTextField(
+          controller: _controller,
+          enabled: widget.enabled,
+          // An empty path is never written; the store keeps its directory.
+          onChanged: (v) {
+            if (v.trim().isNotEmpty) widget.onChanged(v.trim());
+          },
+        ),
+        const _Help(
+          'Stored vectors are not moved: a new directory starts empty.',
+        ),
+      ],
+    );
+  }
+}
+
+/// `public_name`: how peers and the network map refer to this node.
+class _IdentitySection extends ConsumerStatefulWidget {
+  const _IdentitySection({required this.draft});
+
+  final ConfigSnapshot draft;
+
+  @override
+  ConsumerState<_IdentitySection> createState() => _IdentitySectionState();
+}
+
+class _IdentitySectionState extends ConsumerState<_IdentitySection> {
+  late final _controller = TextEditingController(text: widget.draft.publicName);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notifier = ref.read(featuresDraftProvider.notifier);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const KwaaiHeading('Identity'),
+        const SizedBox(height: 4),
+        _SettingRow(
+          label: 'Public name',
+          child: SizedBox(
+            width: 220,
+            child: KwaaiTextField(
+              controller: _controller,
+              hintText: 'None',
+              onChanged: (v) => notifier.setPublicName(v.trim()),
+            ),
+          ),
+        ),
+        const _Help(
+          'Shown to other peers and on the network map. Leave it empty to '
+          'stay unnamed.',
+        ),
+      ],
+    );
+  }
+}
+
+/// How this app's Chat asks for answers. Nothing here needs a restart: the
+/// node reads its config keys on every run, and the rest is sent with each
+/// message.
+class _ChatTab extends ConsumerStatefulWidget {
+  const _ChatTab({required this.settings});
+
+  final Settings settings;
+
+  @override
+  ConsumerState<_ChatTab> createState() => _ChatTabState();
+}
+
+class _ChatTabState extends ConsumerState<_ChatTab> {
+  late final _systemPrompt = TextEditingController(
+    text: ref.read(systemPromptProvider),
+  );
+
+  /// The Chat config as last edited here; null until the file has loaded.
+  ChatConfig? _chat;
+  Timer? _saveTimer;
+
+  @override
+  void dispose() {
+    // Leaving the tab mid-pause must not drop the edit.
+    if (_saveTimer?.isActive ?? false) {
+      _saveTimer!.cancel();
+      unawaited(_flush());
+    }
+    _systemPrompt.dispose();
+    super.dispose();
+  }
+
+  /// Save [chat] after a short pause, so typing "512" writes the file once.
+  void _save(ChatConfig chat) {
+    setState(() => _chat = chat);
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 500), _flush);
+  }
+
+  Future<void> _flush() async {
+    final chat = _chat;
+    if (chat == null) return;
+    try {
+      await ConfigFile.saveChat(chat);
+    } catch (e) {
+      ref.read(daemonErrorProvider.notifier).set('Could not save config: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loaded = ref.watch(chatConfigProvider);
+    return loaded.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text('Failed to load config: $e'),
+      ),
+      data: (onDisk) {
+        final chat = _chat ??= onDisk;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _FeatureCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const KwaaiHeading('Answers'),
+                    const SizedBox(height: 4),
+                    _NumberSetting(
+                      label: 'Max response tokens',
+                      initial: chat.maxTokens,
+                      hint: '$defaultMaxTokens',
+                      min: 1,
+                      max: maxTokensCeiling,
+                      onChanged: (v) => _save(
+                        ChatConfig(
+                          maxTokens: v,
+                          forwardChainOriginate: chat.forwardChainOriginate,
+                        ),
+                      ),
+                    ),
+                    const _Help(
+                      'The longest an answer may run. Empty uses the '
+                      'node\'s default.',
+                    ),
+                    _NumberSetting(
+                      label: 'Earlier exchanges sent as context',
+                      initial: ref.read(contextExchangesProvider),
+                      hint: '$defaultContextExchanges',
+                      min: 0,
+                      max: maxContextExchanges,
+                      onChanged: (v) async {
+                        final n = v ?? defaultContextExchanges;
+                        await widget.settings.setContextExchanges(n);
+                        ref.read(contextExchangesProvider.notifier).state = n;
+                      },
+                    ),
+                    const _Help(
+                      'Question-and-answer pairs resent with each message so '
+                      'the model can follow the conversation. 0 sends each '
+                      'message on its own.',
+                    ),
+                    Text(
+                      'System prompt',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    KwaaiTextField(
+                      controller: _systemPrompt,
+                      hintText: 'e.g. Answer briefly.',
+                      maxLines: 4,
+                      onChanged: (v) async {
+                        await widget.settings.setSystemPrompt(v);
+                        ref.read(systemPromptProvider.notifier).state = v;
+                      },
+                    ),
+                    const _Help(
+                      'Instructions sent ahead of every conversation.',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _FeatureCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const KwaaiHeading('Routing'),
+                    const SizedBox(height: 4),
+                    _SwitchRow(
+                      label: 'Send my messages along a forward chain',
+                      value: chat.forwardChainOriginate,
+                      onChanged: (v) => _save(
+                        ChatConfig(
+                          maxTokens: chat.maxTokens,
+                          forwardChainOriginate: v,
+                        ),
+                      ),
+                    ),
+                    const _Help(
+                      'Each step passes from peer to peer and only the last '
+                      'returns here, instead of every peer answering this '
+                      'node. A chain a peer refuses falls back to that.',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const _Help(
+                'Saved as you change them and used from the next message — '
+                'no restart needed.',
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

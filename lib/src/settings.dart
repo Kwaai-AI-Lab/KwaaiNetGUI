@@ -48,6 +48,10 @@ class Settings {
   static const _ragKey = 'experimental.ragEnabled';
   static const _skippedVersionKey = 'app.skippedVersion';
   static const _autoDownloadKey = 'app.autoDownloadUpdates';
+  static const _systemPromptKey = 'chat.systemPrompt';
+  static const _contextExchangesKey = 'chat.contextExchanges';
+  static const _ragTopKKey = 'rag.topK';
+  static const _ragMinScoreKey = 'rag.minScore';
 
   final SharedPreferences _prefs;
 
@@ -117,6 +121,19 @@ class Settings {
   /// fetched until they click Update. Defaults to true.
   bool get autoDownloadUpdates => _prefs.getBool(_autoDownloadKey) ?? true;
 
+  /// Instructions sent ahead of every Chat conversation. Empty = none.
+  String get systemPrompt => _prefs.getString(_systemPromptKey) ?? '';
+
+  /// Earlier question-and-answer pairs Chat resends as context.
+  int get contextExchanges =>
+      _prefs.getInt(_contextExchangesKey) ?? defaultContextExchanges;
+
+  /// Chunks a RAG query asks for. Null = the node's default (20).
+  int? get ragTopK => _prefs.getInt(_ragTopKKey);
+
+  /// Lowest score a RAG chunk may have. 0 keeps everything.
+  double get ragMinScore => _prefs.getDouble(_ragMinScoreKey) ?? 0;
+
   Future<void> setMode(DaemonMode m) async {
     await _prefs.setString(_modeKey, _serialize(m));
   }
@@ -151,6 +168,26 @@ class Settings {
 
   Future<void> setAutoDownloadUpdates(bool v) async {
     await _prefs.setBool(_autoDownloadKey, v);
+  }
+
+  Future<void> setSystemPrompt(String v) async {
+    await _prefs.setString(_systemPromptKey, v);
+  }
+
+  Future<void> setContextExchanges(int v) async {
+    await _prefs.setInt(_contextExchangesKey, v);
+  }
+
+  Future<void> setRagTopK(int? v) async {
+    if (v == null) {
+      await _prefs.remove(_ragTopKKey);
+    } else {
+      await _prefs.setInt(_ragTopKKey, v);
+    }
+  }
+
+  Future<void> setRagMinScore(double v) async {
+    await _prefs.setDouble(_ragMinScoreKey, v);
   }
 
   Future<void> setSkippedVersion(String? v) async {
@@ -207,3 +244,54 @@ final skippedVersionProvider = StateProvider<String?>((_) => null);
 /// start downloading on its own. Seeded by main.dart at startup; the Settings
 /// UI writes through to both.
 final autoDownloadUpdatesProvider = StateProvider<bool>((_) => true);
+
+/// Earlier exchanges Chat resends by default — 20 messages, as
+/// `kwaainet rag chat` keeps.
+const defaultContextExchanges = 10;
+
+/// Most exchanges the context setting accepts.
+const maxContextExchanges = 50;
+
+/// Riverpod-visible mirrors of the Chat and RAG preferences, read on each
+/// send or query. Seeded by main.dart; the Settings UI writes through.
+final systemPromptProvider = StateProvider<String>((_) => '');
+final contextExchangesProvider = StateProvider<int>(
+  (_) => defaultContextExchanges,
+);
+final ragTopKProvider = StateProvider<int?>((_) => null);
+final ragMinScoreProvider = StateProvider<double>((_) => 0);
+
+/// A whole number in [min, max], or null for empty when [allowEmpty]; else
+/// the error to show beside the field.
+({int? value, String? error}) parseBoundedInt(
+  String raw, {
+  required int min,
+  required int max,
+  bool allowEmpty = true,
+}) {
+  final t = raw.trim();
+  if (t.isEmpty) {
+    return allowEmpty
+        ? (value: null, error: null)
+        : (value: null, error: 'Required.');
+  }
+  final n = int.tryParse(t);
+  if (n == null || n < min || n > max) {
+    return (value: null, error: 'Must be a whole number from $min to $max.');
+  }
+  return (value: n, error: null);
+}
+
+/// Most chunks a RAG query may ask for.
+const maxRagTopK = 200;
+
+/// Parse the minimum-score field: empty is 0 (keep everything).
+({double value, String? error}) parseMinScore(String raw) {
+  final t = raw.trim();
+  if (t.isEmpty) return (value: 0, error: null);
+  final v = double.tryParse(t);
+  if (v == null || v < 0 || !v.isFinite) {
+    return (value: 0, error: 'Must be a number, 0 or more.');
+  }
+  return (value: v, error: null);
+}
