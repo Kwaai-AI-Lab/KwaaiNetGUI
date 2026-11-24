@@ -992,7 +992,7 @@ class _QuerySectionState extends ConsumerState<_QuerySection> {
             text: text,
             kb: widget.kb.name,
             topK: ref.read(ragTopKProvider) ?? 0,
-            minScore: ref.read(ragMinScoreProvider),
+            minScore: ref.read(ragMinScoreProvider) ?? 0,
           );
       if (!mounted) return;
       setState(() => _results = reply.chunks);
@@ -1222,12 +1222,10 @@ class _RetrievalDialogState extends ConsumerState<_RetrievalDialog> {
     text: ref.read(ragTopKProvider)?.toString() ?? '',
   );
   late final _minScore = TextEditingController(
-    text: _formatScore(ref.read(ragMinScoreProvider)),
+    text: ref.read(ragMinScoreProvider)?.toString() ?? '',
   );
   String? _topKError;
   String? _minScoreError;
-
-  static String _formatScore(double v) => v == 0 ? '' : '$v';
 
   @override
   void dispose() {
@@ -1297,7 +1295,7 @@ class _RetrievalDialogState extends ConsumerState<_RetrievalDialog> {
             _field(
               label: 'Chunks returned',
               controller: _topK,
-              hint: 'Default (20)',
+              hint: '20',
               onChanged: _commitTopK,
               error: _topKError,
             ),
@@ -1305,7 +1303,7 @@ class _RetrievalDialogState extends ConsumerState<_RetrievalDialog> {
             _field(
               label: 'Minimum score',
               controller: _minScore,
-              hint: '0 keeps everything',
+              hint: '0',
               onChanged: _commitMinScore,
               error: _minScoreError,
             ),

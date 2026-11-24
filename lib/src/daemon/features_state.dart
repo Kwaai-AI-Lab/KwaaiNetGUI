@@ -64,32 +64,33 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
     }
   }
 
+  // Every setter takes null to clear its key, so the daemon's default applies.
   void _update(ConfigSnapshot Function(ConfigSnapshot) change) {
     final s = state;
     if (s != null) state = change(s);
   }
 
-  void setModel(String v) => _update((s) => s.copyWith(model: v));
-  void setShardingEnabled(bool v) =>
+  void setModel(String? v) => _update((s) => s.copyWith(model: v));
+  void setShardingEnabled(bool? v) =>
       _update((s) => s.copyWith(shardingEnabled: v));
-  void setStorageEnabled(bool v) =>
+  void setStorageEnabled(bool? v) =>
       _update((s) => s.copyWith(storageEnabled: v));
   void setStorageCapacityGb(double? v) =>
       _update((s) => s.copyWith(storageCapacityGb: v));
   void setPort(int? v) => _update((s) => s.copyWith(port: v));
-  void setPublicIp(String v) => _update((s) => s.copyWith(publicIp: v));
-  void setInitialPeers(List<String> v) =>
+  void setPublicIp(String? v) => _update((s) => s.copyWith(publicIp: v));
+  void setInitialPeers(List<String>? v) =>
       _update((s) => s.copyWith(initialPeers: v));
-  void setForcePrivate(bool v) => _update((s) => s.copyWith(forcePrivate: v));
-  void setEnableUpnp(bool v) => _update((s) => s.copyWith(enableUpnp: v));
-  void setEnableQuic(bool v) => _update((s) => s.copyWith(enableQuic: v));
-  void setIpv6(Ipv6Mode v) => _update((s) => s.copyWith(ipv6: v));
+  void setForcePrivate(bool? v) => _update((s) => s.copyWith(forcePrivate: v));
+  void setEnableUpnp(bool? v) => _update((s) => s.copyWith(enableUpnp: v));
+  void setEnableQuic(bool? v) => _update((s) => s.copyWith(enableQuic: v));
+  void setIpv6(Ipv6Mode? v) => _update((s) => s.copyWith(ipv6: v));
 
-  /// Null clears the key so the daemon's own default applies.
   void setMaxConnections(int? v) =>
       _update((s) => s.copyWith(maxConnections: v));
-  void setHealthEnabled(bool v) => _update((s) => s.copyWith(healthEnabled: v));
-  void setHealthEndpoint(String v) =>
+  void setHealthEnabled(bool? v) =>
+      _update((s) => s.copyWith(healthEnabled: v));
+  void setHealthEndpoint(String? v) =>
       _update((s) => s.copyWith(healthEndpoint: v));
   void setBlocks(int? v) => _update((s) => s.copyWith(blocks: v));
 
@@ -104,18 +105,19 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
         ? s.copyWith(startBlock: onDisk.startBlock, startBlockAuto: true)
         : s.copyWith(startBlock: null, startBlockAuto: false),
   );
-  void setUseGpu(bool v) => _update((s) => s.copyWith(useGpu: v));
-  void setShardBackend(ShardBackend v) =>
+  void setUseGpu(bool? v) => _update((s) => s.copyWith(useGpu: v));
+  void setShardBackend(ShardBackend? v) =>
       _update((s) => s.copyWith(shardBackend: v));
-  void setAutoRebalance(bool v) => _update((s) => s.copyWith(autoRebalance: v));
+  void setAutoRebalance(bool? v) =>
+      _update((s) => s.copyWith(autoRebalance: v));
   void setRebalanceIntervalSecs(int? v) =>
       _update((s) => s.copyWith(rebalanceIntervalSecs: v));
   void setRebalanceMinRedundancy(int? v) =>
       _update((s) => s.copyWith(rebalanceMinRedundancy: v));
-  void setForwardChainServe(bool v) =>
+  void setForwardChainServe(bool? v) =>
       _update((s) => s.copyWith(forwardChainServe: v));
-  void setPublicName(String v) => _update((s) => s.copyWith(publicName: v));
-  void setVpkEnabled(bool v) => _update((s) => s.copyWith(vpkEnabled: v));
+  void setPublicName(String? v) => _update((s) => s.copyWith(publicName: v));
+  void setVpkEnabled(bool? v) => _update((s) => s.copyWith(vpkEnabled: v));
   void setVpkMode(VpkMode? v) => _update((s) => s.copyWith(vpkMode: v));
   void setStorageDataDir(String? v) =>
       _update((s) => s.copyWith(storageDataDir: v));
@@ -153,7 +155,8 @@ class FeaturesDraftNotifier extends Notifier<ConfigSnapshot?> {
         s.storageDataDir != onDisk.storageDataDir;
   }
 
-  static bool _listsEqual(List<String> a, List<String> b) {
+  static bool _listsEqual(List<String>? a, List<String>? b) {
+    if (a == null || b == null) return a == b;
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
       if (a[i] != b[i]) return false;

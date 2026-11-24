@@ -16,8 +16,39 @@ ConfigSnapshot _read(String yaml) =>
 
 void main() {
   test('an absent contribute.shards reads as off, as the daemon treats it', () {
-    expect(_read('model: m\n').shardingEnabled, isFalse);
+    expect(_read('model: m\n').shardingEnabled, isNull);
+    expect(_read('model: m\n').shardingEnabledEffective, isFalse);
     expect(_read('contribute:\n  shards: true\n').shardingEnabled, isTrue);
+  });
+
+  test('an absent key reads as unset, a present one as set', () {
+    final unset = _read('model: m\n');
+    final set = _read(
+      'use_gpu: true\nenable_upnp: true\nipv6: auto\n'
+      'shard:\n  backend: auto\n',
+    );
+    expect(unset.useGpu, isNull);
+    expect(unset.enableUpnp, isNull);
+    expect(unset.ipv6, isNull);
+    expect(unset.shardBackend, isNull);
+    expect(set.useGpu, isTrue, reason: 'a default the file spells out is set');
+    expect(set.enableUpnp, isTrue);
+    expect(set.ipv6, Ipv6Mode.auto);
+    expect(set.shardBackend, ShardBackend.auto);
+  });
+
+  test('a value equal to the default is still written', () {
+    final doc = _write(
+      'model: m\n',
+      _read('model: m\n').copyWith(useGpu: true, ipv6: Ipv6Mode.auto),
+    );
+    expect(doc['use_gpu'], isTrue);
+    expect(doc['ipv6'], 'auto');
+  });
+
+  test('an edit leaves unset keys out of the file', () {
+    final doc = _write('model: m\n', _read('model: m\n').copyWith(port: 9));
+    expect(doc.keys.toSet(), {'model', 'port'});
   });
 
   test('serving keys round-trip', () {
@@ -46,40 +77,37 @@ void main() {
     expect(back.vpkMode, VpkMode.eve);
   });
 
-  test(
-    'defaults are left out of the file, and set back to default removes',
-    () {
-      const set =
-          'model: m\nblocks: 16\nuse_gpu: false\n'
-          'shard:\n  backend: mlx\n  forward_chain:\n    serve: false\n'
-          'auto_rebalance: true\npublic_name: n\nvpk_enabled: true\n'
-          'vpk_mode: bob\n';
-      final reset = _read(set).copyWith(
-        blocks: null,
-        useGpu: true,
-        shardBackend: ShardBackend.auto,
-        forwardChainServe: true,
-        autoRebalance: false,
-        publicName: '',
-        vpkEnabled: false,
-        vpkMode: null,
-      );
-      final doc = _write(set, reset);
-      for (final key in [
-        'blocks',
-        'use_gpu',
-        'auto_rebalance',
-        'public_name',
-        'vpk_enabled',
-        'vpk_mode',
-      ]) {
-        expect(doc.containsKey(key), isFalse, reason: key);
-      }
-      final shard = doc['shard'] as YamlMap;
-      expect(shard.containsKey('backend'), isFalse);
-      expect((shard['forward_chain'] as YamlMap).containsKey('serve'), isFalse);
-    },
-  );
+  test('clearing a key removes it', () {
+    const set =
+        'model: m\nblocks: 16\nuse_gpu: false\n'
+        'shard:\n  backend: mlx\n  forward_chain:\n    serve: false\n'
+        'auto_rebalance: true\npublic_name: n\nvpk_enabled: true\n'
+        'vpk_mode: bob\n';
+    final reset = _read(set).copyWith(
+      blocks: null,
+      useGpu: null,
+      shardBackend: null,
+      forwardChainServe: null,
+      autoRebalance: null,
+      publicName: '',
+      vpkEnabled: null,
+      vpkMode: null,
+    );
+    final doc = _write(set, reset);
+    for (final key in [
+      'blocks',
+      'use_gpu',
+      'auto_rebalance',
+      'public_name',
+      'vpk_enabled',
+      'vpk_mode',
+    ]) {
+      expect(doc.containsKey(key), isFalse, reason: key);
+    }
+    final shard = doc['shard'] as YamlMap;
+    expect(shard.containsKey('backend'), isFalse);
+    expect((shard['forward_chain'] as YamlMap).containsKey('serve'), isFalse);
+  });
 
   group('start_block', () {
     test('an auto-assigned range is written back as auto', () {
@@ -131,7 +159,7 @@ void main() {
   });
 
   group('chat keys', () {
-    test('round-trip and are left out at their defaults', () {
+    test('round-trip, and clearing removes them', () {
       final editor = YamlEditor('model: m\n');
       ConfigFile.applyChat(
         editor,
@@ -145,7 +173,7 @@ void main() {
       final doc = loadYaml(editor.toString()) as YamlMap;
       chat = ConfigFile.parseChat(doc);
       expect(chat.maxTokens, isNull);
-      expect(chat.forwardChainOriginate, isFalse);
+      expect(chat.forwardChainOriginate, isNull);
       expect((doc['shard'] as YamlMap).containsKey('max_tokens'), isFalse);
       expect(doc['model'], 'm', reason: 'other keys are untouched');
     });

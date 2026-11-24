@@ -125,14 +125,17 @@ class Settings {
   String get systemPrompt => _prefs.getString(_systemPromptKey) ?? '';
 
   /// Earlier question-and-answer pairs Chat resends as context.
-  int get contextExchanges =>
-      _prefs.getInt(_contextExchangesKey) ?? defaultContextExchanges;
+  int get contextExchanges => contextExchangesSet ?? defaultContextExchanges;
+
+  /// The saved value, or null when the default applies.
+  int? get contextExchangesSet => _prefs.getInt(_contextExchangesKey);
 
   /// Chunks a RAG query asks for. Null = the node's default (20).
   int? get ragTopK => _prefs.getInt(_ragTopKKey);
 
   /// Lowest score a RAG chunk may have. 0 keeps everything.
-  double get ragMinScore => _prefs.getDouble(_ragMinScoreKey) ?? 0;
+  /// Null = unset, which keeps everything.
+  double? get ragMinScore => _prefs.getDouble(_ragMinScoreKey);
 
   Future<void> setMode(DaemonMode m) async {
     await _prefs.setString(_modeKey, _serialize(m));
@@ -174,8 +177,12 @@ class Settings {
     await _prefs.setString(_systemPromptKey, v);
   }
 
-  Future<void> setContextExchanges(int v) async {
-    await _prefs.setInt(_contextExchangesKey, v);
+  Future<void> setContextExchanges(int? v) async {
+    if (v == null) {
+      await _prefs.remove(_contextExchangesKey);
+    } else {
+      await _prefs.setInt(_contextExchangesKey, v);
+    }
   }
 
   Future<void> setRagTopK(int? v) async {
@@ -186,7 +193,11 @@ class Settings {
     }
   }
 
-  Future<void> setRagMinScore(double v) async {
+  Future<void> setRagMinScore(double? v) async {
+    if (v == null) {
+      await _prefs.remove(_ragMinScoreKey);
+      return;
+    }
     await _prefs.setDouble(_ragMinScoreKey, v);
   }
 
@@ -259,7 +270,7 @@ final contextExchangesProvider = StateProvider<int>(
   (_) => defaultContextExchanges,
 );
 final ragTopKProvider = StateProvider<int?>((_) => null);
-final ragMinScoreProvider = StateProvider<double>((_) => 0);
+final ragMinScoreProvider = StateProvider<double?>((_) => null);
 
 /// A whole number in [min, max], or null for empty when [allowEmpty]; else
 /// the error to show beside the field.
@@ -285,13 +296,13 @@ final ragMinScoreProvider = StateProvider<double>((_) => 0);
 /// Most chunks a RAG query may ask for.
 const maxRagTopK = 200;
 
-/// Parse the minimum-score field: empty is 0 (keep everything).
-({double value, String? error}) parseMinScore(String raw) {
+/// Parse the minimum-score field: empty is unset (keep everything).
+({double? value, String? error}) parseMinScore(String raw) {
   final t = raw.trim();
-  if (t.isEmpty) return (value: 0, error: null);
+  if (t.isEmpty) return (value: null, error: null);
   final v = double.tryParse(t);
   if (v == null || v < 0 || !v.isFinite) {
-    return (value: 0, error: 'Must be a number, 0 or more.');
+    return (value: null, error: 'Must be a number, 0 or more.');
   }
   return (value: v, error: null);
 }

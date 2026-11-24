@@ -74,7 +74,8 @@ void main() {
     // runs TCP-only. Defaulting to true here showed QUIC on and wrote
     // `enable_quic: true` on the next Apply.
     test('defaults off, matching the daemon', () {
-      expect(ConfigFile.defaults.enableQuic, isFalse);
+      expect(ConfigFile.defaults.enableQuic, isNull, reason: 'unset');
+      expect(ConfigFile.defaults.enableQuicEffective, isFalse);
     });
   });
 
@@ -113,16 +114,16 @@ void main() {
       expect(Ipv6Mode.fromYaml(42), Ipv6Mode.auto);
     });
 
-    // Null is the signal for ConfigFile.save to remove the key — writing an
-    // explicit null would leave one serde reads as a value, not as absent.
-    test('yamlValue writes bools, and null for auto', () {
+    // A chosen "auto" is written as the daemon spells it; only an unset
+    // snapshot (ipv6 null) removes the key.
+    test('yamlValue writes bools, and auto as a string', () {
       expect(Ipv6Mode.on.yamlValue, isTrue);
       expect(Ipv6Mode.off.yamlValue, isFalse);
-      expect(Ipv6Mode.auto.yamlValue, isNull);
+      expect(Ipv6Mode.auto.yamlValue, 'auto');
     });
 
-    test('defaults to auto', () {
-      expect(ConfigFile.defaults.ipv6, Ipv6Mode.auto);
+    test('is unset when the file has no key', () {
+      expect(ConfigFile.defaults.ipv6, isNull);
     });
   });
 
@@ -131,8 +132,6 @@ void main() {
       expect(_snapshot().maxConnections, isNull);
     });
 
-    // copyWith reads null as "unchanged", so a set value can only be cleared
-    // by rebuilding the snapshot — see FeaturesDraftNotifier.setMaxConnections.
     test('survives an unrelated edit', () {
       final capped = _snapshot(maxConnections: 400);
       expect(capped.copyWith(port: 9000).maxConnections, 400);
