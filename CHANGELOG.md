@@ -4,13 +4,6 @@ All notable changes to KwaaiNet GUI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
-
-### Changed
-- **macOS: Dock icon.** The mark now sits on the cloud blue and fills the
-  squircle. The previous art was the logo on a solid white square, so the
-  Dock showed a white tile. The menu-bar template is unchanged.
-
 ## [0.5.1] - 2026-11-11
 
 Bundles kwaainet **v0.7.3**, as 0.5.0 did.
